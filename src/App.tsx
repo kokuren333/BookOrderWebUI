@@ -21,7 +21,6 @@ export default function App() {
   const [catalogError, setCatalogError] = useState('');
   const [stage, setStage] = useState('');
   useEffect(() => { let live = true; runtimeCatalog(import.meta.env.BASE_URL).then(value => { if (live) setCatalog(value); }).catch(error => { if (live) setCatalogError(error.message); }); return () => { live = false; }; }, []);
-  const input = useRef<HTMLInputElement>(null);
   const errorRef = useRef<HTMLDivElement>(null);
   const names = uniqueNames(files);
   function field<K extends keyof BookForm>(key: K, value: BookForm[K]) { setForm(prev => ({ ...prev, [key]: value })); setSuccess(''); }
@@ -65,7 +64,7 @@ export default function App() {
         <section><div className="section-heading"><span>02</span><h2>資料と追加指示</h2></div>
           <label>Reference URLs<textarea value={form.urls} onChange={e => field('urls', e.target.value)} placeholder="https://example.org/article\n1行に1つのURL" rows={3} /><small>ここではURLを取得しません。資料の調査はAgentが行います。</small></label>
           <div className={`dropzone ${dragging ? 'dragging' : ''}`} onDragOver={e => { e.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={e => { e.preventDefault(); setDragging(false); if (!busy) addFiles(e.dataTransfer.files); }}>
-            <strong>参考資料をここにドロップ</strong><p>PDF / Markdown / DOCX / TXT / CSV / JSON / HTML ほか</p><button type="button" className="secondary" onClick={() => input.current?.click()}>ファイルを選択</button><input ref={input} type="file" multiple hidden onChange={e => { if (e.target.files) addFiles(e.target.files); e.target.value = ''; }} />
+            <strong>参考資料をここにドロップ</strong><p>PDF / Markdown / DOCX / TXT / CSV / JSON / HTML ほか</p><label className="secondary file-picker">ファイルを選択<input type="file" multiple aria-label="参考資料を選択" onChange={e => { if (e.target.files) addFiles(e.target.files); e.target.value = ''; }} /></label>
           </div>
           <div className="attachment-heading"><strong>添付ファイル</strong><span aria-live="polite">{files.length}件 ・ {formatFileSize(files.reduce((total, file) => total + file.size, 0))}</span>{files.length > 0 && <button type="button" className="remove-all" onClick={() => { setFiles([]); setSuccess(''); }}>すべて削除</button>}</div>
           {files.length > 0 ? <ul className="files">{files.map((file, i) => <li key={`${file.name}-${i}`}><span className="file-name"><strong>{file.name}</strong><small>{file.type || 'ファイル'} ・ {formatFileSize(file.size)}{names[i] !== file.name && ` ・ ZIP内：${names[i]}`}</small></span><button type="button" className="remove" aria-label={`${file.name}を削除`} onClick={() => removeFile(i)}>削除</button></li>)}</ul> : <p className="empty-files">まだファイルは添付されていません。</p>}
