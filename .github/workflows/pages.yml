@@ -29,6 +29,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Restore pinned runtime downloads
+        uses: actions/cache@v4
+        with:
+          path: .tools/runtime-cache
+          key: runtime-sources-${{ hashFiles('tools/runtime-lock.json') }}
+          restore-keys: runtime-sources-
       - run: npm ci
       - name: Prepare licensed runtime packs
         run: npm run prepare:runtimes
