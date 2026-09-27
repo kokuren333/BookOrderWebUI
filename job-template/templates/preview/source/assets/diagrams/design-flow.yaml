@@ -1,0 +1,28 @@
+{
+  "type": "flow",
+  "title": "出版の責務分離",
+  "nodes": [
+    {
+      "id": "ir",
+      "label": "Book IR / 意味構造"
+    },
+    {
+      "id": "design",
+      "label": "Design Spec / 意匠"
+    },
+    {
+      "id": "output",
+      "label": "Renderer / 出版"
+    }
+  ],
+  "edges": [
+    {
+      "from": "ir",
+      "to": "design"
+    },
+    {
+      "from": "design",
+      "to": "output"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+topics:
+  - id: topic-origins
+    title: 注意機構の起源
+    synthesis: "固定長ベクトルの限界が長文翻訳で問題となり、出力ごとに入力を重み付けして参照する加法的注意が生まれた。年表資料と基礎資料はこの経緯で一致している。"
+    sources: ["{{src:attention-basics}}", "{{src:history}}"]
+    candidate_chapter: ch-foundations
+  - id: topic-transformer
+    title: 自己注意とTransformer
+    synthesis: "Transformerは再帰を捨て、スケール化内積注意とマルチヘッド注意、位置エンコーディングで系列を並列に処理する。一方で計算量は系列長の二乗に比例し、効率化の研究が続いている。"
+    sources: ["{{src:transformer-architecture}}", "{{src:efficient-attention}}"]
+    candidate_chapter: ch-mechanism
+  - id: topic-scaling
+    title: スケーリングをめぐる議論
+    synthesis: "2020年の研究はパラメータ数優先を、2022年の研究はパラメータとデータの均衡を主張した。両者の違いは学習率スケジュールや比較時点など実験条件の差として説明される。"
+    sources: ["{{src:training-dynamics}}", "{{src:scaling-debate}}"]
+    disputes: ["パラメータ数とデータ量の最適配分"]
+    candidate_chapter: ch-training
+contradictions:
+  - id: contra-allocation
+    description: "計算予算が増えたときにパラメータ数を優先すべきか、データ量と均衡させるべきか。"
+    sources: ["{{src:training-dynamics}}", "{{src:scaling-debate}}"]
+    resolution: "本書では両方の結論と実験条件を併記し、後の研究が条件差を説明した経緯として扱う。"

@@ -1,0 +1,8 @@
+source: "{{id}}"
+relevance: supporting
+reliability: tertiary
+summary: "2014年の加法的注意から、内積注意、2017年のTransformer、事前学習の普及、2020年と2022年のスケーリング研究、効率的な注意に至る注意機構の歴史を年表形式でまとめた資料。"
+key_claims:
+  - text: "2014年に加法的注意、2017年にTransformerが提案された。"
+  - text: "2020年にスケーリング則、2022年に計算最適なスケーリングの再検討が報告された。"
+concepts: [加法的注意, Transformer, 事前学習]

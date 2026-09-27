@@ -1,0 +1,9 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.tools/
+.test-output/
+.screenshots/
+public/runtimes/
+__pycache__/
+*.pyc

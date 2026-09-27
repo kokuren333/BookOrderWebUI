@@ -1,0 +1,29 @@
+concepts:
+  - id: attention
+    term: 注意機構
+    aliases: [attention]
+    definition: "問い合わせに対する各要素の適合度を重みとして、値を加重平均する仕組み。"
+    sources: ["{{src:attention-basics}}", "{{src:history}}"]
+    related: [context-vector]
+  - id: context-vector
+    term: 文脈ベクトル
+    definition: "注意重みで入力表現を加重平均したベクトル。出力ごとに異なる。"
+    sources: ["{{src:attention-basics}}"]
+  - id: self-attention
+    term: 自己注意
+    aliases: [self-attention]
+    definition: "同じ系列の全位置が互いを参照する注意。"
+    sources: ["{{src:transformer-architecture}}"]
+    related: [attention]
+  - id: multi-head
+    term: マルチヘッド注意
+    definition: "複数の射影空間で並列に注意を計算して結合する方式。"
+    sources: ["{{src:transformer-architecture}}"]
+  - id: scaling-law
+    term: スケーリング則
+    definition: "損失が規模・データ量・計算量に対してべき乗則に従うという経験則。"
+    sources: ["{{src:training-dynamics}}", "{{src:scaling-debate}}"]
+  - id: data-contamination
+    term: データ汚染
+    definition: "評価データが学習データに混入し、得点が過大に見える現象。"
+    sources: ["{{src:evaluation}}"]

@@ -1,0 +1,29 @@
+/* Typography: every value comes from tokens.css (Design Spec). */
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{font-family:var(--book-font-body);font-size:var(--book-size-body);font-weight:var(--book-weight-body);line-height:var(--book-line-body);color:var(--book-color-text);font-kerning:normal;font-feature-settings:"palt" 0;text-rendering:optimizeLegibility;hanging-punctuation:allow-end;overflow-wrap:break-word}
+h1,h2,h3,h4,.component-title,.book-title{font-family:var(--book-font-heading);line-height:var(--book-line-heading);font-weight:var(--book-weight-heading);color:var(--book-color-text);text-wrap:balance;letter-spacing:.01em}
+h1{font-size:calc(var(--book-size-heading) * 1.22);margin:0 0 1.2em}
+h2{font-size:calc(var(--book-size-heading) * .78);margin:var(--book-heading-space) 0 .6em}
+h3{font-size:calc(var(--book-size-body) * 1.15);margin:calc(var(--book-heading-space) * .8) 0 .45em;color:var(--book-color-primary)}
+h4{font-size:var(--book-size-body);margin:1.2em 0 .4em}
+.section-number{color:var(--book-color-primary);margin-right:.15em;font-variant-numeric:tabular-nums}
+p{margin:var(--book-paragraph-space) 0}
+:lang(ja) p{text-indent:1em}
+:lang(ja) .book-component p,:lang(ja) li p,:lang(ja) figure p,:lang(ja) .references p,:lang(ja) td p,:lang(ja) .footnotes p{text-indent:0}
+a{color:var(--book-color-primary);text-decoration-thickness:.06em;text-underline-offset:.18em;overflow-wrap:anywhere}
+a.cross-ref,a.citation,.citation a{text-decoration:none;border-bottom:1px dotted color-mix(in srgb,var(--book-color-primary) 55%,transparent)}
+strong{font-weight:700}
+em{font-style:italic}
+:lang(ja) em{font-style:normal;font-weight:600;text-emphasis:none}
+ul,ol{padding-left:1.6em}li+li{margin-top:.3em}li::marker{color:var(--book-color-primary)}
+figcaption{font-family:var(--book-font-caption);font-size:var(--book-size-caption);color:var(--book-color-muted);margin-top:var(--book-caption-gap);font-weight:var(--book-weight-caption);line-height:var(--book-line-caption)}
+.caption-label{color:var(--book-color-primary);font-weight:700;margin-right:.2em}
+.footnotes{font-family:var(--book-font-footnote);font-size:var(--book-size-footnote);font-weight:var(--book-weight-footnote);line-height:var(--book-line-footnote);color:var(--book-color-muted)}
+.footnotes hr{width:20%;margin-left:0;border:0;border-top:1px solid var(--book-color-secondary)}
+.lead{font-size:1.08em;line-height:1.9;color:color-mix(in srgb,var(--book-color-text) 88%,var(--book-color-muted))}
+.glossary-term{font-weight:700}
+.book-title{letter-spacing:.02em}
+.references{font-size:.92em;line-height:1.6}.references .csl-entry{padding-left:2em;text-indent:-2em;margin:.35em 0}
+.csl-left-margin{display:inline-block;min-width:2em;text-indent:0;color:var(--book-color-muted)}.csl-right-inline{display:inline}
+math[display="block"]{margin:0;overflow-x:auto;overflow-y:hidden;max-width:100%}
+@media screen{body{font-size:max(16.5px,calc(var(--book-size-body) * 1.4))}figcaption,caption,.footnotes{font-size:max(13px,calc(var(--book-size-caption) * 1.4))}h2{font-size:max(1.4em,calc(var(--book-size-heading) * .78))}h3{font-size:max(1.08em,calc(var(--book-size-body) * 1.15))}}

@@ -1,0 +1,123 @@
+{
+  "theme": "business-reference",
+  "pdf_backend": "typst",
+  "art_direction": "",
+  "page": {
+    "size": "B5",
+    "orientation": "portrait",
+    "margin": {
+      "top": "18mm",
+      "bottom": "20mm",
+      "inner": "20mm",
+      "outer": "17mm"
+    }
+  },
+  "typography": {
+    "body": {
+      "japanese": "Noto Sans JP",
+      "latin": "Inter",
+      "size": "9pt",
+      "weight": 400,
+      "line_height": 1.8,
+      "fallback": [
+        "Noto Sans JP",
+        "Noto Sans CJK JP",
+        "Yu Gothic",
+        "Hiragino Sans",
+        "Inter",
+        "Arial",
+        "Noto Serif CJK JP"
+      ]
+    },
+    "heading": {
+      "japanese": "Noto Sans JP",
+      "latin": "Inter",
+      "size": "19pt",
+      "weight": 700,
+      "line_height": 1.3,
+      "fallback": [
+        "Noto Sans JP",
+        "Noto Sans CJK JP",
+        "Yu Gothic",
+        "Hiragino Sans",
+        "Inter",
+        "Arial",
+        "Noto Serif CJK JP"
+      ]
+    },
+    "code": {
+      "japanese": "Noto Sans JP",
+      "latin": "JetBrains Mono",
+      "size": "8.3pt",
+      "weight": 400,
+      "line_height": 1.5,
+      "fallback": [
+        "JetBrains Mono",
+        "DejaVu Sans Mono",
+        "Courier New",
+        "Noto Sans JP",
+        "Noto Serif CJK JP"
+      ]
+    },
+    "caption": {
+      "japanese": "Noto Sans JP",
+      "latin": "Inter",
+      "size": "7.8pt",
+      "weight": 400,
+      "line_height": 1.45,
+      "fallback": [
+        "Noto Sans JP",
+        "Noto Sans CJK JP",
+        "Yu Gothic",
+        "Hiragino Sans",
+        "Inter",
+        "Arial",
+        "Noto Serif CJK JP"
+      ]
+    },
+    "footnote": {
+      "japanese": "Noto Serif CJK JP",
+      "latin": "Source Serif 4",
+      "size": "7.3pt",
+      "weight": 400,
+      "line_height": 1.45,
+      "fallback": [
+        "Noto Serif CJK JP",
+        "Noto Serif JP",
+        "Yu Mincho",
+        "Hiragino Mincho ProN",
+        "Source Serif 4",
+        "Libertinus Serif",
+        "Times New Roman"
+      ]
+    }
+  },
+  "colors": {
+    "text": "#1C2230",
+    "muted": "#667085",
+    "primary": "#1E3A5F",
+    "secondary": "#DCE3EC",
+    "accent": "#C2410C",
+    "surface": "#F3F5F8"
+  },
+  "layout": {
+    "density": "compact",
+    "paragraph_spacing": "medium",
+    "heading_spacing": "standard"
+  },
+  "components": {
+    "chapter_opener": "editorial",
+    "callout": "card",
+    "definition": "boxed",
+    "warning": "accent-border",
+    "summary": "shaded",
+    "table": "striped",
+    "code_block": "technical",
+    "figure_caption": "compact"
+  },
+  "figures": {
+    "style": "technical",
+    "line_weight": "thin",
+    "labeling": "numbered"
+  }
+}

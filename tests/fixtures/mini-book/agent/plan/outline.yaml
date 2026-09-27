@@ -1,0 +1,90 @@
+chapters:
+  - id: ch-foundations
+    title: 注意機構の誕生
+    file: source/manuscript/01-foundations.md
+    part: 第I部 原理
+    purpose: "固定長ベクトルの限界と、それを解消した注意機構の基本的な考え方を説明する。"
+    prerequisites: []
+    introduces: [attention, context-vector]
+    develops: []
+    assumes: []
+    hands_off_to: [ch-mechanism]
+    target_characters: 1000
+    required_sections:
+      - {id: sec-foundations-bottleneck, title: 固定長ベクトルの限界}
+      - {id: sec-foundations-idea, title: 注意機構の考え方}
+    required_topics: [固定長ベクトル, 文脈ベクトル, ソフトマックス]
+    sources:
+      primary: ["{{src:attention-basics}}"]
+      supporting: ["{{src:history}}"]
+    required_references: ["{{src:attention-basics}}"]
+    expected_assets: []
+    must_not_repeat: []
+    handoff: "query・key・valueの抽象化を次章に渡す"
+  - id: ch-mechanism
+    title: 自己注意とTransformer
+    file: source/manuscript/02-mechanism.md
+    part: 第I部 原理
+    purpose: "スケール化内積注意、マルチヘッド注意、位置エンコーディングと計算量を説明する。"
+    prerequisites: [ch-foundations]
+    introduces: [self-attention, multi-head]
+    develops: [attention]
+    assumes: [context-vector]
+    hands_off_to: [ch-training]
+    target_characters: 1400
+    required_sections:
+      - {id: sec-mechanism-scaled, title: スケール化内積注意}
+      - {id: sec-mechanism-multihead, title: マルチヘッド注意と位置}
+      - {id: sec-mechanism-cost, title: 計算量と効率化}
+    required_topics: [スケール化内積注意, マルチヘッド注意, 位置エンコーディング, 計算量]
+    sources:
+      primary: ["{{src:transformer-architecture}}"]
+      supporting: ["{{src:efficient-attention}}", "{{src:history}}"]
+    required_references: ["{{src:transformer-architecture}}", "{{src:efficient-attention}}"]
+    expected_assets: [eq-attention, fig-attention-flow, tbl-attention-variants]
+    must_not_repeat: [固定長ベクトルの限界の説明]
+    handoff: "Transformerを大規模に学習する話題へ"
+  - id: ch-training
+    title: 学習とスケーリング
+    file: source/manuscript/03-training.md
+    part: 第II部 学習と評価
+    purpose: "学習手順とスケーリング則、および結論が修正された経緯を実験条件とともに説明する。"
+    prerequisites: [ch-mechanism]
+    introduces: [scaling-law]
+    develops: []
+    assumes: [self-attention]
+    hands_off_to: [ch-evaluation]
+    target_characters: 1000
+    required_sections:
+      - {id: sec-training-procedure, title: 学習の手順}
+      - {id: sec-training-scaling, title: スケーリング則とその修正}
+    required_topics: [ウォームアップ, スケーリング則, 計算最適]
+    sources:
+      primary: ["{{src:training-dynamics}}", "{{src:scaling-debate}}"]
+      supporting: ["{{src:history}}"]
+    required_references: ["{{src:training-dynamics}}", "{{src:scaling-debate}}"]
+    expected_assets: []
+    must_not_repeat: []
+    handoff: "学習したモデルをどう評価するかへ"
+  - id: ch-evaluation
+    title: 評価と限界
+    file: source/manuscript/04-evaluation.md
+    part: 第II部 学習と評価
+    purpose: "パープレキシティと下流タスク評価の違い、データ汚染、多面的評価の必要性を説明し、本書をまとめる。"
+    prerequisites: [ch-training]
+    introduces: [data-contamination]
+    develops: [scaling-law]
+    assumes: []
+    hands_off_to: []
+    target_characters: 900
+    required_sections:
+      - {id: sec-evaluation-metrics, title: 評価指標}
+      - {id: sec-evaluation-conclusion, title: 本書のまとめ}
+    required_topics: [パープレキシティ, データ汚染]
+    sources:
+      primary: ["{{src:evaluation}}"]
+      supporting: ["{{src:scaling-debate}}"]
+    required_references: ["{{src:evaluation}}"]
+    expected_assets: []
+    must_not_repeat: []
+    handoff: "読者自身の評価へ"

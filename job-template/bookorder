@@ -1,0 +1,9 @@
+#!/bin/sh
+set -eu
+JOB_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+if [ -f "$JOB_DIR/runtime/manifest.json" ]; then
+  if [ ! -x "$JOB_DIR/runtime/python/bin/python3" ]; then sh "$JOB_DIR/run.sh" check; fi
+  export PYTHONIOENCODING=utf-8 PYTHONDONTWRITEBYTECODE=1
+  exec "$JOB_DIR/runtime/python/bin/python3" "$JOB_DIR/scripts/cli.py" "$@"
+fi
+exec python3 "$JOB_DIR/scripts/cli.py" "$@"

@@ -1,0 +1,17 @@
+source: "{{id}}"
+relevance: core
+reliability: secondary
+summary: "固定長ベクトルによる情報のボトルネックを解消するため、デコーダが入力の各位置を重み付けして参照する注意機構が生まれた経緯と、query・key・value による一般化、注意重みを説明として扱う際の注意点を解説する資料。"
+key_claims:
+  - text: "固定長ベクトルに入力全体を圧縮する設計では、長い文で翻訳品質が低下した。"
+    locator: "第1段落"
+  - text: "注意重みはソフトマックスで正規化され、文脈ベクトルは入力表現の加重平均である。"
+    locator: "第2-3段落"
+  - text: "注意重みが大きい位置が予測の根拠とは限らない。"
+    locator: "第3段落"
+concepts: [注意機構, 文脈ベクトル, ソフトマックス, query-key-value]
+bibliographic:
+  title: "注意機構の基礎"
+  authors: ["BookOrder fixture"]
+  published: "2024"
+  type: document

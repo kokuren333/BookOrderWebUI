@@ -1,0 +1,8 @@
+source: "{{id}}"
+relevance: supporting
+reliability: secondary
+summary: "Overview of efficient attention: sparse and low-rank/kernel approximations versus exact, memory-efficient tiled computation, and the trade-offs between quality, implementation complexity and hardware efficiency."
+key_claims:
+  - text: "Sparse attention restricts each position to a subset of positions."
+  - text: "Tiled exact attention reduces memory traffic without changing the result."
+concepts: [efficient attention, sparse attention]

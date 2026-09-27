@@ -1,0 +1,8 @@
+table{border-collapse:collapse;width:100%;margin:1.6rem 0;font-size:.9em;line-height:1.55;font-variant-numeric:tabular-nums}
+th,td{padding:.6em .75em;text-align:left;vertical-align:top;border-bottom:1px solid var(--book-color-secondary)}
+thead th{font-family:var(--book-font-heading);font-weight:700;border-bottom:1px solid var(--book-color-primary)}
+thead{border-top:2px solid var(--book-color-primary)}
+th,td{border-left:var(--book-table-border);border-right:var(--book-table-border)}
+tbody tr:nth-child(even){background:var(--book-table-stripe)}
+caption{caption-side:top;font-family:var(--book-font-caption);font-size:var(--book-size-caption);color:var(--book-color-muted);text-align:left;margin-bottom:.6rem}
+@media(max-width:600px){table{display:block;overflow-x:auto;white-space:normal}}

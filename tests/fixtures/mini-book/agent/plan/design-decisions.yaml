@@ -1,0 +1,6 @@
+theme: modern-technical
+decisions:
+  - direction: "本文明朝、見出しゴシック、落ち着いた技術書"
+    spec_change: "theme modern-technical を維持し、アクセント色を青緑 #0E7490 に設定"
+overrides: []
+notes: "custom.css / custom.typ は不要だった。"

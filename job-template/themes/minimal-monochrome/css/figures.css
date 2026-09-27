@@ -1,0 +1,5 @@
+figure{margin:2rem 0;text-align:center}
+figure img,figure svg{max-width:100%;height:auto}
+img{max-width:100%;height:auto}
+figcaption{text-align:left;max-width:38rem;margin-left:auto;margin-right:auto}
+.full-width-figure figure{margin-inline:0}.full-width-figure img{width:100%}

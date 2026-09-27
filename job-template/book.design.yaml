@@ -1,0 +1,4 @@
+{
+  "$schema": "schemas/design.schema.json",
+  "theme": "modern-technical"
+}

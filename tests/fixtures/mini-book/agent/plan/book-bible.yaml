@@ -1,0 +1,36 @@
+title: 注意機構から大規模言語モデルへ
+subtitle: 仕組み・学習・評価をつなぐ入門
+purpose: "注意機構の原理から、Transformer、学習とスケーリング、評価までを一つの流れとして説明し、読者が最新の議論を自分で評価できるようにする。"
+audience: "機械学習の基礎を知るソフトウェアエンジニア"
+tone: "平易だが正確。断定は根拠のある範囲に限る。"
+central_thesis: "注意機構は情報の選択的参照という単純な考えから現代の言語モデルの中核となったが、その性能を語る指針は実験条件に依存する。"
+scope:
+  included: [注意機構の原理, Transformerの構造, 学習とスケーリング, 評価の注意点]
+  excluded: [実装コードの詳細, 特定製品の比較]
+terminology:
+  preferred_terms:
+    - {term: 注意機構, avoid: [アテンション機構]}
+    - {term: 自己注意, avoid: [セルフアテンション]}
+  definitions:
+    注意機構: "問い合わせに応じて参照先を重み付けし値を集約する仕組み"
+editorial_rules:
+  voice: "である調"
+  formality: 中
+  tense: 現在形を基本とする
+  punctuation: "句読点は「、。」"
+  citation_style: "[cite:src-XXXX] による安定IDの引用。表示番号はレンダラが決める。"
+  repetition_policy: "同じ説明は初出の章で行い、後の章では相互参照する。"
+global_narrative:
+  opening: "固定長ベクトルの限界という具体的な問題から始める。"
+  development: "注意機構の一般化、Transformer、学習とスケーリングへと抽象度を上げる。"
+  turning_points: ["スケーリング則の結論が修正された経緯"]
+  conclusion: "評価の限界を確認し、読者が指針を条件付きで読む姿勢を得て終わる。"
+recurring_concepts: [attention, self-attention, scaling-law]
+recurring_examples: [機械翻訳]
+cross_references: "概念の初出章を @ch: で参照する"
+chapter_dependencies: "基礎→仕組み→学習→評価の順に依存する"
+design_intent:
+  theme: modern-technical
+  typography: "本文明朝、見出しゴシック"
+  figure_style: "関係は図、比較は表、計算は式で示す"
+  callout_policy: "要点と注意だけを囲む"

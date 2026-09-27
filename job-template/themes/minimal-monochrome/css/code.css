@@ -1,0 +1,6 @@
+pre,code{font-family:var(--book-font-code);font-size:var(--book-size-code);line-height:var(--book-line-code);font-variant-ligatures:none}
+:not(pre)>code{background:var(--book-color-surface);padding:.1em .35em;border-radius:3px;font-size:.88em}
+pre{padding:1rem 1.15rem;background:var(--book-code-fill);border-left:2px solid color-mix(in srgb,var(--book-color-primary) 55%,transparent);overflow:auto;border-radius:0 4px 4px 0;tab-size:4}
+@media screen{pre,code{font-size:max(13.5px,calc(var(--book-size-code) * 1.4))}}
+.terminal-session pre{background:#1b1f24;color:#e8edf2;border-left-color:var(--book-color-accent)}
+.sourceCode .kw,.sourceCode .cf{color:var(--book-color-primary);font-weight:600}.sourceCode .st,.sourceCode .ss{color:#2f6f4e}.sourceCode .co{color:var(--book-color-muted);font-style:italic}.sourceCode .dv,.sourceCode .fl{color:#9a3412}.sourceCode .fu{color:#6d28d9}

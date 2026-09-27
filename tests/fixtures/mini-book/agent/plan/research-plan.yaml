@@ -1,0 +1,15 @@
+web_research: performed
+gaps:
+  - id: gap-efficiency
+    description: "供給資料は自己注意の計算量が二乗で増えることを述べるが、それを削減する手法の資料がない。"
+    priority: high
+    status: resolved
+    sources: ["{{src:efficient-attention}}"]
+    queries: ["q-0001"]
+    note: "効率的な注意の概説を追加した。"
+  - id: gap-evaluation-depth
+    description: "評価に関する供給資料が短く、ベンチマーク設計の一次資料がない。"
+    priority: low
+    status: unresolvable
+    queries: ["q-0002"]
+    note: "小規模フィクスチャのため追加の一次資料は探さず、限界として本文に明記する。"

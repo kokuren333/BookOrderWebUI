@@ -1,0 +1,10 @@
+clusters:
+  - id: cl-mechanism
+    label: 注意機構の原理
+    sources: ["{{src:attention-basics}}", "{{src:transformer-architecture}}", "{{src:history}}", "{{src:efficient-attention}}"]
+  - id: cl-scaling
+    label: 学習とスケーリング
+    sources: ["{{src:training-dynamics}}", "{{src:scaling-debate}}"]
+  - id: cl-evaluation
+    label: 評価
+    sources: ["{{src:evaluation}}"]

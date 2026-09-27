@@ -1,0 +1,11 @@
+source: "{{id}}"
+relevance: core
+reliability: secondary
+summary: "Transformerが再帰構造を使わず自己注意で系列を処理すること、スケール化内積注意の式と平方根で割る理由、マルチヘッド注意、位置エンコーディング、系列長の二乗に比例する計算量を説明する解説記事。"
+key_claims:
+  - text: "スケール化内積注意は softmax(QK^T / sqrt(d_k)) V で計算される。"
+    locator: "スケール化内積注意"
+  - text: "sqrt(d_k) で割るのは、内積が大きくなりソフトマックスの勾配が小さくなるのを防ぐためである。"
+  - text: "自己注意の計算量とメモリは系列長の二乗に比例する。"
+    locator: "計算量"
+concepts: [自己注意, マルチヘッド注意, 位置エンコーディング, スケール化内積注意]

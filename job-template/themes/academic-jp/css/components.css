@@ -1,0 +1,18 @@
+/* Semantic components. Ordinary prose stays dominant; only real callouts get boxes. */
+.book-component{margin:var(--book-space-lg) 0;break-inside:avoid}
+.book-component>p:first-child,.book-component>.component-title+p{margin-top:0}.book-component>p:last-child{margin-bottom:0}
+.component-title{display:block;font-size:.78em;font-weight:700;letter-spacing:.06em;color:var(--book-color-primary);margin-bottom:.45rem;break-after:avoid}
+.note,.tip,.sidebar,.example,.exercise,.checklist,.step-by-step{padding:.9rem 1.1rem;background:var(--book-callout-fill);border-left:var(--book-callout-border)}
+.key-point{padding:.95rem 1.15rem;background:var(--book-color-surface);border-left:3px solid var(--book-color-primary);font-weight:600}
+.warning{padding:.9rem 1.1rem;background:var(--book-warning-fill);border:var(--book-warning-border);border-left:var(--book-warning-left)}
+.warning .component-title{color:var(--book-color-accent)}
+.definition{padding:.9rem 1.1rem;border:var(--book-definition-border)}
+.summary{padding:.95rem 1.15rem;background:var(--book-summary-fill);border-top:2px solid var(--book-color-primary)}
+.lead,.section-opener,.chapter-opener,.figure,.full-width-figure,.table,.glossary-term,.comparison,.code-listing,.terminal-session,.quote{padding:0;border:0;background:none}
+.pull-quote{font-family:var(--book-font-heading);font-size:1.2em;line-height:1.6;color:var(--book-color-primary);text-align:center;padding:1rem 8%;border-top:1px solid var(--book-color-secondary);border-bottom:1px solid var(--book-color-secondary)}
+blockquote,.quote{border-left:2px solid var(--book-color-secondary);margin:1.5rem 0;padding:.1rem 0 .1rem 1.25rem;color:color-mix(in srgb,var(--book-color-text) 85%,var(--book-color-muted))}
+.timeline{border-left:2px solid var(--book-color-accent);padding-left:1.1rem}
+.book-equation{display:flex;align-items:center;gap:1rem;margin:1.4rem 0}
+.book-equation>p{flex:1;margin:0;text-align:center;text-indent:0}
+.book-equation .eq-number{flex:none;font-variant-numeric:tabular-nums;color:var(--book-color-muted)}
+.equation:not(.book-equation){margin:1.4rem 0;text-align:center}

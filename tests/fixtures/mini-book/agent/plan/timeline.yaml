@@ -1,0 +1,5 @@
+events:
+  - {date: "2014", event: "加法的注意の提案", sources: ["{{src:history}}"]}
+  - {date: "2017", event: "Transformerの提案", sources: ["{{src:history}}", "{{src:transformer-architecture}}"]}
+  - {date: "2020", event: "スケーリング則の報告", sources: ["{{src:training-dynamics}}"]}
+  - {date: "2022", event: "計算最適スケーリングの再検討", sources: ["{{src:scaling-debate}}"]}

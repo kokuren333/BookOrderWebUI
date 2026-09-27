@@ -1,0 +1,15 @@
+{
+  "name": "portable-publishing-job-generator",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "prepare:runtimes": "python tools/prepare-runtimes.py",
+    "build": "node tools/check-runtime-assets.mjs && node tools/webui-notices.mjs && tsc -b && vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "test": "node --experimental-strip-types --test tests/job.test.ts"
+  },
+  "dependencies": { "jszip": "^3.10.1", "react": "^19.1.1", "react-dom": "^19.1.1" },
+  "devDependencies": { "@types/react": "^19.1.16", "@types/react-dom": "^19.1.9", "typescript": "^5.9.2", "vite": "^7.1.7" }
+}

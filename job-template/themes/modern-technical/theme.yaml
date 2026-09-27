@@ -1,0 +1,123 @@
+{
+  "theme": "modern-technical",
+  "pdf_backend": "typst",
+  "art_direction": "",
+  "page": {
+    "size": "A5",
+    "orientation": "portrait",
+    "margin": {
+      "top": "18mm",
+      "bottom": "20mm",
+      "inner": "20mm",
+      "outer": "17mm"
+    }
+  },
+  "typography": {
+    "body": {
+      "japanese": "Noto Serif CJK JP",
+      "latin": "Source Serif 4",
+      "size": "9.5pt",
+      "weight": 400,
+      "line_height": 1.75,
+      "fallback": [
+        "Noto Serif CJK JP",
+        "Noto Serif JP",
+        "Yu Mincho",
+        "Hiragino Mincho ProN",
+        "Source Serif 4",
+        "Libertinus Serif",
+        "Times New Roman"
+      ]
+    },
+    "heading": {
+      "japanese": "Noto Sans JP",
+      "latin": "Inter",
+      "size": "18pt",
+      "weight": 700,
+      "line_height": 1.3,
+      "fallback": [
+        "Noto Sans JP",
+        "Noto Sans CJK JP",
+        "Yu Gothic",
+        "Hiragino Sans",
+        "Inter",
+        "Arial",
+        "Noto Serif CJK JP"
+      ]
+    },
+    "code": {
+      "japanese": "Noto Sans JP",
+      "latin": "JetBrains Mono",
+      "size": "8.3pt",
+      "weight": 400,
+      "line_height": 1.5,
+      "fallback": [
+        "JetBrains Mono",
+        "DejaVu Sans Mono",
+        "Courier New",
+        "Noto Sans JP",
+        "Noto Serif CJK JP"
+      ]
+    },
+    "caption": {
+      "japanese": "Noto Sans JP",
+      "latin": "Inter",
+      "size": "7.8pt",
+      "weight": 400,
+      "line_height": 1.45,
+      "fallback": [
+        "Noto Sans JP",
+        "Noto Sans CJK JP",
+        "Yu Gothic",
+        "Hiragino Sans",
+        "Inter",
+        "Arial",
+        "Noto Serif CJK JP"
+      ]
+    },
+    "footnote": {
+      "japanese": "Noto Serif CJK JP",
+      "latin": "Source Serif 4",
+      "size": "7.3pt",
+      "weight": 400,
+      "line_height": 1.45,
+      "fallback": [
+        "Noto Serif CJK JP",
+        "Noto Serif JP",
+        "Yu Mincho",
+        "Hiragino Mincho ProN",
+        "Source Serif 4",
+        "Libertinus Serif",
+        "Times New Roman"
+      ]
+    }
+  },
+  "colors": {
+    "text": "#18181B",
+    "muted": "#71717A",
+    "primary": "#164E63",
+    "secondary": "#DCECEF",
+    "accent": "#0891B2",
+    "surface": "#F4F7F8"
+  },
+  "layout": {
+    "density": "standard",
+    "paragraph_spacing": "medium",
+    "heading_spacing": "generous"
+  },
+  "components": {
+    "chapter_opener": "editorial",
+    "callout": "border",
+    "definition": "boxed",
+    "warning": "accent-border",
+    "summary": "shaded",
+    "table": "minimal-horizontal",
+    "code_block": "technical",
+    "figure_caption": "compact"
+  },
+  "figures": {
+    "style": "technical",
+    "line_weight": "thin",
+    "labeling": "numbered"
+  }
+}

@@ -1,0 +1,84 @@
+{
+  "type": "object",
+  "properties": {
+    "format": {
+      "type": "string",
+      "enum": [
+        "bookorder-book-ir"
+      ]
+    },
+    "version": {
+      "type": "string",
+      "enum": [
+        "1"
+      ]
+    },
+    "ast": {
+      "type": "object"
+    },
+    "components": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "chapter-opener",
+              "section-opener",
+              "lead",
+              "key-point",
+              "note",
+              "tip",
+              "warning",
+              "definition",
+              "example",
+              "exercise",
+              "summary",
+              "checklist",
+              "quote",
+              "pull-quote",
+              "sidebar",
+              "step-by-step",
+              "code-listing",
+              "terminal-session",
+              "comparison",
+              "timeline",
+              "figure",
+              "full-width-figure",
+              "table",
+              "glossary-term",
+              "equation"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "id",
+          "title",
+          "text"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "crossrefs": {
+      "type": "object"
+    }
+  },
+  "required": [
+    "format",
+    "version",
+    "ast",
+    "components"
+  ],
+  "additionalProperties": false
+}

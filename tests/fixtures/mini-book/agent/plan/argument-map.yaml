@@ -1,0 +1,9 @@
+central_thesis: "注意機構は情報の選択的参照という単純な考えから出発し、Transformerと大規模学習を通じて現代の言語モデルの中核になったが、その性能を語る指針は実験条件に依存する。"
+arguments:
+  - id: arg-bottleneck
+    claim: "注意機構は固定長ベクトルのボトルネックを解消した。"
+    support: ["{{src:attention-basics}}"]
+  - id: arg-scaling-conditional
+    claim: "スケーリングの最適配分は実験条件に依存し、単一の法則として扱えない。"
+    support: ["{{src:training-dynamics}}", "{{src:scaling-debate}}"]
+    counter: ["2020年の研究はパラメータ数優先を主張した"]

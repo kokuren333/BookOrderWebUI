@@ -1,0 +1,4 @@
+reviewed_chapters: [ch-foundations, ch-mechanism, ch-training, ch-evaluation]
+changes:
+  - {chapter: ch-mechanism, description: "第1章の文脈ベクトルへの参照を追加し、重複説明を避けた。"}
+remaining_issues: []

@@ -1,0 +1,12 @@
+terms:
+  - term: 注意機構
+    definition: "問い合わせに応じて参照先を重み付けし、値を集約する仕組み。"
+    aliases: [attention]
+    forbidden: [アテンション機構]
+  - term: 自己注意
+    definition: "同じ系列内の位置同士が互いを参照する注意。"
+    forbidden: [セルフアテンション]
+  - term: スケーリング則
+    definition: "損失と規模の関係を表すべき乗則。"
+  - term: データ汚染
+    definition: "評価データが学習データに含まれてしまう問題。"

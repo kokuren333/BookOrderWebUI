@@ -1,0 +1,27 @@
+rationale: "関係は図、式は式、比較は表で示し、装飾的な画像は使わない。"
+assets:
+  - id: fig-attention-flow
+    chapter: ch-mechanism
+    section: sec-mechanism-scaled
+    placement: "スケール化内積注意の説明の直後"
+    purpose: "Q・K・Vから出力までの計算の流れを一目で追えるようにする。"
+    type: diagram
+    source: source/assets/diagrams/attention-flow.yaml
+    caption: "スケール化内積注意の計算の流れ"
+    provenance: "authored from {{src:transformer-architecture}}"
+    style: technical
+  - id: eq-attention
+    chapter: ch-mechanism
+    section: sec-mechanism-scaled
+    placement: "式の本文説明の直前"
+    purpose: "計算を正確に定義し、以降の章から参照できるようにする。"
+    type: equation
+    provenance: "{{src:transformer-architecture}}"
+  - id: tbl-attention-variants
+    chapter: ch-mechanism
+    section: sec-mechanism-cost
+    placement: "効率化の段落の後"
+    purpose: "注意の方式を計算量と特徴で比較する。"
+    type: table
+    caption: "注意の方式の比較"
+    provenance: "{{src:transformer-architecture}}, {{src:efficient-attention}}"

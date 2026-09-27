@@ -1,0 +1,102 @@
+{
+  "chapter-opener": {
+    "docx_style": "Chapter Opener",
+    "label": "Chapter Opener"
+  },
+  "section-opener": {
+    "docx_style": "Section Opener",
+    "label": "Section Opener"
+  },
+  "lead": {
+    "docx_style": "Lead",
+    "label": "Lead"
+  },
+  "key-point": {
+    "docx_style": "Key Point",
+    "label": "Key Point"
+  },
+  "note": {
+    "docx_style": "Note",
+    "label": "Note"
+  },
+  "tip": {
+    "docx_style": "Tip",
+    "label": "Tip"
+  },
+  "warning": {
+    "docx_style": "Warning",
+    "label": "Warning"
+  },
+  "definition": {
+    "docx_style": "Definition",
+    "label": "Definition"
+  },
+  "example": {
+    "docx_style": "Example",
+    "label": "Example"
+  },
+  "exercise": {
+    "docx_style": "Exercise",
+    "label": "Exercise"
+  },
+  "summary": {
+    "docx_style": "Summary",
+    "label": "Summary"
+  },
+  "checklist": {
+    "docx_style": "Checklist",
+    "label": "Checklist"
+  },
+  "quote": {
+    "docx_style": "Quote",
+    "label": "Quote"
+  },
+  "pull-quote": {
+    "docx_style": "Pull Quote",
+    "label": "Pull Quote"
+  },
+  "sidebar": {
+    "docx_style": "Sidebar",
+    "label": "Sidebar"
+  },
+  "step-by-step": {
+    "docx_style": "Step By Step",
+    "label": "Step By Step"
+  },
+  "code-listing": {
+    "docx_style": "Code Listing",
+    "label": "Code Listing"
+  },
+  "terminal-session": {
+    "docx_style": "Terminal Session",
+    "label": "Terminal Session"
+  },
+  "comparison": {
+    "docx_style": "Comparison",
+    "label": "Comparison"
+  },
+  "timeline": {
+    "docx_style": "Timeline",
+    "label": "Timeline"
+  },
+  "figure": {
+    "docx_style": "Figure",
+    "label": "Figure"
+  },
+  "full-width-figure": {
+    "docx_style": "Full Width Figure",
+    "label": "Full Width Figure"
+  },
+  "table": {
+    "docx_style": "Table",
+    "label": "Table"
+  },
+  "glossary-term": {
+    "docx_style": "Glossary Term",
+    "label": "Glossary Term"
+  },
+  "equation": {
+    "docx_style": "Equation",
+    "label": "Equation"
+  }
+}

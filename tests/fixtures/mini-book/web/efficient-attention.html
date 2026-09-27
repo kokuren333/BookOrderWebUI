@@ -1,0 +1,9 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Efficient attention: an overview</title>
+<meta name="author" content="R. Tanaka"><meta name="citation_publication_date" content="2024-02-15"></head>
+<body><main>
+<h1>Efficient attention: an overview</h1>
+<p>Standard self-attention requires time and memory proportional to the square of the sequence length. Efficient attention methods reduce this cost in several ways. Sparse attention restricts each position to a subset of other positions, such as a local window plus a few global tokens. Low-rank and kernel-based methods approximate the attention matrix so that the softmax does not have to be materialized for every pair of positions.</p>
+<p>Another family of methods keeps exact attention but reorganizes the computation to use GPU memory more efficiently. By computing attention in tiles and avoiding writing the full attention matrix to slow memory, these methods reduce memory traffic and make long contexts practical without changing the mathematical result.</p>
+<p>Each approach trades accuracy, implementation complexity and hardware efficiency differently. Approximate methods can degrade quality on tasks that require precise long-range retrieval, while exact but memory-efficient implementations depend on specific hardware features. Evaluations should therefore report both quality and wall-clock efficiency on realistic sequence lengths.</p>
+</main></body></html>

@@ -1,0 +1,3 @@
+reviewed_chapters: [ch-foundations, ch-mechanism, ch-training, ch-evaluation]
+checks: [cross-chapter contradictions, narrative progression, coverage, bibliography]
+issues: []

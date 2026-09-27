@@ -1,0 +1,17 @@
+@page{size:var(--book-page-size);margin:var(--book-margin-top) var(--book-margin-outer) var(--book-margin-bottom) var(--book-margin-inner)}
+@media print{
+  body{font-size:var(--book-size-body)}
+  body>header,.search,.chapter-nav,.anchor{display:none}
+  body>main,body>article{max-width:none;padding:0}
+  h1{break-before:page}h1,h2,h3{break-after:avoid}
+  figure,.book-component,table,pre{break-inside:avoid}
+  pre{white-space:pre-wrap;overflow-wrap:anywhere}
+  a{color:inherit;text-decoration:none}
+}
+/* Dark reading mode for screens only (print and EPUB keep the book palette). */
+@media screen and (prefers-color-scheme:dark){
+  :root{--book-color-page:#111417;--book-color-text:#e6e9ec;--book-color-muted:#9aa4ad;--book-color-surface:#1b2126;--book-color-secondary:#2c353d;
+        --book-color-primary:color-mix(in srgb,var(--book-color-accent) 70%,#fff)}
+  body{background:var(--book-color-page)}
+  figure img{background:#fff;border-radius:4px;padding:.4rem}
+}

@@ -1,0 +1,56 @@
+name: Deploy GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: npm ci
+      - name: Prepare licensed runtime packs
+        run: npm run prepare:runtimes
+      - name: Build site for GitHub Pages
+        run: npm run build -- --base="/${{ github.event.repository.name }}/"
+      - name: Check complete Pages payload
+        run: |
+          test -s dist/index.html
+          test -s dist/webui-licenses.txt
+          test -s dist/runtimes/catalog.json
+          test -d dist/runtimes
+          python - <<'PY'
+          from pathlib import Path
+          total = sum(p.stat().st_size for p in Path('dist').rglob('*') if p.is_file())
+          limit = 1_000_000_000
+          print(f'Pages payload: {total:,} bytes / {limit:,} bytes')
+          if total >= limit:
+              raise SystemExit('Pages artifact must be smaller than 1 GB.')
+          PY
+          node --input-type=module -e "const c=await import('./dist/runtimes/catalog.json',{with:{type:'json'}}); for(const p of [c.default.shared,...c.default.platforms.map(x=>x.pack)]) for(const f of p.parts) { const {stat}=await import('node:fs/promises'); if(!(await stat('dist/runtimes/'+f.file)).isFile()) throw Error('Missing runtime part '+f.file) }"
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+      - id: deployment
+        uses: actions/deploy-pages@v4

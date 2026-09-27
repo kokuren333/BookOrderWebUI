@@ -1,0 +1,9 @@
+source: "{{id}}"
+relevance: supporting
+reliability: tertiary
+summary: "言語モデルの評価におけるパープレキシティと下流タスク指標の違い、データ汚染の確認、単一の総合点に頼らない多面的評価の必要性をまとめた短い覚え書き。"
+key_claims:
+  - text: "パープレキシティの低さは下流タスクの性能と常に一致するわけではない。"
+  - text: "評価データの学習データへの混入（データ汚染）は得点を過大に見せる。"
+concepts: [パープレキシティ, データ汚染, ベンチマーク]
+bibliographic: {title: "言語モデルの評価に関する覚え書き", authors: ["BookOrder fixture"], published: "2024", type: document}

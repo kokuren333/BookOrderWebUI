@@ -1,0 +1,6 @@
+source: "{{id}}"
+relevance: irrelevant
+reliability: unknown
+summary: "A short test document about a generic publishing pipeline. It does not discuss attention mechanisms or language models and is outside this book's scope."
+key_claims: []
+concepts: []

@@ -1,0 +1,10 @@
+chapter: ch-training
+reviewed: true
+checks: [factual consistency against notes, citation support, terminology, transitions]
+issues:
+  - severity: medium
+    section: sec-training-scaling
+    type: unsupported-claim
+    description: "「この議論は多くの研究者に支持されている」には出典がなく、資料からも支持の広さは読み取れない。削除するか根拠を示す。"
+    action: rewrite
+    evidence: "この議論は多くの研究者に支持されている"
