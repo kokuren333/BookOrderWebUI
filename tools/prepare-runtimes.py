@@ -87,6 +87,13 @@ def fetch(url, expected=None):
                     raise ValueError(f"Checksum mismatch: {url}")
                 path.write_bytes(data)
                 break
+            except urllib.error.HTTPError as exc:
+                # Candidate package names inferred from abbreviated GHC unit IDs
+                # can include unrelated Hackage names. A 404 is definitive and
+                # must not spend several minutes in the transient-error retry loop.
+                if exc.code == 404:
+                    raise RuntimeError(f"Source archive not found: {url}") from exc
+                last = exc
             except Exception as exc: last = exc
             if attempt < 4:
                 delay = min(15 * (2 ** attempt), 120)
