@@ -24,7 +24,7 @@ export default function App() {
   const errorRef = useRef<HTMLDivElement>(null);
   const names = uniqueNames(files);
   function field<K extends keyof BookForm>(key: K, value: BookForm[K]) { setForm(prev => ({ ...prev, [key]: value })); setSuccess(''); }
-  function addFiles(list: FileList | File[]) { setFiles(prev => [...prev, ...Array.from(list)]); setSuccess(''); }
+  function addFiles(list: FileList | File[]) { const selected = Array.from(list); setFiles(prev => [...prev, ...selected]); setSuccess(''); }
   function removeFile(index: number) { setFiles(prev => prev.filter((_, i) => i !== index)); setSuccess(''); }
   function formatFileSize(bytes: number) { return bytes < 1024 * 1024 ? `${(bytes / 1024).toLocaleString('ja', { maximumFractionDigits: 1 })} KB` : `${(bytes / 1024 / 1024).toLocaleString('ja', { maximumFractionDigits: 1 })} MB`; }
   async function submit(event: FormEvent) {
