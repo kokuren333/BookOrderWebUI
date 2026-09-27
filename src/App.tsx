@@ -26,6 +26,8 @@ export default function App() {
   const names = uniqueNames(files);
   function field<K extends keyof BookForm>(key: K, value: BookForm[K]) { setForm(prev => ({ ...prev, [key]: value })); setSuccess(''); }
   function addFiles(list: FileList | File[]) { setFiles(prev => [...prev, ...Array.from(list)]); setSuccess(''); }
+  function removeFile(index: number) { setFiles(prev => prev.filter((_, i) => i !== index)); setSuccess(''); }
+  function formatFileSize(bytes: number) { return bytes < 1024 * 1024 ? `${(bytes / 1024).toLocaleString('ja', { maximumFractionDigits: 1 })} KB` : `${(bytes / 1024 / 1024).toLocaleString('ja', { maximumFractionDigits: 1 })} MB`; }
   async function submit(event: FormEvent) {
     event.preventDefault(); setSuccess(''); const issues = validateForm(form); setErrors(issues);
     if (issues.length) { requestAnimationFrame(() => errorRef.current?.focus()); return; }
@@ -65,7 +67,8 @@ export default function App() {
           <div className={`dropzone ${dragging ? 'dragging' : ''}`} onDragOver={e => { e.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={e => { e.preventDefault(); setDragging(false); if (!busy) addFiles(e.dataTransfer.files); }}>
             <strong>参考資料をここにドロップ</strong><p>PDF / Markdown / DOCX / TXT / CSV / JSON / HTML ほか</p><button type="button" className="secondary" onClick={() => input.current?.click()}>ファイルを選択</button><input ref={input} type="file" multiple hidden onChange={e => { if (e.target.files) addFiles(e.target.files); e.target.value = ''; }} />
           </div>
-          {files.length > 0 && <ul className="files">{files.map((file, i) => <li key={i}><span>{file.name}<small>{(file.size / 1024).toLocaleString('ja', { maximumFractionDigits: 1 })} KB{names[i] !== file.name && ` · ZIP内：${names[i]}`}</small></span><button type="button" className="remove" aria-label={`${file.name}を削除`} onClick={() => setFiles(files.filter((_, n) => n !== i))}>削除</button></li>)}</ul>}
+          <div className="attachment-heading"><strong>添付ファイル</strong><span aria-live="polite">{files.length}件 ・ {formatFileSize(files.reduce((total, file) => total + file.size, 0))}</span>{files.length > 0 && <button type="button" className="remove-all" onClick={() => { setFiles([]); setSuccess(''); }}>すべて削除</button>}</div>
+          {files.length > 0 ? <ul className="files">{files.map((file, i) => <li key={`${file.name}-${i}`}><span className="file-name"><strong>{file.name}</strong><small>{file.type || 'ファイル'} ・ {formatFileSize(file.size)}{names[i] !== file.name && ` ・ ZIP内：${names[i]}`}</small></span><button type="button" className="remove" aria-label={`${file.name}を削除`} onClick={() => removeFile(i)}>削除</button></li>)}</ul> : <p className="empty-files">まだファイルは添付されていません。</p>}
           <p className="privacy">ファイルはブラウザ内でのみ処理し、生成するPublishing Job ZIPに含めます。サーバーには送信しません。</p>
           <label>Additional user instructions<textarea value={form.instructions} onChange={e => field('instructions', e.target.value)} placeholder="文体、難易度、扱う・扱わないテーマ、引用・調査方針、図表、デザインなど。原文をそのままTASK.mdへ保存します。" rows={5} /></label>
         </section>
