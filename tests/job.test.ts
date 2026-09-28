@@ -125,3 +125,11 @@ test('a named preset page size is mirrored into the Design Spec for legacy consu
   assert.equal(project.layout_preset, 'medical-scientific');
   assert.ok((await zip.file('publishing-job/TASK.md')!.async('string')).includes('bookorder publication'));
 });
+
+test('file picker snapshots the live FileList before the input is reset (attachment regression)', async () => {
+  // Browsers empty input.files when the input value is reset; reading it later inside a React updater adds nothing.
+  const app = await readFile('src/App.tsx', 'utf8');
+  const addFiles = app.slice(app.indexOf('function addFiles'), app.indexOf('\n', app.indexOf('function addFiles')));
+  assert.ok(addFiles.indexOf('Array.from(list)') >= 0 && addFiles.indexOf('Array.from(list)') < addFiles.indexOf('setFiles('), addFiles);
+  assert.match(app, /type="file"[^>]*onChange=\{e => \{ if \(e\.target\.files\) addFiles\(e\.target\.files\); e\.target\.value = ''; \}\}/);
+});
