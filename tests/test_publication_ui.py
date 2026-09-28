@@ -17,6 +17,9 @@ import zipfile
 
 REPO = Path(__file__).resolve().parent.parent
 TEMPLATE = REPO / "job-template"
+sys.path.insert(0, str(REPO / "tests"))
+import _tools  # sets PANDOC/TYPST from env, PATH or .tools/ (the job scripts parse YAML with Pandoc)
+NEEDS_PANDOC = unittest.skipIf("pandoc" in _tools.MISSING, "Pandoc not found: set PANDOC, add it to PATH, or place it in .tools/")
 sys.path.insert(0, str(TEMPLATE / "scripts"))
 import common
 import design as design_module
@@ -46,6 +49,7 @@ def project(extra=None):
     return {**json.loads(json.dumps(BASE)), **(extra or {})}
 
 
+@NEEDS_PANDOC
 class Resolvers(unittest.TestCase):
     """B-J against the resolvers directly (payloads built by hand match the WebUI cases below)."""
     @classmethod
@@ -179,6 +183,7 @@ class Resolvers(unittest.TestCase):
         self.assertEqual(figure_spec.resolve({}, full, "diagram")["span"], "full")
 
 
+@NEEDS_PANDOC
 @unittest.skipUnless(NODE, "node not installed")
 class WebUIPayload(unittest.TestCase):
     """A, K, L, M and TS/Python parity through the real WebUI modules."""
@@ -255,6 +260,36 @@ class WebUIPayload(unittest.TestCase):
         vertical = webui("zip", json.dumps({"preset": "standard-book", "publication": {"writingMode": "vertical-rl"}}), str(self.tmp / "v.zip"))
         self.assertFalse(vertical["ok"])
         self.assertTrue(any("縦書き" in e for e in vertical["errors"]), vertical)
+
+    def test_publication_preset_resolves_through_existing_resolvers(self):
+        """One Basic choice -> genre + layout + style + theme; all resolved by the unchanged resolvers."""
+        root, result = self.job("bundle", {"publicationPreset": "medical-scientific"})
+        self.assertEqual(result["payload"], {"profile": {"genre": "medical_science"}, "layout_preset": "medical-scientific", "style_preset": "medical-evidence"})
+        design = json.loads((root / "book.design.yaml").read_text(encoding="utf-8"))
+        self.assertEqual((design["theme"], design["page"]["size"]), ("medical-textbook", "B5"))
+        self.assertEqual(self.resolve_job(root).returncode, 0)
+        spec = common.yaml_data(root / "plan/layout-spec.yaml")
+        self.assertEqual((spec["page_size"], str(spec["body"]["columns"])), ("B5", "2"))
+        self.assertEqual(common.yaml_data(root / "plan/style-bible.yaml")["preset"], "medical-evidence")
+
+    def test_explicit_visual_edits_win_over_presets(self):
+        """Accent/density/chapter opener have one control; explicit edits reach the StyleBible and beat the preset."""
+        root, result = self.job("edits", {"publicationPreset": "technical-reference", "design": {"accent": "#AA3300", "density": "spacious", "chapterStyle": "minimal"}})
+        self.assertEqual(result["project"]["style_bible"], {"palette": {"accent": "#AA3300"}})
+        self.assertEqual(result["project"]["style_controls"], {"visual_density": "airy", "chapter_opener": "minimal"})
+        self.assertEqual(self.resolve_job(root).returncode, 0)
+        style = common.yaml_data(root / "plan/style-bible.yaml")
+        self.assertEqual((style["preset"], style["palette"]["accent"], style["chapter_opener"]["title_style"]), ("technical-clean", "#AA3300", "minimal"))
+        self.assertEqual(style["visual_grammar"]["rhythm"]["section_space"], "generous")
+
+    def test_tier_rule_is_shared(self):
+        rule = json.loads((TEMPLATE / "schemas/publication-presets.json").read_text(encoding="utf-8"))["tier_from_pages"]
+        import pacing
+        self.assertEqual(publication_profile.PAGE_TIERS, tuple((b, n) for b, n in rule["bounds"]))
+        self.assertEqual(pacing.PAGE_TIERS, publication_profile.PAGE_TIERS)
+        for pages, tier in ((50, "short"), (150, "standard"), (300, "long"), (451, "monograph")):
+            request = project({"book": {**BASE["book"], "target_pages": pages}})
+            self.assertEqual(publication_profile.resolve(request, self.design)["tier"], tier)
 
     def test_webui_preview_matches_resolver(self):
         """The live summary/early warnings (TypeScript) agree with layout_spec (Python) on values and issue codes."""

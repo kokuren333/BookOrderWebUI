@@ -9,8 +9,9 @@ mini-E2E (`python tests/mini_e2e.py`) was.
    `npm test && npm run build`.
 2. In the web UI create a job: title, goal, readers, language `ja`, **Target scale: Long · 約300ページ**,
    paste all URLs (one per line) and drop any files, research: allow web research ON, "関連する提供資料をすべて
-   本文に反映" ON, citation style as desired, outputs: DOCX, Semantic HTML, PDF, Static website, EPUB, design
-   theme `modern-technical` (plus free-text art direction if you want to test it), runtime = your OS.
+   本文に反映" ON, citation style as desired, outputs: DOCX, Semantic HTML, PDF, Static website, EPUB, in
+   "05 出版形式とデザイン" leave Basic untouched (theme `modern-technical`, theme-default layout) or pick a
+   publication preset (Expert › art direction if you want to test it), runtime = your OS.
 3. Extract the ZIP. Give the agent network access for its shell if possible (Codex: a sandbox mode with
    network, e.g. `--sandbox danger-full-access` or workspace-write with network enabled); otherwise every URL
    comes back as an `ingest:` task for the agent's browser tool, which is slower but still tracked.

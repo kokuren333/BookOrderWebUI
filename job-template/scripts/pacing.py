@@ -23,7 +23,9 @@ ISSUE_TYPE = "layout-pacing"
 
 # Used only when no PublicationProfile can be resolved (plan/profile.resolved.yaml is the authority).
 TIER_LIMITS = {"short": 3, "standard": 4, "long": 4, "monograph": 6}
-PAGE_TIERS = ((80, "short"), (200, "standard"), (450, "long"))
+# book.target_pages -> tier when no tier is requested; shared with the WebUI (schemas/publication-presets.json).
+_TIER_RULE = __import__("json").loads((ROOT / "schemas/publication-presets.json").read_text(encoding="utf-8"))["tier_from_pages"]
+PAGE_TIERS = tuple((int(bound), name) for bound, name in _TIER_RULE["bounds"])
 
 
 def limits(project=None, profile=None):
@@ -49,7 +51,7 @@ def limits(project=None, profile=None):
                 "source": f"{source} ({profile['id']})", "profile": profile["id"], "allow_unmeasured": allow,
                 "nonprose_share_target": profile["scale"]["nonprose_share_target"]}
     pages = int(float((project.get("book") or {}).get("target_pages") or 0))
-    tier = pacing.get("tier") if pacing.get("tier") in TIER_LIMITS else next((name for bound, name in PAGE_TIERS if pages <= bound), "monograph")
+    tier = pacing.get("tier") if pacing.get("tier") in TIER_LIMITS else next((name for bound, name in PAGE_TIERS if pages <= bound), _TIER_RULE["above"])
     limit = int(pacing["max_text_only_pages"]) if str(pacing.get("max_text_only_pages", "")).isdigit() else TIER_LIMITS[tier]
     return {"tier": tier, "max_text_only_pages": limit, "source": f"compatibility fallback (book.target_pages={pages})",
             "profile": None, "allow_unmeasured": allow, "nonprose_share_target": None}

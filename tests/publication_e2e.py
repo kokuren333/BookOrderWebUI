@@ -17,6 +17,9 @@ import sys
 import zipfile
 
 REPO = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO / "tests"))
+import _tools  # noqa: E402  PANDOC/TYPST from env, PATH or .tools/
+if _tools.MISSING: raise SystemExit(f"Missing {', '.join(_tools.MISSING)}: set PANDOC/TYPST, add to PATH, or place them in .tools/")
 BASE = REPO / ".test-output/mini-e2e/publishing-job"
 OUT = REPO / ".test-output/publication-e2e"
 PT = 72 / 25.4

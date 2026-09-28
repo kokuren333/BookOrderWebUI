@@ -1,4 +1,12 @@
-// Publication settings frontend model.
+// Publication & design settings frontend model.
+//
+// Resolution order (later wins), mirrored by the job's resolvers:
+//   Layout (LayoutSpec):  theme page/margins (Design Spec)  <  layout preset  <  explicit geometry edits (layout_spec patch)
+//   Scale (Profile):      target scale (book.target_pages) -> automatic tier  <  explicit tier override
+//   PDF appearance:       theme tokens (Design Spec)  <  style template (style_preset, else genre)  <  profile art direction
+//                         <  style_controls (incl. values derived from explicit Visual grammar edits)  <  style_bible (explicit accent)
+//   Free-text instructions supplement the structured settings; structured settings are authoritative.
+// A "publication preset" only fills genre + layout preset + style preset + theme at once; it writes nothing of its own.
 //
 // The WebUI is an input frontend for the job's existing resolvers (PublicationProfile, LayoutSpec, StyleBible).
 // It never becomes the source of truth: `publicationPayload` only writes the project.json request fields those
@@ -7,17 +15,21 @@
 // resolvers load. `previewLayout` mirrors layout_spec.summary()/geometry_issues() for the live summary and early
 // warnings; `bookorder publication` / the orchestrator remain the final authority (a parity test keeps them equal).
 import presets from '../job-template/schemas/publication-presets.json' with { type: 'json' };
+import type { DesignOptions } from './design.ts';
 
 export type PageSize = 'A4' | 'A5' | 'B5' | 'B6' | 'Letter' | 'custom';
 export type SpanPolicy = 'auto' | 'column' | 'full';
 export type WritingMode = 'horizontal-tb' | 'vertical-rl';
+export type Orientation = 'portrait' | 'landscape';
 export type StyleControlName = keyof typeof presets.style_controls;
 export interface Margins { top: number; bottom: number; inner: number; outer: number }
 export interface PublicationOptions {
   tier: string;            // 'auto' = from target scale (resolver compatibility rule)
   genre: string;           // 'auto' = general
+  publicationPreset: string; // 'none' or a publication_presets id (UI bundle: genre + layout + style + theme)
   layoutPreset: string;    // 'theme' = Design Spec defaults (unchanged behaviour), a preset id, or 'custom'
-  pageSize: PageSize; customWidthMm: number; customHeightMm: number; orientation: 'portrait' | 'landscape';
+  // The single authority for page size and orientation. 'theme' = follow the selected theme's Design Spec page.
+  pageSize: PageSize | 'theme'; customWidthMm: number; customHeightMm: number; orientation: Orientation | 'theme';
   columns: 1 | 2; gutterMm: number; margins: Margins; writingMode: WritingMode;
   figureSpan: SpanPolicy; tableSpan: SpanPolicy;
   stylePreset: string;     // 'auto' = follow genre
@@ -35,6 +47,9 @@ export const publicationPresets = presets;
 export const LIMITS = presets.limits;
 export const PAGE_SIZES = presets.page_sizes as unknown as Record<string, [number, number]>;
 export const LAYOUT_PRESETS = presets.layout_presets as Record<string, { label: string; description: string; layout: PresetLayout }>;
+export const PUBLICATION_PRESETS = presets.publication_presets as Record<string, { label: string; description: string; genre: string | null; layout: string; style: string | null; theme: string }>;
+export const TIER_RULE = presets.tier_from_pages as unknown as { bounds: [number, string][]; above: string; default: string };
+export const DESIGN_PAGE_SIZES = ['A5', 'B5', 'A4', 'Letter'];  // sizes the Design Spec schema accepts
 export const STYLE_PRESETS = presets.style_presets as Record<string, { label: string; template: string }>;
 export const SPAN_POLICIES = presets.span_policies as Record<SpanPolicy, { label: string; description: string }>;
 export const WRITING_MODES = presets.writing_modes as Record<WritingMode, { label: string; typst: boolean; reason?: string }>;
@@ -47,8 +62,8 @@ interface PresetLayout {
 // LayoutSpec defaults when project.json asks for nothing (layout_spec.defaults): 1 column, 6 mm gutter.
 const DEFAULT_GUTTER = 6;
 export const defaultPublication: PublicationOptions = {
-  tier: 'auto', genre: 'auto', layoutPreset: 'theme',
-  pageSize: 'A5', customWidthMm: 182, customHeightMm: 257, orientation: 'portrait',
+  tier: 'auto', genre: 'auto', publicationPreset: 'none', layoutPreset: 'theme',
+  pageSize: 'theme', customWidthMm: 182, customHeightMm: 257, orientation: 'theme',
   columns: 1, gutterMm: DEFAULT_GUTTER, margins: { top: 18, bottom: 20, inner: 20, outer: 17 }, writingMode: 'horizontal-tb',
   figureSpan: 'column', tableSpan: 'column', stylePreset: 'auto', styleControls: {},
 };
@@ -65,8 +80,8 @@ const round2 = (value: number) => Math.round(value * 100) / 100;
 export function applyLayoutPreset(current: PublicationOptions, id: string, themePage?: ThemePage): PublicationOptions {
   if (id === 'custom') return { ...current, layoutPreset: 'custom' };
   if (id === 'theme') {
-    const page = themePage ?? { size: 'A5', margin: {} };
-    return { ...current, layoutPreset: 'theme', pageSize: page.size as PageSize, orientation: 'portrait', columns: 1, gutterMm: DEFAULT_GUTTER,
+    const page = themePage ?? DEFAULT_THEME_PAGE;
+    return { ...current, layoutPreset: 'theme', pageSize: 'theme', orientation: 'theme', columns: 1, gutterMm: DEFAULT_GUTTER,
       margins: themeMargins(page), writingMode: 'horizontal-tb', figureSpan: 'column', tableSpan: 'column' };
   }
   const layout = LAYOUT_PRESETS[id].layout;
@@ -75,7 +90,81 @@ export function applyLayoutPreset(current: PublicationOptions, id: string, theme
     margins: { top: layout.page.margin_top_mm, bottom: layout.page.margin_bottom_mm, inner: layout.page.margin_inner_mm, outer: layout.page.margin_outer_mm },
     figureSpan: layout.span_policy?.figure ?? 'column', tableSpan: layout.span_policy?.table ?? 'column' };
 }
-export interface ThemePage { size: string; margin: Record<string, string | undefined> }
+export interface ThemePage { size: string; orientation?: string; margin: Record<string, string | undefined> }
+/** The parts of a theme's theme.yaml (Design Spec defaults) the linked settings compare against. */
+export interface ThemeSpec { page: ThemePage; layout: { density: string }; components: { chapter_opener: string }; colors: { accent: string } }
+export const DEFAULT_THEME_PAGE: ThemePage = { size: 'A5', orientation: 'portrait', margin: { top: '18mm', bottom: '20mm', inner: '20mm', outer: '17mm' } };
+
+/** Actual page size / orientation: an explicit choice, else the theme's page ('theme' sentinel). */
+export function resolvePage(options: PublicationOptions, themePage: ThemePage = DEFAULT_THEME_PAGE): { size: PageSize; orientation: Orientation } {
+  return { size: (options.pageSize === 'theme' ? themePage.size : options.pageSize) as PageSize,
+    orientation: (options.orientation === 'theme' ? (themePage.orientation ?? 'portrait') : options.orientation) as Orientation };
+}
+/** Options with every theme-derived value filled in: in theme mode the geometry is the Design Spec's (layout_spec.defaults). */
+export function effectivePublication(options: PublicationOptions, themePage: ThemePage = DEFAULT_THEME_PAGE): PublicationOptions {
+  const page = resolvePage(options, themePage);
+  if (options.layoutPreset !== 'theme') return { ...options, pageSize: page.size, orientation: page.orientation };
+  return { ...options, pageSize: page.size, orientation: page.orientation, columns: 1, gutterMm: DEFAULT_GUTTER, margins: themeMargins(themePage),
+    writingMode: 'horizontal-tb', figureSpan: 'column', tableSpan: 'column' };
+}
+/** Page written to the Design Spec (book.design.yaml). Its schema only knows A5/B5/A4/Letter; B6 and custom sizes live in
+ *  the LayoutSpec request and the Design Spec keeps the theme's page for the legacy CSS/HTML consumers. */
+export function designPage(options: PublicationOptions, themePage: ThemePage = DEFAULT_THEME_PAGE): { size: string; orientation: Orientation } {
+  const page = resolvePage(options, themePage);
+  return { size: DESIGN_PAGE_SIZES.includes(page.size) ? page.size : themePage.size, orientation: page.orientation };
+}
+/** Tier the PublicationProfile resolver derives from book.target_pages when no tier is requested (shared rule). */
+export function autoTier(pages: number): string {
+  if (!pages) return TIER_RULE.default;
+  return TIER_RULE.bounds.find(([bound]) => pages <= bound)?.[1] ?? TIER_RULE.above;
+}
+/** Selecting a publication preset fills genre, layout preset and style preset; the caller switches the theme. */
+export function applyPublicationPreset(current: PublicationOptions, id: string): { publication: PublicationOptions; theme?: string } {
+  const bundle = PUBLICATION_PRESETS[id];
+  if (!bundle) return { publication: { ...current, publicationPreset: 'none' } };
+  const publication = { ...applyLayoutPreset(current, bundle.layout), publicationPreset: id, genre: bundle.genre ?? 'auto', stylePreset: bundle.style ?? 'auto' };
+  return { publication, theme: bundle.theme };
+}
+/** Which parts of a publication preset the user has since changed (empty = preset as selected). */
+export function presetDeviations(options: PublicationOptions, theme: string): string[] {
+  const bundle = PUBLICATION_PRESETS[options.publicationPreset];
+  if (!bundle) return [];
+  const out: string[] = [];
+  if ((bundle.genre ?? 'auto') !== options.genre) out.push('genre');
+  if (bundle.layout !== options.layoutPreset || publicationPayload(options).layout_spec) out.push('layout');
+  if ((bundle.style ?? 'auto') !== options.stylePreset) out.push('style');
+  if (bundle.theme !== theme) out.push('theme');
+  return out;
+}
+
+/** Visual-grammar settings with one control in the UI but two consumers: the Design Spec value is the authority and,
+ *  only when the user changed it from the theme default, the matching StyleBible request is derived so the PDF agrees. */
+export const DENSITY_TO_VISUAL_DENSITY: Record<string, string> = { compact: 'compact', standard: 'balanced', spacious: 'airy' };
+export function designStyleLinks(design: Pick<DesignOptions, 'density' | 'chapterStyle' | 'accent'>, theme?: ThemeSpec) {
+  const controls: Record<string, string> = {}; const styleBible: Record<string, unknown> = {};
+  if (!theme) return { controls, styleBible };
+  if (design.density !== theme.layout.density && DENSITY_TO_VISUAL_DENSITY[design.density]) controls.visual_density = DENSITY_TO_VISUAL_DENSITY[design.density];
+  if (design.chapterStyle !== theme.components.chapter_opener) controls.chapter_opener = design.chapterStyle;
+  if (design.accent.toLowerCase() !== theme.colors.accent.toLowerCase()) styleBible.palette = { accent: design.accent.toUpperCase() };
+  return { controls, styleBible };
+}
+/** Accent the PDF will use (StyleBible palette): an explicit accent, else the style template's palette accent, else the
+ *  theme's. `templateAccent` looks up styles/genres/<template>.yaml. HTML/EPUB always use the Design Spec accent. */
+export function pdfAccent(options: PublicationOptions, design: Pick<DesignOptions, 'accent'>, theme: ThemeSpec | undefined, templateAccent: (template: string) => string | undefined): string {
+  if (theme && design.accent.toLowerCase() !== theme.colors.accent.toLowerCase()) return design.accent;
+  const template = options.stylePreset !== 'auto' ? STYLE_PRESETS[options.stylePreset]?.template : options.genre !== 'auto' ? options.genre : undefined;
+  return (template && templateAccent(template)) || design.accent;
+}
+/** Every project.json request field the WebUI writes: publication payload plus the derived visual-grammar links. */
+export function requestPayload(options: PublicationOptions, design?: Pick<DesignOptions, 'density' | 'chapterStyle' | 'accent'>, theme?: ThemeSpec, themePage?: ThemePage) {
+  const payload = publicationPayload(options, themePage ?? theme?.page);
+  if (!design) return payload;
+  const links = designStyleLinks(design, theme);
+  const controls = { ...links.controls, ...((payload.style_controls as Record<string, string>) ?? {}) };
+  if (Object.keys(controls).length) payload.style_controls = controls;
+  if (Object.keys(links.styleBible).length) payload.style_bible = links.styleBible;
+  return payload;
+}
 export function themeMargins(page: ThemePage): Margins {
   return { top: mm(page.margin.top, 20), bottom: mm(page.margin.bottom, 20), inner: mm(page.margin.inner, 20), outer: mm(page.margin.outer, 17) };
 }
@@ -87,8 +176,8 @@ export function pageDimensions(size: string, orientation: string, customWidth?: 
 }
 
 /** The LayoutSpec request fields (layout_spec patch) the options describe, relative to a base preset. */
-function layoutRequest(options: PublicationOptions) {
-  const [width, height] = pageDimensions(options.pageSize, options.orientation, options.customWidthMm, options.customHeightMm);
+function layoutRequest(options: PublicationOptions) {  // options must be effective (no 'theme' sentinels)
+  const [width, height] = pageDimensions(options.pageSize as string, options.orientation as string, options.customWidthMm, options.customHeightMm);
   const full: Record<string, unknown> = {
     page_size: options.pageSize, orientation: options.orientation, writing_mode: options.writingMode,
     page: { margin_top_mm: options.margins.top, margin_bottom_mm: options.margins.bottom, margin_inner_mm: options.margins.inner, margin_outer_mm: options.margins.outer,
@@ -113,13 +202,14 @@ function diff(value: Record<string, unknown>, base: Record<string, unknown>): Re
 }
 
 /** project.json fields for the resolvers. Untouched defaults produce {} so existing jobs build exactly as before. */
-export function publicationPayload(options: PublicationOptions) {
+export function publicationPayload(input: PublicationOptions, themePage?: ThemePage) {
+  const options = effectivePublication(input, themePage);
   const payload: Record<string, unknown> = {};
   const profile: Record<string, string> = {};
   if (options.tier !== 'auto') profile.tier = options.tier;
   if (options.genre !== 'auto') profile.genre = options.genre;
   if (Object.keys(profile).length) payload.profile = profile;
-  if (options.layoutPreset !== 'theme') {
+  if (input.layoutPreset !== 'theme') {
     if (options.layoutPreset !== 'custom') payload.layout_preset = options.layoutPreset;
     const patch = layoutRequest(options);
     if (Object.keys(patch).length) payload.layout_spec = patch;
@@ -131,8 +221,9 @@ export function publicationPayload(options: PublicationOptions) {
 }
 
 /** Live summary + early warnings. Mirrors layout_spec.summary() and geometry_issues(); BookOrder re-validates. */
-export function previewLayout(options: PublicationOptions): LayoutPreview {
-  const [widthMm, heightMm] = pageDimensions(options.pageSize, options.orientation, options.customWidthMm, options.customHeightMm);
+export function previewLayout(input: PublicationOptions, themePage?: ThemePage): LayoutPreview {
+  const options = effectivePublication(input, themePage);
+  const [widthMm, heightMm] = pageDimensions(options.pageSize as string, options.orientation as string, options.customWidthMm, options.customHeightMm);
   const m = options.margins; const columns = options.columns; const gutter = options.gutterMm;
   const bodyWidth = widthMm - m.inner - m.outer; const bodyHeight = heightMm - m.top - m.bottom;
   const columnWidth = (bodyWidth - (columns > 1 ? gutter * (columns - 1) : 0)) / columns;
@@ -160,7 +251,7 @@ export function previewLayout(options: PublicationOptions): LayoutPreview {
     if (spanPolicy[kind] === 'full') add('span_policy_single_column', `span_policy.${kind}`, `LayoutSpec span_policy.${kind}=full needs two columns; a one-column body has no column span`);
   if (!WRITING_MODES[options.writingMode]?.typst) add('vertical_unsupported', 'writing_mode', 'Current Typst renderer does not support vertical writing (writing_mode vertical-rl); choose horizontal-tb');
   return { source: options.layoutPreset === 'theme' ? 'theme' : options.layoutPreset === 'custom' ? 'custom' : 'preset',
-    pageSize: options.pageSize, orientation: options.orientation, widthMm, heightMm, columns, gutterMm: columns > 1 ? gutter : 0,
+    pageSize: options.pageSize as string, orientation: options.orientation as string, widthMm, heightMm, columns, gutterMm: columns > 1 ? gutter : 0,
     bodyWidthMm: round2(bodyWidth), bodyHeightMm: round2(bodyHeight), columnWidthMm: round2(columnWidth), margins: { ...m },
     writingMode: options.writingMode, spanPolicy, issues };
 }

@@ -1,7 +1,7 @@
 import JSZip from 'jszip';
 import type { RuntimeBundle, RuntimeTarget } from './runtime.ts';
 import { defaultDesign, designSpec, type DesignOptions } from './design.ts';
-import { defaultPublication, issueText, previewLayout, publicationPayload, type PublicationOptions } from './publication.ts';
+import { defaultPublication, designPage, issueText, previewLayout, requestPayload, PUBLICATION_PRESETS, type PublicationOptions, type ThemeSpec } from './publication.ts';
 
 export interface BookForm {
   title: string; description: string; targetReaders: string; language: string;
@@ -53,7 +53,7 @@ export function validateForm(form: BookForm): string[] {
   if (!/^#[0-9a-fA-F]{6}$/.test(design.accent)) errors.push('アクセント色は6桁のカラーコードで指定してください。');
   if (![design.bodyJapanese, design.bodyLatin, design.headingJapanese, design.headingLatin, design.codeFont, design.captionFont, design.footnoteFont].every(name => name.trim() && name.length <= 120 && !/[\u0000-\u001f]/.test(name))) errors.push('フォント名を指定してください。');
   if (form.publication && form.publication.layoutPreset !== 'theme') {
-    const preview = previewLayout(form.publication);
+    const preview = previewLayout(form.publication);  // non-theme layouts carry explicit page values
     for (const issue of preview.issues) errors.push(`出版形式：${issueText(issue, preview)}`);
   }
   urlLines(form.urls).forEach((url, i) => {
@@ -62,7 +62,15 @@ export function validateForm(form: BookForm): string[] {
   });
   return errors;
 }
-export function projectData(form: BookForm, names: string[], files: SourceFile[]) {
+/** The selected theme's Design Spec defaults (theme.yaml) from the job template, used to derive linked settings. */
+export function templateTheme(templates: Record<string, string | Uint8Array>, theme: string): ThemeSpec | undefined {
+  const text = templates[`themes/${theme}/theme.yaml`];
+  if (typeof text !== 'string') return undefined;
+  const t = JSON.parse(text);
+  return { page: { size: t.page.size, orientation: t.page.orientation, margin: t.page.margin }, layout: { density: t.layout.density },
+    components: { chapter_opener: t.components.chapter_opener }, colors: { accent: t.colors.accent } };
+}
+export function projectData(form: BookForm, names: string[], files: SourceFile[], theme?: ThemeSpec) {
   const languageNames: Record<string, string> = { japanese: 'ja', '日本語': 'ja', english: 'en', '英語': 'en', chinese: 'zh', korean: 'ko', french: 'fr', german: 'de', spanish: 'es' };
   const language = languageNames[form.language.trim().toLowerCase()] ?? form.language.trim();
   return {
@@ -74,16 +82,13 @@ export function projectData(form: BookForm, names: string[], files: SourceFile[]
     design: { spec: 'book.design.yaml', theme: form.design.theme, custom_css: 'custom.css' },
     input: { urls: urlLines(form.urls), sources: names.map((name, i) => ({ original_name: files[i].name, path: `input/sources/${name}`, size_bytes: files[i].size })) },
     // Publication request for the existing resolvers (profile / LayoutSpec / StyleBible). Empty when untouched.
-    ...publicationPayload(form.publication ?? defaultPublication),
+    ...requestPayload(form.publication ?? defaultPublication, form.design, theme),
   };
 }
 /** Design Spec written to the job. A layout request's named page size is mirrored for the legacy CSS/HTML consumers;
  *  plan/layout-spec.yaml (resolved from project.json) stays the geometry authority for PDF. */
-export function jobDesign(form: BookForm) {
-  const publication = form.publication ?? defaultPublication;
-  const design = { ...form.design };
-  if (publication.layoutPreset !== 'theme' && ['A5', 'B5', 'A4', 'Letter'].includes(publication.pageSize)) design.pageSize = publication.pageSize;
-  return designSpec(design);
+export function jobDesign(form: BookForm, theme?: ThemeSpec) {
+  return designSpec(form.design, designPage(form.publication ?? defaultPublication, theme?.page));
 }
 export async function generateJob(form: BookForm, files: SourceFile[], templates: Record<string, string | Uint8Array>, progress?: (percent: number) => void, runtime?: RuntimeBundle) {
   const errors = validateForm(form); if (errors.length) throw new Error(errors.join('\n'));
@@ -103,16 +108,19 @@ export async function generateJob(form: BookForm, files: SourceFile[], templates
     if (!/^(runtime|third-party)\//.test(path) || path.split('/').includes('..')) throw new Error('実行環境に不正なパスがあります。');
     root.file(path, data, { compression: /\.(zip|gz|xz|crate)$/.test(path) ? 'STORE' : 'DEFLATE' });
   }
-  const names = uniqueNames(files); const project = projectData(form, names, files);
+  const theme = templateTheme(templates, form.design.theme);
+  const names = uniqueNames(files); const project = projectData(form, names, files, theme);
   root.file('project.json', JSON.stringify(project, null, 2) + '\n');
-  root.file('book.design.yaml', JSON.stringify(jobDesign(form), null, 2) + '\n');
+  root.file('book.design.yaml', JSON.stringify(jobDesign(form, theme), null, 2) + '\n');
   root.file('custom.css', form.design.customCss + '\n');
   root.file('input/urls.txt', urlLines(form.urls).join('\n') + '\n');
   for (let i = 0; i < files.length; i++) {
     const data = files[i].data;
     root.file(`input/sources/${names[i]}`, data instanceof Blob ? await data.arrayBuffer() : data);
   }
-  root.file('TASK.md', `# Publishing task\n\n## Title\n${form.title}\n\n## Goal\n${form.description}\n\n## Target readers\n${form.targetReaders}\n\n## Language\n${form.language}\n\n## Expected scale\nApproximately ${form.targetPages} pages. This is a planning guide, not a fixed PDF page count.\n\n## Provided sources\n${names.map(n => '- input/sources/' + n).join('\n') || '(No uploaded files)'}\n\n### URLs\n${urlLines(form.urls).join('\n') || '(No URLs)'}\n\n## Research policy\n${JSON.stringify(form.research, null, 2)}\nIf additional web research is disabled, use only provided files and explicitly supplied URLs. Do not discover additional sources.\n\n## Requested outputs\n${Object.entries(project.outputs).filter(([, v]) => v).map(([key]) => '- ' + key).join('\n')}\n\n## Publication format\n${Object.keys(publicationPayload(form.publication ?? defaultPublication)).length ? 'Requested in project.json (' + Object.keys(publicationPayload(form.publication ?? defaultPublication)).join(', ') + '). BookOrder resolves it into plan/profile.resolved.yaml, plan/layout-spec.yaml and plan/style-bible.yaml; check it with `bookorder publication`.' : 'Theme defaults (no explicit publication request).'}\n\n## Figure policy\n${JSON.stringify(form.figures, null, 2)}\n\n## Additional user instructions (verbatim)\n${form.instructions}\n\n## How this job runs\nOne instruction runs the whole publication. With Codex: \`/goal AGENTS.mdを読み、bookorder goal が STATUS: COMPLETE を表示するまで出版ジョブを最後まで実行してください。\` BookOrder's orchestrator (\`bookorder goal\`) owns every phase and alone decides completion; a built PDF is not a finished publication.\n`);
+  const requested = ['profile', 'layout_preset', 'layout_spec', 'style_preset', 'style_controls', 'style_bible'].filter(key => key in project);
+  const preset = PUBLICATION_PRESETS[(form.publication ?? defaultPublication).publicationPreset];
+  root.file('TASK.md', `# Publishing task\n\n## Title\n${form.title}\n\n## Goal\n${form.description}\n\n## Target readers\n${form.targetReaders}\n\n## Language\n${form.language}\n\n## Expected scale\nApproximately ${form.targetPages} pages. This is a planning guide, not a fixed PDF page count.\n\n## Provided sources\n${names.map(n => '- input/sources/' + n).join('\n') || '(No uploaded files)'}\n\n### URLs\n${urlLines(form.urls).join('\n') || '(No URLs)'}\n\n## Research policy\n${JSON.stringify(form.research, null, 2)}\nIf additional web research is disabled, use only provided files and explicitly supplied URLs. Do not discover additional sources.\n\n## Requested outputs\n${Object.entries(project.outputs).filter(([, v]) => v).map(([key]) => '- ' + key).join('\n')}\n\n## Publication format\n${requested.length ? 'Requested in project.json (' + requested.join(', ') + ')' + (preset ? ', starting from the WebUI publication preset "' + preset.label + '"' : '') + '. BookOrder resolves it into plan/profile.resolved.yaml, plan/layout-spec.yaml and plan/style-bible.yaml; check it with `bookorder publication`.' : 'Theme defaults (no explicit publication request).'} Theme and typography: book.design.yaml.\n\n## Figure policy\n${JSON.stringify(form.figures, null, 2)}\n\n## Additional user instructions (verbatim)\n${form.instructions}\n\n## Precedence of settings\nThe structured settings (project.json, book.design.yaml and the plan files resolved from them) are authoritative for scale, format, layout and appearance. The additional instructions above supplement them: follow them where they add detail or constraints. If an instruction contradicts a structured setting, keep the structured setting and tell the user about the conflict in your final report.\n\n## How this job runs\nOne instruction runs the whole publication. With Codex: \`/goal AGENTS.mdを読み、bookorder goal が STATUS: COMPLETE を表示するまで出版ジョブを最後まで実行してください。\` BookOrder's orchestrator (\`bookorder goal\`) owns every phase and alone decides completion; a built PDF is not a finished publication.\n`);
   for (const path of ['input/sources', 'research', 'plan', 'source/manuscript', 'source/assets/figures', 'source/assets/images', 'source/assets/generated', 'source/metadata/chapters', 'interchange', 'publish', 'reports']) root.file(`${path}/.gitkeep`, '');
   root.file('source/references/references.bib', '% Add verified BibTeX records here.\n');
   for (const [file, key] of [['outline', 'chapters'], ['glossary', 'terms'], ['sources', 'sources'], ['figures', 'figures']]) root.file(`source/metadata/${file}.yaml`, `${key}: []\n`);

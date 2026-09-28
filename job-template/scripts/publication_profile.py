@@ -27,7 +27,9 @@ TIERS = ("short", "standard", "long", "monograph")
 GENRES = ("technical", "medical_science", "practical", "criticism", "essay")
 GENRE_ALIASES = {"medical": "medical_science", "science": "medical_science", "medical-science": "medical_science",
                  "humanities": "criticism", "general": None, "": None}
-PAGE_TIERS = ((80, "short"), (200, "standard"), (450, "long"))
+# book.target_pages -> tier when no tier is requested; shared with the WebUI (schemas/publication-presets.json).
+_TIER_RULE = __import__("json").loads((ROOT / "schemas/publication-presets.json").read_text(encoding="utf-8"))["tier_from_pages"]
+PAGE_TIERS = tuple((int(bound), name) for bound, name in _TIER_RULE["bounds"])
 
 # Characters of running text on a full text-only page, A5 at standard density (measured: a 10pt Japanese A5
 # page holds about 780 non-space characters). Page size and density scale it.
@@ -118,7 +120,7 @@ def request(project):
     tier = spec.get("tier") or pacing.get("tier")
     if tier: notes.append(f"tier {tier} from project.json " + ("profile" if spec.get("tier") else "pacing.tier"))
     else:
-        tier = next((name for bound, name in PAGE_TIERS if pages <= bound), "monograph") if pages else "standard"
+        tier = next((name for bound, name in PAGE_TIERS if pages <= bound), _TIER_RULE["above"]) if pages else _TIER_RULE["default"]
         notes.append(f"tier {tier} chosen from book.target_pages={pages} (compatibility)" if pages else "tier standard (no profile or page target)")
     genre = spec.get("genre", project.get("genre"))
     genre = GENRE_ALIASES.get(genre, genre)

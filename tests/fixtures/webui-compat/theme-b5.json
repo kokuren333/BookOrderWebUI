@@ -1,0 +1,98 @@
+{
+  "project": {
+    "format": "portable-publishing-job",
+    "format_version": "0.2",
+    "book": {
+      "title": "Compat",
+      "description": "Goal",
+      "target_readers": "Readers",
+      "target_pages": 150,
+      "language": "ja"
+    },
+    "user_instructions": "",
+    "research": {
+      "allow_web_research": true,
+      "prefer_primary_sources": true,
+      "keep_provenance": true,
+      "require_supplied_coverage": true
+    },
+    "figures": {
+      "tables": true,
+      "diagrams": true,
+      "charts": true,
+      "generative_images": false
+    },
+    "citations": {
+      "style": "numeric"
+    },
+    "outputs": {
+      "canonical_markdown": true,
+      "docx": true,
+      "semantic_html": true,
+      "pdf": true,
+      "static_site": true,
+      "epub": false
+    },
+    "runtime": {
+      "target": "none",
+      "bundled": false
+    },
+    "design": {
+      "spec": "book.design.yaml",
+      "theme": "modern-technical",
+      "custom_css": "custom.css"
+    },
+    "input": {
+      "urls": [],
+      "sources": []
+    }
+  },
+  "design": {
+    "$schema": "schemas/design.schema.json",
+    "theme": "modern-technical",
+    "art_direction": "",
+    "page": {
+      "size": "B5",
+      "orientation": "portrait"
+    },
+    "layout": {
+      "density": "standard"
+    },
+    "colors": {
+      "accent": "#0891B2"
+    },
+    "typography": {
+      "body": {
+        "japanese": "Noto Serif CJK JP",
+        "latin": "Source Serif 4",
+        "size": "9.5pt",
+        "weight": 400
+      },
+      "heading": {
+        "japanese": "Noto Sans JP",
+        "latin": "Inter",
+        "weight": 700
+      },
+      "code": {
+        "latin": "JetBrains Mono",
+        "size": "8.3pt"
+      },
+      "caption": {
+        "family": "Noto Sans JP",
+        "size": "7.8pt"
+      },
+      "footnote": {
+        "family": "Noto Serif CJK JP",
+        "size": "7.3pt"
+      }
+    },
+    "components": {
+      "chapter_opener": "editorial",
+      "table": "minimal-horizontal",
+      "callout": "border"
+    },
+    "figures": {
+      "style": "technical"
+    }
+  }
+}

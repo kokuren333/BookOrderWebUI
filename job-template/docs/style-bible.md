@@ -88,3 +88,10 @@ definition treatments), `table_density` (table and visual_grammar row spacing), 
 (chapter_opener.title_style: editorial, academic, minimal) and `visual_tone` (tone.restraint, tone.ornament).
 Controls apply after the template and art direction and before `project.style_bible`, which still wins. Preset and
 controls enter `inputs_fingerprint` only when present, so existing jobs keep their fingerprint.
+
+The WebUI shows one control per concept. Density, chapter opener and accent colour are Design Spec settings; when
+the user changes one of them from the theme default, the WebUI also writes the matching request —
+`style_controls.visual_density` (compact→compact, standard→balanced, spacious→airy), `style_controls.chapter_opener`
+and `style_bible.palette.accent` — so the PDF follows the same choice and an explicit accent wins over the style
+preset's palette. `typography_scale` is no longer offered in the WebUI (font sizes are set directly) but remains
+valid in hand-written project.json files.

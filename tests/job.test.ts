@@ -133,3 +133,114 @@ test('file picker snapshots the live FileList before the input is reset (attachm
   assert.ok(addFiles.indexOf('Array.from(list)') >= 0 && addFiles.indexOf('Array.from(list)') < addFiles.indexOf('setFiles('), addFiles);
   assert.match(app, /type="file"[^>]*onChange=\{e => \{ if \(e\.target\.files\) addFiles\(e\.target\.files\); e\.target\.value = ''; \}\}/);
 });
+
+// ---------------------------------------------------------------- IA revision: single authorities, presets, precedence
+import { designFromTheme, defaultDesign } from '../src/design.ts';
+import { applyPublicationPreset, autoTier, designPage, effectivePublication, presetDeviations, requestPayload } from '../src/publication.ts';
+import { jobDesign, projectData, templateTheme } from '../src/job.ts';
+
+const themeYaml = async (theme: string) => JSON.parse(await readFile(`job-template/themes/${theme}/theme.yaml`, 'utf8'));
+const themeOf = async (theme: string) => templateTheme({ [`themes/${theme}/theme.yaml`]: await readFile(`job-template/themes/${theme}/theme.yaml`, 'utf8') }, theme)!;
+const baseForm = () => ({ ...structuredClone(defaults), title: 'Compat', description: 'Goal', targetReaders: 'Readers', runtimeTarget: 'none' as const });
+
+test('target scale is the only scale input; tier is resolved automatically from it by the shared rule', () => {
+  assert.deepEqual([50, 80, 81, 150, 200, 300, 400, 450, 451, 0].map(autoTier), ['short', 'short', 'standard', 'standard', 'standard', 'long', 'long', 'long', 'monograph', 'standard']);
+  assert.equal(defaultPublication.tier, 'auto');
+  assert.ok(!('profile' in projectData(baseForm(), [], [])));            // automatic tier writes nothing
+  assert.deepEqual(projectData({ ...baseForm(), publication: { ...defaultPublication, tier: 'long' } }, [], []).profile, { tier: 'long' });
+});
+test('a publication preset fills genre, layout, style preset and theme in one step; later edits win', async () => {
+  const { publication, theme } = applyPublicationPreset(defaultPublication, 'medical-scientific');
+  assert.equal(theme, 'medical-textbook');
+  assert.deepEqual([publication.publicationPreset, publication.genre, publication.layoutPreset, publication.stylePreset], ['medical-scientific', 'medical_science', 'medical-scientific', 'medical-evidence']);
+  const design = designFromTheme('medical-textbook', await themeYaml('medical-textbook'));
+  const form = { ...baseForm(), publication, design };
+  const project = projectData(form, [], [], await themeOf('medical-textbook'));
+  assert.deepEqual([project.profile, project.layout_preset, project.style_preset], [{ genre: 'medical_science' }, 'medical-scientific', 'medical-evidence']);
+  assert.ok(!('layout_spec' in project) && !('style_controls' in project) && !('style_bible' in project));
+  assert.deepEqual(jobDesign(form, await themeOf('medical-textbook')).page, { size: 'B5', orientation: 'portrait' });
+  assert.deepEqual(presetDeviations(publication, 'medical-textbook'), []);
+  assert.deepEqual(presetDeviations({ ...publication, gutterMm: 9, genre: 'technical' }, 'modern-technical'), ['genre', 'layout', 'theme']);
+  for (const id of Object.keys(presetsData.publication_presets)) {
+    const bundle = presetsData.publication_presets[id as 'compact'];
+    assert.ok(bundle.layout in presetsData.layout_presets && (bundle.style === null || bundle.style in presetsData.style_presets), id);
+    await readFile(`job-template/themes/${bundle.theme}/theme.yaml`);
+  }
+});
+test('page size and orientation have a single authority (PublicationOptions); the Design Spec page is derived', async () => {
+  assert.ok(!('pageSize' in defaultDesign) && !('orientation' in defaultDesign));
+  const modern = await themeOf('modern-technical');
+  // Theme mode: an explicit Design Spec size/orientation stays on the legacy book.design.yaml path (no layout_spec).
+  const legacy = { ...baseForm(), publication: { ...defaultPublication, pageSize: 'B5' as const, orientation: 'landscape' as const } };
+  assert.deepEqual(jobDesign(legacy, modern).page, { size: 'B5', orientation: 'landscape' });
+  assert.ok(!('layout_spec' in projectData(legacy, [], [], modern)));
+  // Layout presets: the LayoutSpec request carries the geometry; the Design Spec mirrors a Design-Spec-legal size only.
+  const b6 = { ...baseForm(), publication: applyLayoutPreset(defaultPublication, 'compact-shinsho') };
+  assert.deepEqual(jobDesign(b6, modern).page, { size: 'A5', orientation: 'portrait' });
+  const rotated = { ...baseForm(), publication: { ...applyLayoutPreset(defaultPublication, 'standard-book'), orientation: 'landscape' as const } };
+  assert.equal((projectData(rotated, [], [], modern).layout_spec as { orientation: string }).orientation, 'landscape');
+  assert.equal(jobDesign(rotated, modern).page.orientation, 'landscape');
+});
+test('changing the theme never discards an explicit layout choice; theme-following values follow the new theme', async () => {
+  const business = await themeOf('business-reference');                   // theme page: B5
+  const follow = { ...baseForm(), design: designFromTheme('business-reference', await themeYaml('business-reference')) };
+  assert.deepEqual(jobDesign(follow, business).page, { size: 'B5', orientation: 'portrait' });
+  const pinned = { ...follow, publication: { ...defaultPublication, pageSize: 'A4' as const } };
+  assert.deepEqual(jobDesign(pinned, business).page, { size: 'A4', orientation: 'portrait' });
+  const custom = { ...follow, publication: { ...applyLayoutPreset(defaultPublication, 'technical-reference'), gutterMm: 9 } };
+  assert.deepEqual(projectData(custom, [], [], business).layout_spec, { body: { gutter_mm: 9 } });
+  assert.equal(effectivePublication(custom.publication, business.page).pageSize, 'B5');
+});
+test('one control per visual concept: explicit Design Spec edits derive the matching StyleBible request', async () => {
+  const modern = await themeOf('modern-technical');
+  assert.deepEqual(requestPayload(defaultPublication, defaultDesign, modern), {});
+  const edited = requestPayload({ ...defaultPublication, styleControls: { table_density: 'compact' } }, { ...defaultDesign, density: 'spacious', chapterStyle: 'academic', accent: '#123abc' }, modern);
+  assert.deepEqual(edited, { style_controls: { visual_density: 'airy', chapter_opener: 'academic', table_density: 'compact' }, style_bible: { palette: { accent: '#123ABC' } } });
+  const controls = await readFile('src/DesignPanel.tsx', 'utf8');
+  for (const hidden of ["control('visual_density')", "control('chapter_opener')", "control('typography_scale')"]) assert.ok(!controls.includes(hidden), hidden);
+});
+test('generated project.json and book.design.yaml stay compatible with the previous WebUI', async () => {
+  const modern = await themeOf('modern-technical');
+  const golden = async (name: string) => JSON.parse(await readFile(`tests/fixtures/webui-compat/${name}.json`, 'utf8'));
+  const cases: Record<string, BookFormLike> = {
+    default: baseForm(),
+    'theme-b5': { ...baseForm(), publication: { ...defaultPublication, pageSize: 'B5' } },   // was DesignOptions.pageSize
+    'medical-preset': { ...baseForm(), publication: { ...applyLayoutPreset(defaultPublication, 'medical-scientific'), genre: 'medical_science', stylePreset: 'medical-evidence', tier: 'long' } },
+    'custom-geometry': { ...baseForm(), publication: { ...applyLayoutPreset(defaultPublication, 'custom'), pageSize: 'custom', customWidthMm: 182, customHeightMm: 257, columns: 2, figureSpan: 'auto', tableSpan: 'full', margins: { top: 18, bottom: 20, inner: 20, outer: 16 } } },
+  };
+  for (const [name, form] of Object.entries(cases)) {
+    const expected = await golden(name);
+    assert.deepEqual(projectData(form, [], [], modern), expected.project, name);
+    assert.deepEqual(jobDesign(form, modern), expected.design, name);
+  }
+});
+type BookFormLike = ReturnType<typeof baseForm>;
+test('TASK.md states that structured settings are authoritative over free-text instructions', async () => {
+  const zip = await JSZip.loadAsync((await generateJob({ ...baseForm(), instructions: '横書きで' }, [], await templateFiles())).data);
+  const task = await zip.file('publishing-job/TASK.md')!.async('string');
+  assert.ok(task.includes('## Precedence of settings') && task.includes('structured settings'));
+});
+
+// ---------------------------------------------------------------- audit: theme switching keeps explicit values
+import { switchTheme } from '../src/design.ts';
+import { pdfAccent } from '../src/publication.ts';
+test('the WebUI default design is exactly the default theme (untouched Basic derives no StyleBible request)', async () => {
+  assert.deepEqual(defaultDesign, designFromTheme('modern-technical', await themeYaml('modern-technical')));
+});
+test('switching theme keeps explicit design values and follows the new theme elsewhere', async () => {
+  const modern = designFromTheme('modern-technical', await themeYaml('modern-technical'));
+  const medical = designFromTheme('medical-textbook', await themeYaml('medical-textbook'));
+  const untouched = switchTheme(modern, modern, medical);
+  assert.deepEqual(untouched, medical);
+  const edited = switchTheme({ ...modern, accent: '#AA3300', bodySize: 10, customCss: '.x{}', artDirection: 'calm' }, modern, medical);
+  assert.deepEqual([edited.theme, edited.accent, edited.bodySize, edited.density, edited.customCss, edited.artDirection], ['medical-textbook', '#AA3300', 10, medical.density, '.x{}', 'calm']);
+});
+test('the summary shows the accent the PDF will actually use', async () => {
+  const medical = await themeOf('medical-textbook');
+  const design = designFromTheme('medical-textbook', await themeYaml('medical-textbook'));
+  const lookup = (t: string) => ({ medical_science: '#116B78' } as Record<string, string>)[t];
+  const preset = applyPublicationPreset(defaultPublication, 'medical-scientific').publication;
+  assert.equal(pdfAccent(preset, design, medical, lookup), '#116B78');                       // style template beats theme in PDF
+  assert.equal(pdfAccent(preset, { accent: '#AA3300' }, medical, lookup), '#AA3300');        // explicit beats template
+  assert.equal(pdfAccent(defaultPublication, design, medical, lookup), design.accent);
+});

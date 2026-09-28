@@ -21,6 +21,9 @@ import threading
 import zipfile
 
 REPO = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO / "tests"))
+import _tools  # noqa: E402  PANDOC/TYPST from env, PATH or .tools/
+if _tools.MISSING: raise SystemExit(f"Missing {', '.join(_tools.MISSING)}: set PANDOC/TYPST, add to PATH, or place them in .tools/")
 FIXTURE = REPO / "tests/fixtures/mini-book"
 AGENT = FIXTURE / "agent"
 WORK = REPO / ".test-output/mini-e2e/publishing-job"

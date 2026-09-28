@@ -1,12 +1,88 @@
 {
   "schema": "bookorder/publication-presets@1",
   "note": "Shared by the WebUI (display, early warnings) and the job scripts (resolution, final validation). Presets only produce LayoutSpec / StyleBible input values; they are not renderer modes.",
+  "tier_from_pages": {
+    "note": "PublicationProfile compatibility rule: book.target_pages -> tier when no explicit tier is requested.",
+    "bounds": [
+      [
+        80,
+        "short"
+      ],
+      [
+        200,
+        "standard"
+      ],
+      [
+        450,
+        "long"
+      ]
+    ],
+    "above": "monograph",
+    "default": "standard"
+  },
+  "publication_presets": {
+    "standard-book": {
+      "label": "Standard Book",
+      "description": "一般書・単行本。A5・1段組み、落ち着いた書籍テーマ。",
+      "genre": null,
+      "layout": "standard-book",
+      "style": null,
+      "theme": "academic-jp"
+    },
+    "technical-reference": {
+      "label": "Technical / Reference",
+      "description": "技術書・リファレンス。B5・2段組み、図表は必要に応じて段抜き。",
+      "genre": "technical",
+      "layout": "technical-reference",
+      "style": "technical-clean",
+      "theme": "modern-technical"
+    },
+    "medical-scientific": {
+      "label": "Medical / Scientific",
+      "description": "医学・理工系の教科書。B5・2段組み、エビデンス重視の誌面。",
+      "genre": "medical_science",
+      "layout": "medical-scientific",
+      "style": "medical-evidence",
+      "theme": "medical-textbook"
+    },
+    "magazine-mook": {
+      "label": "Magazine / Mook",
+      "description": "実用書・ムック。A4・2段組み、図版を大きく見せる。",
+      "genre": "practical",
+      "layout": "magazine-mook",
+      "style": "practical-guide",
+      "theme": "business-reference"
+    },
+    "compact": {
+      "label": "Compact",
+      "description": "新書・エッセイ。B6・1段組み、文字中心の簡潔な誌面。",
+      "genre": "essay",
+      "layout": "compact-shinsho",
+      "style": "essay",
+      "theme": "minimal-monochrome"
+    }
+  },
   "page_sizes": {
-    "A4": [210.0, 297.0],
-    "A5": [148.0, 210.0],
-    "B5": [176.0, 250.0],
-    "B6": [125.0, 176.0],
-    "Letter": [215.9, 279.4]
+    "A4": [
+      210.0,
+      297.0
+    ],
+    "A5": [
+      148.0,
+      210.0
+    ],
+    "B5": [
+      176.0,
+      250.0
+    ],
+    "B6": [
+      125.0,
+      176.0
+    ],
+    "Letter": [
+      215.9,
+      279.4
+    ]
   },
   "page_size_notes": {
     "B5": "ISO B5 (176 x 250 mm). For JIS B5 (182 x 257 mm) choose Custom.",
@@ -29,115 +105,382 @@
       "label": "Standard Book",
       "description": "A5, 1 column, conventional book margins.",
       "layout": {
-        "page_size": "A5", "orientation": "portrait", "writing_mode": "horizontal-tb",
-        "page": {"margin_top_mm": 20, "margin_bottom_mm": 20, "margin_inner_mm": 20, "margin_outer_mm": 17},
-        "body": {"columns": 1, "gutter_mm": 6}
+        "page_size": "A5",
+        "orientation": "portrait",
+        "writing_mode": "horizontal-tb",
+        "page": {
+          "margin_top_mm": 20,
+          "margin_bottom_mm": 20,
+          "margin_inner_mm": 20,
+          "margin_outer_mm": 17
+        },
+        "body": {
+          "columns": 1,
+          "gutter_mm": 6
+        }
       }
     },
     "technical-reference": {
       "label": "Technical / Reference",
       "description": "B5, 2 columns, moderate gutter; wide figures and tables may span both columns.",
       "layout": {
-        "page_size": "B5", "orientation": "portrait", "writing_mode": "horizontal-tb",
-        "page": {"margin_top_mm": 18, "margin_bottom_mm": 20, "margin_inner_mm": 20, "margin_outer_mm": 16},
-        "body": {"columns": 2, "gutter_mm": 6},
-        "span_policy": {"figure": "auto", "table": "auto"}
+        "page_size": "B5",
+        "orientation": "portrait",
+        "writing_mode": "horizontal-tb",
+        "page": {
+          "margin_top_mm": 18,
+          "margin_bottom_mm": 20,
+          "margin_inner_mm": 20,
+          "margin_outer_mm": 16
+        },
+        "body": {
+          "columns": 2,
+          "gutter_mm": 6
+        },
+        "span_policy": {
+          "figure": "auto",
+          "table": "auto"
+        }
       }
     },
     "medical-scientific": {
       "label": "Medical / Scientific",
       "description": "B5, 2 columns (1 column also valid), evidence-heavy: figures and tables span when they need the width.",
       "layout": {
-        "page_size": "B5", "orientation": "portrait", "writing_mode": "horizontal-tb",
-        "page": {"margin_top_mm": 18, "margin_bottom_mm": 20, "margin_inner_mm": 19, "margin_outer_mm": 15},
-        "body": {"columns": 2, "gutter_mm": 7},
-        "span_policy": {"figure": "auto", "table": "auto"}
+        "page_size": "B5",
+        "orientation": "portrait",
+        "writing_mode": "horizontal-tb",
+        "page": {
+          "margin_top_mm": 18,
+          "margin_bottom_mm": 20,
+          "margin_inner_mm": 19,
+          "margin_outer_mm": 15
+        },
+        "body": {
+          "columns": 2,
+          "gutter_mm": 7
+        },
+        "span_policy": {
+          "figure": "auto",
+          "table": "auto"
+        }
       }
     },
     "magazine-mook": {
       "label": "Magazine / Mook",
       "description": "A4, 2 columns, stronger visual rhythm: figures prefer the full body width.",
       "layout": {
-        "page_size": "A4", "orientation": "portrait", "writing_mode": "horizontal-tb",
-        "page": {"margin_top_mm": 15, "margin_bottom_mm": 18, "margin_inner_mm": 18, "margin_outer_mm": 14},
-        "body": {"columns": 2, "gutter_mm": 8},
-        "span_policy": {"figure": "full", "table": "auto"}
+        "page_size": "A4",
+        "orientation": "portrait",
+        "writing_mode": "horizontal-tb",
+        "page": {
+          "margin_top_mm": 15,
+          "margin_bottom_mm": 18,
+          "margin_inner_mm": 18,
+          "margin_outer_mm": 14
+        },
+        "body": {
+          "columns": 2,
+          "gutter_mm": 8
+        },
+        "span_policy": {
+          "figure": "full",
+          "table": "auto"
+        }
       }
     },
     "compact-shinsho": {
       "label": "Compact / Shinsho-like",
       "description": "B6, 1 column, compact margins.",
       "layout": {
-        "page_size": "B6", "orientation": "portrait", "writing_mode": "horizontal-tb",
-        "page": {"margin_top_mm": 15, "margin_bottom_mm": 17, "margin_inner_mm": 16, "margin_outer_mm": 13},
-        "body": {"columns": 1, "gutter_mm": 6}
+        "page_size": "B6",
+        "orientation": "portrait",
+        "writing_mode": "horizontal-tb",
+        "page": {
+          "margin_top_mm": 15,
+          "margin_bottom_mm": 17,
+          "margin_inner_mm": 16,
+          "margin_outer_mm": 13
+        },
+        "body": {
+          "columns": 1,
+          "gutter_mm": 6
+        }
       }
     }
   },
   "span_policies": {
-    "auto": {"label": "Automatic", "description": "Stay in a column; span the body when the planned width or the table needs it (decided at layout time)."},
-    "column": {"label": "Single column preferred", "description": "Stay in a column unless an asset explicitly requests a span."},
-    "full": {"label": "Full width preferred", "description": "Default to the full body width unless an asset explicitly requests span 1."}
+    "auto": {
+      "label": "Automatic",
+      "description": "Stay in a column; span the body when the planned width or the table needs it (decided at layout time)."
+    },
+    "column": {
+      "label": "Single column preferred",
+      "description": "Stay in a column unless an asset explicitly requests a span."
+    },
+    "full": {
+      "label": "Full width preferred",
+      "description": "Default to the full body width unless an asset explicitly requests span 1."
+    }
   },
-  "auto_span": {"table_min_columns": 5},
+  "auto_span": {
+    "table_min_columns": 5
+  },
   "writing_modes": {
-    "horizontal-tb": {"label": "Horizontal", "typst": true},
-    "vertical-rl": {"label": "Vertical", "typst": false, "reason": "Current Typst renderer does not support vertical writing."}
+    "horizontal-tb": {
+      "label": "Horizontal",
+      "typst": true
+    },
+    "vertical-rl": {
+      "label": "Vertical",
+      "typst": false,
+      "reason": "Current Typst renderer does not support vertical writing."
+    }
   },
   "style_presets": {
-    "technical-clean": {"label": "Technical Clean", "template": "technical"},
-    "medical-evidence": {"label": "Medical Evidence", "template": "medical_science"},
-    "practical-guide": {"label": "Practical Guide", "template": "practical"},
-    "critical-editorial": {"label": "Critical / Editorial", "template": "criticism"},
-    "essay": {"label": "Essay", "template": "essay"}
+    "technical-clean": {
+      "label": "Technical Clean",
+      "template": "technical"
+    },
+    "medical-evidence": {
+      "label": "Medical Evidence",
+      "template": "medical_science"
+    },
+    "practical-guide": {
+      "label": "Practical Guide",
+      "template": "practical"
+    },
+    "critical-editorial": {
+      "label": "Critical / Editorial",
+      "template": "criticism"
+    },
+    "essay": {
+      "label": "Essay",
+      "template": "essay"
+    }
   },
   "style_controls": {
     "visual_density": {
       "label": "Visual density",
       "options": {
-        "compact": {"label": "Compact", "patch": {"tone": {"density": "dense", "whitespace": "tight"}, "visual_grammar": {"rhythm": {"section_space": "compact"}}}, "spacing_scale": 0.85},
-        "balanced": {"label": "Balanced", "patch": {"tone": {"density": "balanced", "whitespace": "balanced"}, "visual_grammar": {"rhythm": {"section_space": "regular"}}}, "spacing_scale": 1.0},
-        "airy": {"label": "Airy", "patch": {"tone": {"density": "open", "whitespace": "generous"}, "visual_grammar": {"rhythm": {"section_space": "generous"}}}, "spacing_scale": 1.2}
+        "compact": {
+          "label": "Compact",
+          "patch": {
+            "tone": {
+              "density": "dense",
+              "whitespace": "tight"
+            },
+            "visual_grammar": {
+              "rhythm": {
+                "section_space": "compact"
+              }
+            }
+          },
+          "spacing_scale": 0.85
+        },
+        "balanced": {
+          "label": "Balanced",
+          "patch": {
+            "tone": {
+              "density": "balanced",
+              "whitespace": "balanced"
+            },
+            "visual_grammar": {
+              "rhythm": {
+                "section_space": "regular"
+              }
+            }
+          },
+          "spacing_scale": 1.0
+        },
+        "airy": {
+          "label": "Airy",
+          "patch": {
+            "tone": {
+              "density": "open",
+              "whitespace": "generous"
+            },
+            "visual_grammar": {
+              "rhythm": {
+                "section_space": "generous"
+              }
+            }
+          },
+          "spacing_scale": 1.2
+        }
       }
     },
     "typography_scale": {
       "label": "Typography scale",
       "options": {
-        "small": {"label": "Small (-6%)", "type_scale": 0.94},
-        "standard": {"label": "Standard", "type_scale": 1.0},
-        "large": {"label": "Large (+6%)", "type_scale": 1.06}
+        "small": {
+          "label": "Small (-6%)",
+          "type_scale": 0.94
+        },
+        "standard": {
+          "label": "Standard",
+          "type_scale": 1.0
+        },
+        "large": {
+          "label": "Large (+6%)",
+          "type_scale": 1.06
+        }
       }
     },
     "callout_intensity": {
       "label": "Callout intensity",
       "options": {
-        "quiet": {"label": "Quiet", "components": {"key_point": {"treatment": "plain-emphasis", "fill_policy": "none"}, "warning": {"treatment": "side-rule", "fill_policy": "none"}, "definition": {"treatment": "plain-emphasis", "fill_policy": "none"}}, "patch": {"callout": {"fill_style": "none"}}},
-        "standard": {"label": "Standard"},
-        "strong": {"label": "Strong", "components": {"key_point": {"treatment": "filled-box", "fill_policy": "surface"}, "warning": {"treatment": "filled-box", "fill_policy": "surface"}, "definition": {"treatment": "side-rule"}}, "patch": {"callout": {"fill_style": "surface"}}}
+        "quiet": {
+          "label": "Quiet",
+          "components": {
+            "key_point": {
+              "treatment": "plain-emphasis",
+              "fill_policy": "none"
+            },
+            "warning": {
+              "treatment": "side-rule",
+              "fill_policy": "none"
+            },
+            "definition": {
+              "treatment": "plain-emphasis",
+              "fill_policy": "none"
+            }
+          },
+          "patch": {
+            "callout": {
+              "fill_style": "none"
+            }
+          }
+        },
+        "standard": {
+          "label": "Standard"
+        },
+        "strong": {
+          "label": "Strong",
+          "components": {
+            "key_point": {
+              "treatment": "filled-box",
+              "fill_policy": "surface"
+            },
+            "warning": {
+              "treatment": "filled-box",
+              "fill_policy": "surface"
+            },
+            "definition": {
+              "treatment": "side-rule"
+            }
+          },
+          "patch": {
+            "callout": {
+              "fill_style": "surface"
+            }
+          }
+        }
       }
     },
     "table_density": {
       "label": "Table density",
       "options": {
-        "compact": {"label": "Compact", "patch": {"table": {"row_spacing": "compact"}, "visual_grammar": {"table": {"row_spacing": "compact"}}}},
-        "regular": {"label": "Regular", "patch": {"table": {"row_spacing": "standard"}, "visual_grammar": {"table": {"row_spacing": "regular"}}}},
-        "generous": {"label": "Generous", "patch": {"table": {"row_spacing": "generous"}, "visual_grammar": {"table": {"row_spacing": "generous"}}}}
+        "compact": {
+          "label": "Compact",
+          "patch": {
+            "table": {
+              "row_spacing": "compact"
+            },
+            "visual_grammar": {
+              "table": {
+                "row_spacing": "compact"
+              }
+            }
+          }
+        },
+        "regular": {
+          "label": "Regular",
+          "patch": {
+            "table": {
+              "row_spacing": "standard"
+            },
+            "visual_grammar": {
+              "table": {
+                "row_spacing": "regular"
+              }
+            }
+          }
+        },
+        "generous": {
+          "label": "Generous",
+          "patch": {
+            "table": {
+              "row_spacing": "generous"
+            },
+            "visual_grammar": {
+              "table": {
+                "row_spacing": "generous"
+              }
+            }
+          }
+        }
       }
     },
     "chapter_opener": {
       "label": "Chapter opener",
       "options": {
-        "editorial": {"label": "Editorial", "patch": {"chapter_opener": {"title_style": "editorial"}}},
-        "academic": {"label": "Academic", "patch": {"chapter_opener": {"title_style": "academic"}}},
-        "minimal": {"label": "Minimal", "patch": {"chapter_opener": {"title_style": "minimal"}}}
+        "editorial": {
+          "label": "Editorial",
+          "patch": {
+            "chapter_opener": {
+              "title_style": "editorial"
+            }
+          }
+        },
+        "academic": {
+          "label": "Academic",
+          "patch": {
+            "chapter_opener": {
+              "title_style": "academic"
+            }
+          }
+        },
+        "minimal": {
+          "label": "Minimal",
+          "patch": {
+            "chapter_opener": {
+              "title_style": "minimal"
+            }
+          }
+        }
       }
     },
     "visual_tone": {
       "label": "Visual tone",
       "options": {
-        "restrained": {"label": "Restrained", "patch": {"tone": {"restraint": "high", "ornament": "low"}}},
-        "balanced": {"label": "Balanced", "patch": {"tone": {"restraint": "medium", "ornament": "low"}}},
-        "expressive": {"label": "Expressive", "patch": {"tone": {"restraint": "low", "ornament": "medium"}}}
+        "restrained": {
+          "label": "Restrained",
+          "patch": {
+            "tone": {
+              "restraint": "high",
+              "ornament": "low"
+            }
+          }
+        },
+        "balanced": {
+          "label": "Balanced",
+          "patch": {
+            "tone": {
+              "restraint": "medium",
+              "ornament": "low"
+            }
+          }
+        },
+        "expressive": {
+          "label": "Expressive",
+          "patch": {
+            "tone": {
+              "restraint": "low",
+              "ornament": "medium"
+            }
+          }
+        }
       }
     }
   }

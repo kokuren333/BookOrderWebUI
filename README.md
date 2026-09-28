@@ -46,15 +46,26 @@ The integration check uses PANDOC and TYPST environment variables when tools are
 
 This demonstrates the publishing pipeline with a short fixture. An external agent's actual research quality, 50–400-page writing, licensing review and complete editorial work depend on that agent and its available tools. A generated job alone does not guarantee those outcomes.
 
-## Publication format (P1-UI)
+## Settings layout (what goes where)
 
-Section 05 of the WebUI sets the book format: PublicationProfile tier/genre, a layout preset (Standard Book, Technical / Reference, Medical / Scientific, Magazine / Mook, Compact / Shinsho-like, Custom), page size (A4/A5/B5/B6/Letter/custom), 1 or 2 columns, gutter, inner/outer/top/bottom margins, figure/table span policy, and a StyleBible preset with a few high-level controls (Advanced). The WebUI writes only the request fields the job's existing resolvers read (`profile`, `layout_preset`, `layout_spec`, `style_preset`, `style_controls` in project.json); the job resolves them into plan/profile.resolved.yaml, plan/layout-spec.yaml and plan/style-bible.yaml. Presets, paper sizes and validation limits are shared with the Python resolvers through `job-template/schemas/publication-presets.json`. The live summary and schematic preview are estimates from those shared rules; `bookorder publication` and the LayoutSpec resolver are the authority. Untouched settings produce the same project.json as before. Vertical writing is shown but disabled (the Typst renderer does not support it).
+| Section | Basic | Advanced |
+|---|---|---|
+| 01 本の企画 | title, goal, readers, language, **Target scale** (the only scale input) | tier override (automatic by default) |
+| 02 資料と指示 | URLs, files, additional instructions (supplementary; structured settings win) | — |
+| 03 調査とコンテンツの方針 | research, citation style, whether tables/diagrams/charts/images may be made | — |
+| 04 希望する出力 | output formats | — |
+| 05 出版形式とデザイン | Publication preset, Genre, Theme, Layout, Page size, Columns | Geometry · Typography · Visual grammar · Expert |
+| 06 実行環境 | runtime OS/CPU | — |
 
-Tests: `python tests/test_publication_ui.py` (resolver + WebUI payload + TypeScript/Python parity) and, after `python tests/mini_e2e.py --keep`, `python tests/publication_e2e.py` (A5 one-column and B5 two-column PDFs from WebUI payloads).
+A **Publication preset** (Standard Book, Technical / Reference, Medical / Scientific, Magazine / Mook, Compact) fills genre, layout preset, PDF style preset and theme at once; any later edit wins. **Genre** = kind of content, **Layout** = page size, columns and margins, **Theme** = typefaces, colour and component look. Each concept has exactly one control: page size and orientation belong to the layout; density, chapter opener and accent belong to the Design Spec and, when changed from the theme default, are passed on to the StyleBible automatically. Changing the theme keeps the values you changed and the whole layout; only untouched values follow the new theme. The right-hand summary shows the resolved format, typography, tier, PDF style and outputs next to a schematic page and the theme sample.
+
+The WebUI writes only request fields that the job's resolvers already read (`profile`, `layout_preset`, `layout_spec`, `style_preset`, `style_controls`, and `style_bible` only for an explicit accent colour) plus `book.design.yaml`; the job resolves them into plan/profile.resolved.yaml, plan/layout-spec.yaml and plan/style-bible.yaml. Presets, paper sizes, validation limits and the pages→tier rule are shared with the Python resolvers through `job-template/schemas/publication-presets.json`. Untouched settings produce the same project.json and book.design.yaml as earlier releases. Resolution order and the full field mapping: [docs/webui-information-architecture.md](docs/webui-information-architecture.md).
+
+Tests: `npm test` (payload, single authorities, compatibility fixtures), `python tests/test_publication_ui.py` (resolvers + WebUI payload + TypeScript/Python parity), `python tests/ui_interaction.py` (headless Chromium via Playwright; skips without it), and after `python tests/mini_e2e.py --keep`, `python tests/publication_e2e.py` (A5 one-column and B5 two-column PDFs from WebUI payloads).
 
 ## Book design
 
-See [the design system guide](job-template/docs/design-system.md). The GUI configures four themes, role fonts, page size, density, components, vector diagrams and custom CSS. Content IR, Design Spec and renderer are separate; CSS/Typst/DOCX share normalized tokens. Theme preview builds an isolated sample. No alternate PDF backend or print PDF/X certification is implemented.
+See [the design system guide](job-template/docs/design-system.md). Section 05 of the GUI configures five themes, role fonts, density, components, vector diagrams and custom CSS (page size and orientation are part of the layout). Content IR, Design Spec and renderer are separate; CSS/Typst/DOCX share normalized tokens. Theme preview builds an isolated sample. No alternate PDF backend or print PDF/X certification is implemented.
 
 
 Design integration: python tests/design.py (PANDOC/TYPST must be available). Portable integration: node --experimental-strip-types tools/make-portable-fixture.mjs, then python tests/e2e.py --portable.

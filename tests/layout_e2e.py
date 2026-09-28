@@ -10,6 +10,9 @@ import subprocess
 import sys
 
 REPO = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO / "tests"))
+import _tools  # noqa: E402  PANDOC/TYPST from env, PATH or .tools/; UTF-8 child output
+if _tools.MISSING: raise SystemExit(f"Missing {', '.join(_tools.MISSING)}: set PANDOC/TYPST, add to PATH, or place them in .tools/")
 BASE = REPO / ".test-output/mini-e2e/publishing-job"
 WORK = REPO / ".test-output/layout-e2e/publishing-job"
 
@@ -79,7 +82,7 @@ def main():
     text = text.replace(anchor, anchor + '\n\n![一列幅の図版](source/assets/figures/column-probe.svg){#fig-column-probe}')
     chapter.write_text(text, encoding="utf-8")
 
-    result = subprocess.run([sys.executable, "scripts/build.py"], cwd=WORK, capture_output=True, text=True)
+    result = subprocess.run([sys.executable, "scripts/build.py"], cwd=WORK, capture_output=True, text=True, encoding="utf-8", errors="replace")
     require(result.returncode == 0, result.stdout + "\n" + result.stderr)
     metrics = json.loads((WORK / "reports/layout-metrics.json").read_text(encoding="utf-8"))
     figure = json.loads((WORK / "reports/figure-check.json").read_text(encoding="utf-8"))
@@ -97,7 +100,7 @@ def main():
     require(capabilities["renderers"]["pdf"]["status"] == "supported", "PDF capability wrong")
     require(metrics["area_accuracy"] == "approximate", "two-column metric limit not declared")
     specimen = subprocess.run([sys.executable, "tools/layout-specimen.py"], cwd=WORK,
-                              capture_output=True, text=True)
+                              capture_output=True, text=True, encoding="utf-8", errors="replace")
     require(specimen.returncode == 0 and (WORK / "publish/layout-specimen.pdf").is_file(),
             specimen.stdout + "\n" + specimen.stderr)
     print(json.dumps({"ok": True, "pages": metrics["totals"]["pages"], "two_column_text": True,
