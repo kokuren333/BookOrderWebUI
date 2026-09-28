@@ -10,6 +10,7 @@ import shutil
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 REPO = Path(__file__).resolve().parent.parent
 TEMPLATE = REPO / "job-template"
@@ -159,7 +160,10 @@ class PacingReadsProfile(unittest.TestCase):
         try:
             pp.RESOLVED = folder / "profile.resolved.yaml"
             pp.write(pp.resolve(project(300, {"tier": "long", "overrides": {"rhythm.max_text_only_pages": 5}}), A5))
-            limits = pacing.limits(project(50))  # the page target alone would say short/3
+            # Other test modules reload a temporary job's publication_profile into sys.modules.
+            # Match this test's pacing import with its own profile module for the call.
+            with patch.dict(sys.modules, {"publication_profile": pp}):
+                limits = pacing.limits(project(50))  # the page target alone would say short/3
             self.assertEqual((limits["tier"], limits["max_text_only_pages"], limits["profile"]), ("long", 5, "long.general"))
             self.assertIn("plan/profile.resolved.yaml", limits["source"])
         finally:

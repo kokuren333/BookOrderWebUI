@@ -14,5 +14,9 @@ editorial inspection that programs cannot do.
   Table Caption, Bibliography, component styles, Equation) and native equations.
 - EPUB: navigation, reflow, MathML equations; run epubcheck if installed.
 
+- User intent: check the rendered book against the user's instructions (voice and structure as asked, requested
+  figures present, excluded apparatus absent, structured format kept) and add a `## User intent` section to
+  reports/layout-review.md with what you checked and any conflict.
+
 Record actual evidence and limitations in reports/layout-review.md. A build that succeeds is not a publication
 that is finished: only `bookorder goal` reporting `STATUS: COMPLETE` is.

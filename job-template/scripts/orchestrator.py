@@ -64,6 +64,8 @@ def new_state(project):
     return {"format": "bookorder-project-state", "version": 1, "status": "running", "phase": PHASES[0],
             "phases": {name: "pending" for name in PHASES}, "phase_times": {}, "scale": compute_scale(project, design),
             "accepted": {}, "counters": {}, "blockers": [], "reviewed_hashes": {}, "created_at": now(), "updated_at": now(),
+            # Jobs started with this flag verify user-intent compliance (docs/user-intent.md); older states are not re-gated.
+            "user_intent_protocol": 1,
             "project": {"title": project["book"]["title"], "requested_pages": project["book"].get("target_pages"),
                         "language": project["book"].get("language"), "citation_style": project["citations"]["style"]}}
 
@@ -170,9 +172,31 @@ class Context:
 
 def task(identifier, phase, title, instructions, outputs=(), inputs=(), group=None, checks=None, kind="agent"):
     from skills import resolve
-    return {"id": identifier, "phase": phase, "kind": kind, "title": title, "skills": resolve(*SKILL_IDS.get(phase, ())),
+    import user_intent
+    item = {"id": identifier, "phase": phase, "kind": kind, "title": title, "skills": resolve(*SKILL_IDS.get(phase, ())),
             "inputs": list(inputs), "outputs": list(outputs), "instructions": instructions if isinstance(instructions, list) else [instructions],
             "parallel_group": group, "failing_checks": checks or [], "done": f"bookorder done {identifier}"}
+    # The user's verbatim instructions travel with every agent task: a sub-agent that only sees this task still has them.
+    block = user_intent.task_block(phase) if kind == "agent" else None
+    if block: item["user_intent"] = block
+    return item
+
+
+def intent_active(ctx):
+    """User-intent compliance checks apply when the user wrote instructions and the job started under this protocol."""
+    import user_intent
+    return user_intent.present(ctx.project) and bool(ctx.state.get("user_intent_protocol"))
+
+
+def intent_check_errors(ctx, path, label=None):
+    """A content-changing task records a short intent_check in the file it already writes."""
+    import user_intent
+    if not intent_active(ctx) or not path.is_file(): return []
+    try: data = yaml_data(path)
+    except ValueError: return []
+    if user_intent.noted(data.get("intent_check")): return []
+    return [f"{label or path.relative_to(ROOT).as_posix()}: intent_check is required — how this work follows the user's instructions "
+            "(or which conflict you recorded in plan/user-intent.yaml)"]
 
 
 class Result:
@@ -317,6 +341,10 @@ def h_architecture(ctx):
     errors = check_bible()
     outline_errors, chapters = check_outline(ctx.scale, ctx.project)
     errors += outline_errors
+    intent_outputs = []
+    if intent_active(ctx):
+        errors += architecture_intent_errors(ctx)
+        intent_outputs = ["plan/user-intent.yaml"]
     if errors:
         scale = ctx.scale
         return Result(tasks=[task("architecture", "architecture", "Book Bible and whole-book architecture", [
@@ -325,10 +353,25 @@ def h_architecture(ctx):
             "Write plan/book-bible.yaml: title, subtitle, purpose, audience, tone, central_thesis, scope{included, excluded}, terminology{preferred_terms, definitions, aliases}, editorial_rules{voice, formality, tense, punctuation, citation_style, repetition_policy}, global_narrative{opening, development, turning_points, conclusion}, recurring_concepts, recurring_examples, cross_references, chapter_dependencies, design_intent{theme, typography, figure_style, callout_policy}.",
             "Write source/metadata/outline.yaml: chapters: [{id: ch-<slug>, title, file: source/manuscript/NN-<slug>.md, part?, purpose, prerequisites, introduces, develops, assumes, hands_off_to, target_characters, required_sections: [{id: sec-..., title}], required_topics, sources: {primary, supporting}, required_references, expected_assets, must_not_repeat, handoff}].",
             "Design chapters as a dependency graph grounded in plan/topic-synthesis.yaml and plan/source-clusters.yaml; allocate the character budget intentionally; assign every relevant supplied source."],
-            outputs=["plan/book-bible.yaml", "source/metadata/outline.yaml"], checks=errors)])
+            outputs=["plan/book-bible.yaml", "source/metadata/outline.yaml"] + intent_outputs, checks=errors)])
     graph = dependency_graph(chapters)
     log_event("architecture", "summary", chapters=len(chapters), waves=len(graph["parallel_waves"]), planned_characters=sum(c["target_characters"] for c in chapters))
     return Result(done=True)
+
+
+def architecture_intent_errors(ctx):
+    """plan/user-intent.yaml is valid and the Book Bible says which choices come from the user and which are defaults."""
+    import user_intent
+    from planning import BIBLE
+    user_intent.seed(ctx.project)
+    errors = user_intent.check(ctx.project)
+    bible = yaml_data(BIBLE) if BIBLE.is_file() else {}
+    section = bible.get("user_intent") if isinstance(bible.get("user_intent"), dict) else {}
+    if not as_list(section.get("governs")):
+        errors.append("book-bible.yaml: user_intent.governs is required (each user choice and how this book follows it)")
+    if "defaults_used" not in section:
+        errors.append("book-bible.yaml: user_intent.defaults_used is required (BookOrder defaults used where the user said nothing; [] if none)")
+    return errors
 
 
 def profile_lines():
@@ -392,9 +435,10 @@ def h_editorial_planning(ctx):
     return Result(done=True)
 
 
-def drafted(chapter, record):
-    from planning import check_summary
-    return bool(record) and record["id"] == chapter["id"] and record["chars"] >= 0.5 * chapter["minimum_characters"] and not check_summary(chapter["id"])
+def drafted(chapter, record, ctx=None):
+    from planning import check_summary, summary_path
+    return (bool(record) and record["id"] == chapter["id"] and record["chars"] >= 0.5 * chapter["minimum_characters"] and not check_summary(chapter["id"])
+            and not (ctx and intent_check_errors(ctx, summary_path(chapter["id"]))))
 
 
 def h_drafting(ctx):
@@ -402,7 +446,7 @@ def h_drafting(ctx):
     import citations
     citations.generate()
     chapters = ctx.outline(); mapped = ctx.by_chapter()
-    done = {c["id"] for c in chapters if drafted(c, mapped.get(c["id"]))}
+    done = {c["id"] for c in chapters if drafted(c, mapped.get(c["id"]), ctx)}
     tasks = []; waiting = []
     waves = {}
     for chapter in chapters:
@@ -415,12 +459,15 @@ def h_drafting(ctx):
         from planning import check_summary
         problems = ([] if record else [f"{chapter['file']} missing"]) + (["chapter heading ID must be " + chapter["id"]] if record and record["id"] != chapter["id"] else [])
         problems += ([f"only {current} characters; a first full draft needs at least {int(0.5 * chapter['minimum_characters'])}"] if record and current < 0.5 * chapter["minimum_characters"] else []) + check_summary(chapter["id"])
+        from planning import summary_path
+        problems += intent_check_errors(ctx, summary_path(chapter["id"]))
         tasks.append(task(f"draft:{chapter['id']}", "drafting", f"Draft {chapter['id']} — {chapter['title']} ({chapter['target_characters']:,} characters)", [
             f"Read plan/chapter-packets/{chapter['id']}.yaml first, then plan/book-bible.yaml, source/metadata/glossary.yaml and the packet's source texts. Do not redefine terminology, tone or thesis.",
             f"Write {chapter['file']} section by section: skeleton → each required section → source enrichment → examples → citations → transitions. Target {chapter['target_characters']:,} characters (minimum {chapter['minimum_characters']:,}); currently {current:,}.",
             "Cite with [cite:src-XXXX] only; cross-reference with @ch:/@sec:/@fig:/@tbl:/@eq:. Never type visible citation numbers.",
             *editorial_lines(chapter),
-            f"Then write plan/summaries/{chapter['id']}.yaml: summary (60+ chars), introduced_concepts, key_terms, examples_used, handoff (what the next chapters can assume)."],
+            f"Then write plan/summaries/{chapter['id']}.yaml: summary (60+ chars), introduced_concepts, key_terms, examples_used, handoff (what the next chapters can assume)"
+            + (", intent_check (one or two sentences: how this chapter follows the user's instructions, or the conflict you recorded)." if intent_active(ctx) else ".")],
             inputs=[f"plan/chapter-packets/{chapter['id']}.yaml"], outputs=[chapter["file"], f"plan/summaries/{chapter['id']}.yaml"], group=f"wave-{level}", checks=problems))
     if tasks or waiting:
         return Result(tasks=tasks, info=(f"Waiting on prerequisites: {', '.join(waiting)}" if waiting else None))
@@ -449,7 +496,7 @@ def expansion_task(contract, chapter, phase="chapter_review"):
     lines += ["Problem: " + r["detail"] for r in contract["reasons"]]
     if "length" in kinds:
         lines.append(f"Expand by about {contract['deficit']:,} characters with substance: unused assigned sources {', '.join(contract.get('unused_assigned_sources', [])) or '(none)'}, missing concepts, worked examples, historical context, technical explanation, comparisons, counterexamples, limitations. No padding or repetition.")
-    lines.append(f"Use plan/chapter-packets/{contract['id']}.yaml (regenerated). Keep the Book Bible, glossary and must_not_repeat. Update plan/summaries/{contract['id']}.yaml if the content changed.")
+    lines.append(f"Use plan/chapter-packets/{contract['id']}.yaml (regenerated). Keep the Book Bible, glossary and must_not_repeat. Update plan/summaries/{contract['id']}.yaml if the content changed (keep any intent_check current).")
     return task(("expand:" if kinds == ["length"] else "review:") + contract["id"], phase,
                 ("Expand " if kinds == ["length"] else "Complete contract for ") + contract["id"], lines,
                 outputs=[chapter["file"]], group="chapters", checks=[r["detail"] for r in contract["reasons"]])
@@ -499,7 +546,7 @@ def h_integration(ctx):
     ledger = run_integration_checks(ctx, "integration")
     high = [e for e in audit.open_issues(ledger, ("high",)) if e.get("scope") == "integration"]
     ids = [c["id"] for c in ctx.outline()]
-    review_errors = audit.check_review_file(ROOT / "plan/integration-review.yaml", ids)
+    review_errors = audit.check_review_file(ROOT / "plan/integration-review.yaml", ids) + intent_check_errors(ctx, ROOT / "plan/integration-review.yaml")
     if high or review_errors or not agent_reported(ctx.state, "integrate"):
         lines = ["Read the whole manuscript in order as ONE book. Fix: repeated explanations, terminology drift, inconsistent definitions, contradictions, concepts used before introduction, missing callbacks/hand-offs, broken cross references, duplicated examples, abrupt transitions, inconsistent voice, disproportionate chapter sizes.",
                  "Deterministic findings to fix (see reports/audit-report.yaml):"]
@@ -645,7 +692,7 @@ def h_audit(ctx):
                 f"Audit {chapter['file']} against its sources (packet + research/notes) and the Book Bible: factual consistency, unsupported claims, citation/source mismatch, contradictions, terminology drift, inconsistent definitions, repeated explanations, duplicated examples, dependency errors, transitions, figure/table/equation consistency, notation.",
                 f"Write plan/audit/{chapter['id']}.yaml: chapter: {chapter['id']}, reviewed: true, checks: [what you verified], issues: [{{severity: high|medium|low, section, type, description, action}}]. Report real problems only; do not fix yet."],
                 outputs=[f"plan/audit/{chapter['id']}.yaml"], group="audit", checks=errors))
-    book_errors = audit.check_review_file(ROOT / "plan/audit/book.yaml", ids)
+    book_errors = audit.check_review_file(ROOT / "plan/audit/book.yaml", ids) + intent_check_errors(ctx, ROOT / "plan/audit/book.yaml")
     if book_errors or not agent_reported(ctx.state, "audit:book"):
         tasks.append(task("audit:book", "audit", "Whole-book audit (cross-chapter)", [
             "Audit across chapters: contradictory statements between chapters, narrative progression, chapter balance, repeated explanations, supplied-source coverage (reports/source-coverage.json), bibliography consistency, figure/table/equation consistency and design consistency.",
@@ -671,7 +718,7 @@ def h_prose_audit(ctx):
     signals = prose_signals.run(ctx.outline(), profile.get("genre", "general"))
     ids = [c["id"] for c in ctx.outline()]
     path = ROOT / "plan/prose-audit.yaml"
-    errors = audit.check_review_file(path, ids)
+    errors = audit.check_review_file(path, ids) + intent_check_errors(ctx, path)
     if path.is_file():
         report = yaml_data(path)
         for field in ("candidates", "lexical_comparison", "role_comparison", "protected_passages"):
@@ -739,7 +786,7 @@ def h_rewrite(ctx):
 def h_prose_editing(ctx):
     import audit
     path = ROOT / "plan/prose-editing.yaml"
-    errors = audit.check_review_file(path, [c["id"] for c in ctx.outline()])
+    errors = audit.check_review_file(path, [c["id"] for c in ctx.outline()]) + intent_check_errors(ctx, path)
     if path.is_file():
         report = yaml_data(path)
         for field in ("edits", "preserved", "citation_reaudit"):
@@ -810,6 +857,7 @@ def h_design(ctx):
         spec = load_design(); normalize(spec, require_pdf=bool(ctx.project["outputs"].get("pdf")))
     except Exception as exc: errors.append(f"Design Spec: {exc}")
     decisions = ROOT / "plan/design-decisions.yaml"
+    errors += intent_check_errors(ctx, decisions)
     if errors or not decisions.is_file() or not agent_reported(ctx.state, "design"):
         art = ""
         try: art = load_design().get("art_direction", "")
@@ -856,13 +904,20 @@ def h_layout(ctx):
     review = ROOT / "reports/layout-review.md"
     pacing = audit.pacing_issues({cid: rec for cid, rec in ctx.by_chapter().items()})
     fresh_review = review.is_file() and review.stat().st_mtime >= built and len(review.read_text(encoding="utf-8").strip()) > 200
-    if not fresh_review or not agent_reported(ctx.state, "layout-review"):
+    intent_missing = intent_active(ctx) and review.is_file() and not layout_review_has_intent(review)
+    if not fresh_review or intent_missing or not agent_reported(ctx.state, "layout-review"):
         lines = ["Open the proof outputs: publish/book.pdf (several representative pages at real size incl. chapter openers, dense tables, figures, equations, bibliography), publish/site/ (navigation, search, mobile width), interchange/book.docx styles, EPUB if requested.",
                  "Check awkward page breaks, orphan headings, figures separated from their explanation, overflowing tables/code, missing glyphs, long uninterrupted prose runs, callout density and chapter density differences.",
                  "Fix problems in canonical source or Design Spec, rebuild with `bookorder goal`, then record ACTUAL checks and findings in reports/layout-review.md (never invent checks)."]
         lines += [f"- pacing: {p['chapter']}/{p.get('section') or ''}: {p['detail']}" for p in pacing[:20]]
-        return Result(tasks=[task("layout-review", "layout", "Visual layout and pacing review of the proof build", lines, outputs=["reports/layout-review.md"])])
+        return Result(tasks=[task("layout-review", "layout", "Visual layout and pacing review of the proof build", lines, outputs=["reports/layout-review.md"],
+                                  checks=(["reports/layout-review.md: add a '## User intent' section (what you checked against the user's instructions)"] if intent_missing else None))])
     return Result(done=True)
+
+
+def layout_review_has_intent(path):
+    import re
+    return bool(re.search(r"^#{1,4}\s*User intent\b", path.read_text(encoding="utf-8"), re.IGNORECASE | re.MULTILINE))
 
 
 def layout_pacing(ctx):
@@ -929,6 +984,8 @@ def write_editorial_review(ctx):
     if integration.is_file(): lines += ["", "## Integration review", "", "See plan/integration-review.yaml."]
     if (ROOT / "plan/prose-audit.yaml").is_file():
         lines += ["", "## Whole-book prose review", "", "See plan/prose-audit.yaml, plan/prose-editing.yaml and reports/prose-signals.json. Signals are descriptive; editorial decisions are recorded in the plan files."]
+    import user_intent
+    lines += user_intent.report_lines(ctx.project)
     (ROOT / "reports/editorial-review.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
@@ -1059,6 +1116,8 @@ def completion_gates(ctx, include_package=True):
     gate(21, "Generated images resolved and print-safe", image_check['passed'],
          f"{image_check['summary']['high']} high, {image_check['summary']['medium']} medium",
          "validation", "image asset")
+    intent = user_intent_gate(ctx)
+    gate(22, "User intent governed the book", intent["passed"], intent["detail"], intent["phase"], "user intent")
     if include_package:
         from common import output_paths
         target = ROOT / "publish/result.zip"
@@ -1067,6 +1126,29 @@ def completion_gates(ctx, include_package=True):
         gate(16, "Requested output package generated", outputs_ok and packaged, "publish/result.zip" if packaged else "missing or older than build", "package", "build")
     write_json(ROOT / "reports/completion-gates.json", {"checked_at": now(), "passed": all(g["passed"] for g in gates), "gates": gates})
     return gates
+
+
+def user_intent_gate(ctx):
+    """Gate 22: with user instructions, the interpretation is valid and every content/review stage recorded its intent check.
+    Conflicts are allowed (they are reported); silence is not."""
+    import user_intent
+    if not user_intent.present(ctx.project): return {"passed": True, "detail": "no user instructions", "phase": "architecture"}
+    if not ctx.state.get("user_intent_protocol"): return {"passed": True, "detail": "legacy job (started before user-intent checks)", "phase": "architecture"}
+    from planning import summary_path
+    stages = [("architecture", architecture_intent_errors(ctx))]
+    stages.append(("drafting", [e for c in ctx.outline() for e in intent_check_errors(ctx, summary_path(c["id"]))]))
+    for phase, name in (("integration", "plan/integration-review.yaml"), ("audit", "plan/audit/book.yaml"), ("prose_audit", "plan/prose-audit.yaml"),
+                        ("prose_editing", "plan/prose-editing.yaml"), ("design", "plan/design-decisions.yaml")):
+        path = ROOT / name
+        stages.append((phase, [f"Missing {name}"] if not path.is_file() else intent_check_errors(ctx, path)))
+    review = ROOT / "reports/layout-review.md"
+    stages.append(("layout", [] if review.is_file() and layout_review_has_intent(review) else ["reports/layout-review.md: no '## User intent' section"]))
+    failing = [(phase, errors) for phase, errors in stages if errors]
+    if failing:
+        return {"passed": False, "phase": failing[0][0], "detail": "; ".join(e for _, errors in failing for e in errors)[:400]}
+    found = user_intent.conflicts(ctx.project); overridden = user_intent.overrides(ctx.project)
+    return {"passed": True, "phase": "architecture", "detail": f"{len(found)} conflicts reported, {len(overridden)} defaults switched off"
+            + (f" ({', '.join(sorted(overridden))})" if overridden else "")}
 
 
 def handle_failed_gates(ctx, failing):
@@ -1215,7 +1297,7 @@ def write_summary(ctx):
         "design_theme": build.get("theme") if build else None,
         "renderer_outputs": build.get("outputs") if build and build.get("ok") else [],
         "validation": {"ok": validation.get("ok"), "errors": len(validation.get("errors", []))} if validation else None,
-        "completion_gates": gates, "diagnosis": diagnosis,
+        "completion_gates": gates, "diagnosis": diagnosis, "user_intent": __import__("user_intent").summary(ctx.project),
         "files": {"state": "project-state.json", "events": "run-events.jsonl", "source_status": "research/source-status.json",
                   "source_index": "research/index.json", "search_log": "research/search-log.jsonl", "research_lock": "research/research-lock.json",
                   "corpus_summary": "research/corpus-summary.yaml", "book_bible": "plan/book-bible.yaml", "outline": "source/metadata/outline.yaml",
@@ -1236,6 +1318,10 @@ def status_text(state, tasks, info):
     for blocker in state.get("blockers", []): lines.append(f"BLOCKER [{blocker['category']}]: {blocker['detail']}")
     if state["status"] == "complete":
         lines.append("Publication COMPLETE. Deliverables: publish/, interchange/, publish/result.zip. See execution-summary.json.")
+        import user_intent
+        if user_intent.present():
+            lines.append(f"User intent: {len(user_intent.conflicts())} conflicts recorded — include every one (instruction, stage, resolution, reason) "
+                         "in your final report to the user; see reports/editorial-review.md '## User intent'.")
         return "\n".join(lines)
     if tasks:
         agent = [t for t in tasks if t["kind"] == "agent"]
@@ -1243,6 +1329,10 @@ def status_text(state, tasks, info):
         for item in tasks:
             lines.append(f"\n## {item['id']} — {item['title']}" + (f"  [group: {item['parallel_group']}]" if item["parallel_group"] else ""))
             if item["skills"]: lines.append("Read: " + ", ".join(item["skills"]))
+            if item.get("user_intent"):
+                import user_intent
+                lines += user_intent.render(item["user_intent"])
+                lines.append("Task:")
             for line in item["instructions"]: lines.append("  " + line)
             if item["inputs"]: lines.append("Inputs: " + ", ".join(item["inputs"]))
             if item["outputs"]: lines.append("Outputs: " + ", ".join(item["outputs"][:12]))

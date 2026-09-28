@@ -26,6 +26,7 @@ import math
 import re
 
 from common import ROOT, as_list, write_yaml, yaml_data
+from user_intent import apply_overrides
 
 SCHEMA = "bookorder/editorial-plan@1"
 DIR = ROOT / "plan/editorial"
@@ -183,8 +184,9 @@ def _waive(findings, waivers):
 
 
 def blocking(findings):
-    """Errors and unwaived medium findings stop the plan; low findings are advice."""
-    return [f for f in findings if f["severity"] == "error" or (f["severity"] == "medium" and not f.get("waived"))]
+    """Errors and unwaived medium findings stop the plan; low findings are advice. A pipeline default the user's
+    explicit intent switched off (plan/user-intent.yaml overrides, scripts/user_intent.py) never blocks."""
+    return [f for f in findings if not f.get("user_intent") and (f["severity"] == "error" or (f["severity"] == "medium" and not f.get("waived")))]
 
 
 # ---------------------------------------------------------------- device conditions
@@ -329,8 +331,8 @@ REQUIRED_CHAPTER = ("chapter_title", "chapter_role", "reader_before", "reader_af
 REQUIRED_SECTION = ("id", "heading", "purpose", "rhetorical_role", "intended_reader_effect", "expected_density", "target_chars")
 
 
-def check_chapter(chapter, plan, profile, known_sources=None, first_terms=None, last=False):
-    cid = chapter["id"]; findings = []
+def check_chapter(chapter, plan, profile, known_sources=None, first_terms=None, last=False, intent=None):
+    cid = chapter["id"]; findings = []; intent = intent or {}
     add = lambda rule, severity, detail, section=None, device=None, suggestion=None: findings.append(finding(rule, severity, detail, cid, section, device, suggestion))
     if plan is None:
         add("plan_missing", "error", f"write plan/editorial/{cid}.yaml before drafting"); return {"id": cid, "findings": findings}
@@ -339,7 +341,8 @@ def check_chapter(chapter, plan, profile, known_sources=None, first_terms=None, 
     if plan.get("chapter_id") != cid: add("chapter_id_mismatch", "error", f"chapter_id must be {cid}")
     for key in REQUIRED_CHAPTER:
         value = plan.get(key)
-        if value in (None, "", []) and not (key == "chapter_end" and not profile["structure"]["chapter_end"]): add("missing_field", "error", f"{key} is required")
+        optional_end = key == "chapter_end" and (not profile["structure"]["chapter_end"] or "chapter_end_missing" in intent)
+        if value in (None, "", []) and not optional_end: add("missing_field", "error", f"{key} is required")
     if plan.get("chapter_role") and plan["chapter_role"] not in CHAPTER_ROLES: add("chapter_role_invalid", "error", f"chapter_role must be one of {', '.join(CHAPTER_ROLES)}")
     target = int(plan.get("target_chars") or 0); outline_target = int(chapter.get("target_characters") or 0)
     if target and outline_target and abs(target - outline_target) > 0.1 * outline_target:
@@ -448,6 +451,7 @@ def check_chapter(chapter, plan, profile, known_sources=None, first_terms=None, 
     gaps, pace = pacing(plan, profile, cid)
     findings += pace
     _waive(findings, plan["waivers"])
+    apply_overrides(findings, intent)
     return {"id": cid, "role": plan.get("chapter_role"), "target_chars": target, "planned_chars": total, "density_profile": rhythm,
             "counts": {**counts, "visuals": visuals + counts["tables"]}, "pauses": gaps,
             "max_gap_chars": max([g["chars"] for g in gaps], default=0), "findings": findings}
@@ -455,10 +459,11 @@ def check_chapter(chapter, plan, profile, known_sources=None, first_terms=None, 
 
 # ---------------------------------------------------------------- the book
 
-def check(chapters, plans, profile, known_sources=None, book=None):
-    """The editorial plan of the whole book against the profile (a report dict)."""
-    book = book or {}; first_terms = {}
-    results = [check_chapter(c, plans.get(c["id"]), profile, known_sources, first_terms, last=i == len(chapters) - 1) for i, c in enumerate(chapters)]
+def check(chapters, plans, profile, known_sources=None, book=None, intent=None):
+    """The editorial plan of the whole book against the profile (a report dict). `intent`: pipeline-default rule ids
+    switched off by explicit user intent (user_intent.overrides)."""
+    book = book or {}; first_terms = {}; intent = intent or {}
+    results = [check_chapter(c, plans.get(c["id"]), profile, known_sources, first_terms, last=i == len(chapters) - 1, intent=intent) for i, c in enumerate(chapters)]
     findings = []
     ids = {}
     for c in chapters:
@@ -488,10 +493,11 @@ def check(chapters, plans, profile, known_sources=None, book=None):
         findings.append(finding("nonprose_share_low", "low", f"planned devices fill about {share:.0%} of the pages; the profile targets {profile['scale']['nonprose_share_target']:.0%} "
                                 "(an estimate before typesetting)"))
     _waive(findings, [w for w in as_list(book.get("waivers")) if isinstance(w, dict)])
+    apply_overrides(findings, intent)
     every = findings + [f for r in results for f in r["findings"]]
-    summary = {"chapters": len(chapters), "planned": sum(1 for c in chapters if plans.get(c["id"])), "errors": sum(f["severity"] == "error" for f in every),
+    summary = {"chapters": len(chapters), "planned": sum(1 for c in chapters if plans.get(c["id"])), "errors": sum(f["severity"] == "error" and not f.get("user_intent") for f in every),
                "medium": sum(f["severity"] == "medium" and not f.get("waived") for f in every), "low": sum(f["severity"] == "low" for f in every),
-               "waived": sum(bool(f.get("waived")) for f in every), "planned_chars": chars, "visual_intents": visuals,
+               "waived": sum(bool(f.get("waived")) for f in every), "user_intent_overrides": sorted(intent), "planned_chars": chars, "visual_intents": visuals,
                "visuals_per_10k": round(rate, 2), "nonprose_share_est": round(share, 3)}
     return {"schema": SCHEMA, "profile": profile.get("id"), "ok": not blocking(every), "summary": summary,
             "limits": {"pause_every_chars": profile["rhythm"]["pause_every_chars"], "max_text_only_pages": profile["rhythm"]["max_text_only_pages"],
@@ -524,7 +530,8 @@ def profile_for(project=None):
 
 
 def run(chapters, write=True, project=None):
-    result = check(chapters, load_plans(chapters), profile_for(project), known_sources(), load_book())
+    import user_intent
+    result = check(chapters, load_plans(chapters), profile_for(project), known_sources(), load_book(), intent=user_intent.overrides(project))
     if write:
         REPORT.parent.mkdir(exist_ok=True)
         write_yaml(REPORT, result, "Generated by BookOrder from plan/editorial/*.yaml and the resolved profile. Change the plans, not this file.")

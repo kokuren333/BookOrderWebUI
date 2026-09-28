@@ -7,7 +7,8 @@ device there becomes a candidate with the same id (or `device: <id>`), and this 
 renderer, geometry and caption. A candidate the review rejects goes back to the editorial plan
 (`bookorder editorial fallback <id> --to table|prose|case_study|summary --reason ...`).
 
-Plan assets after substantive text exists. Every asset is a *candidate* that must say what the reader gains;
+Visuals the user's instructions ask for are planned first; things they say not to illustrate are not
+illustrated. Plan assets after substantive text exists. Every asset is a *candidate* that must say what the reader gains;
 BookOrder reviews each one (reports/visual-review.yaml) and only `accepted` candidates are generated.
 Route by the shape of the information, not by habit:
 

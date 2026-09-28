@@ -18,7 +18,7 @@ REPO = Path(__file__).resolve().parent.parent
 BASE = REPO / ".test-output/unit"
 MODULES = ["common", "crossref", "sources", "research", "planning", "manuscript", "assets", "audit", "citations", "orchestrator",
            "design", "diagrams", "book_ir", "schema", "validate", "build", "package", "check_env",
-           "publication_profile", "pacing", "layout_metrics", "figure_spec", "figure_check", "chartkit", "visual_review", "editorial_plan"]
+           "publication_profile", "pacing", "layout_metrics", "figure_spec", "figure_check", "chartkit", "visual_review", "editorial_plan", "user_intent"]
 
 
 def make_job(name, pages=300, language="ja", urls=(), files=(), web_research=True, coverage=True):

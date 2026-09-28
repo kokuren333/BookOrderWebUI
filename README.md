@@ -37,6 +37,7 @@ Choose the OS/CPU of the machine running the agent: Windows 10+ x64, macOS 15+ a
 npm test
 npm run build
 python tests/test_orchestrator.py   # deterministic orchestration tests (Pandoc required)
+python tests/test_user_intent.py    # user instructions reach every phase; precedence, overrides, conflicts, gate 22
 python tests/mini_e2e.py            # real /goal orchestration with a scripted mock agent (Pandoc + Typst)
 python tests/e2e.py                 # legacy build pipeline on the npm-test job ZIP
 python tests/design.py              # themes, tokens, fonts, previews
@@ -51,7 +52,7 @@ This demonstrates the publishing pipeline with a short fixture. An external agen
 | Section | Basic | Advanced |
 |---|---|---|
 | 01 本の企画 | title, goal, readers, language, **Target scale** (the only scale input) | tier override (automatic by default) |
-| 02 資料と指示 | URLs, files, additional instructions (supplementary; structured settings win) | — |
+| 02 資料と指示 | URLs, files, additional instructions — book-wide priority instruction, carried verbatim into every phase; outranks BookOrder defaults, not structured settings or integrity rules ([docs/USER_INTENT.md](docs/USER_INTENT.md)) | — |
 | 03 調査とコンテンツの方針 | research, citation style, whether tables/diagrams/charts/images may be made | — |
 | 04 希望する出力 | output formats | — |
 | 05 出版形式とデザイン | Publication preset, Genre, Theme, Layout, Page size, Columns | Geometry · Typography · Visual grammar · Expert |

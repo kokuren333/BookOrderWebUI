@@ -212,8 +212,28 @@ def check(project=None):
     limit_info = limits(project)
     metrics, problem = load_metrics()
     result = unmeasured(problem, limit_info) if problem else evaluate(metrics, limit_info)
+    apply_user_intent(result, project)
     REPORT.parent.mkdir(exist_ok=True)
     REPORT.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return result
+
+
+def apply_user_intent(result, project=None):
+    """Explicit user intent may switch off the text-wall limit (plan/user-intent.yaml, override `layout_pacing`): the
+    measured walls stay reported as medium findings but no longer block gate 17 or ask for inserted devices."""
+    import user_intent
+    entry = user_intent.overrides(project).get("layout_pacing")
+    if not entry: return result
+    for finding in result["findings"]:
+        if finding["severity"] == "high" and finding["rule"] in user_intent.PACING_RULES:
+            finding["severity"] = "medium"; finding.pop("actions", None)
+            finding["user_intent"] = entry["directive"] or True
+            finding["detail"] += f" (not blocking: user intent {entry['directive']} \"{entry['quote']}\")"
+    summary = result["summary"]
+    summary["high"] = sum(f["severity"] == "high" for f in result["findings"])
+    summary["medium"] = sum(f["severity"] == "medium" for f in result["findings"])
+    result["verdict"] = "fail" if summary["high"] else "pass"
+    result["user_intent_override"] = entry
     return result
 
 

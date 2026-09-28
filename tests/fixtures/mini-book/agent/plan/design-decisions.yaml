@@ -4,3 +4,4 @@ decisions:
     spec_change: "theme modern-technical を維持し、アクセント色を青緑 #0E7490 に設定"
 overrides: []
 notes: "custom.css / custom.typ は不要だった。"
+intent_check: "ユーザー指示は資料の反映に関するもので、デザイン上の矛盾はない。"

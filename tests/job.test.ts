@@ -215,10 +215,25 @@ test('generated project.json and book.design.yaml stay compatible with the previ
   }
 });
 type BookFormLike = ReturnType<typeof baseForm>;
-test('TASK.md states that structured settings are authoritative over free-text instructions', async () => {
-  const zip = await JSZip.loadAsync((await generateJob({ ...baseForm(), instructions: '横書きで' }, [], await templateFiles())).data);
+test('TASK.md gives the free text authority over defaults, structured settings authority over their own fields', async () => {
+  const instructions = '教科書的にせず、批評性を残す。\n各章末にまとめを付けない。\n判型はA4にする。';
+  const zip = await JSZip.loadAsync((await generateJob({ ...baseForm(), instructions }, [], await templateFiles())).data);
   const task = await zip.file('publishing-job/TASK.md')!.async('string');
+  const project = JSON.parse(await zip.file('publishing-job/project.json')!.async('string'));
+  assert.equal(project.user_instructions, instructions);
+  assert.ok(task.includes('## Additional user instructions (verbatim)\n' + instructions + '\n'));
   assert.ok(task.includes('## Precedence of settings') && task.includes('structured settings'));
+  assert.ok(!task.includes('supplement them'), 'the free text is no longer described as a mere supplement');
+  for (const words of ["Do not improve the book against the user's explicit intent", 'for the fields they represent', 'editorial and semantic choices',
+    'fill only what the user left unspecified', 'Invariants', 'the book stays A5', 'plan/user-intent.yaml', 'docs/user-intent.md'])
+    assert.ok(task.includes(words), words);
+  assert.ok(zip.file('publishing-job/docs/user-intent.md') && zip.file('publishing-job/scripts/user_intent.py'), 'the job ships the user-intent spec and module');
+});
+test('an empty instruction field keeps the job valid and states no user intent', async () => {
+  const zip = await JSZip.loadAsync((await generateJob({ ...baseForm(), instructions: '' }, [], await templateFiles())).data);
+  const project = JSON.parse(await zip.file('publishing-job/project.json')!.async('string'));
+  assert.equal(project.user_instructions, '');
+  assert.ok((await zip.file('publishing-job/TASK.md')!.async('string')).includes('## Additional user instructions (verbatim)\n\n'));
 });
 
 // ---------------------------------------------------------------- audit: theme switching keeps explicit values

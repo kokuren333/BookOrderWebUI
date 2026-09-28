@@ -1,3 +1,4 @@
 reviewed_chapters: [ch-foundations, ch-mechanism, ch-training, ch-evaluation]
 checks: [cross-chapter contradictions, narrative progression, coverage, bibliography]
 issues: []
+intent_check: "全供給資料が本文に反映されていることを source-coverage で確認した（intent-001）。"

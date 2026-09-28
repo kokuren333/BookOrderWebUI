@@ -26,6 +26,7 @@ import _tools  # noqa: E402  PANDOC/TYPST from env, PATH or .tools/
 if _tools.MISSING: raise SystemExit(f"Missing {', '.join(_tools.MISSING)}: set PANDOC/TYPST, add to PATH, or place them in .tools/")
 FIXTURE = REPO / "tests/fixtures/mini-book"
 AGENT = FIXTURE / "agent"
+USER_INSTRUCTIONS = "すべての供給資料を反映すること。\n**章末まとめ**は付けず、`key_points` の囲みも使わない。"
 WORK = REPO / ".test-output/mini-e2e/publishing-job"
 SUMMARIES = {
     "ch-foundations": ("固定長ベクトルの限界と、出力ごとに入力の参照先を重み付けして選び直す注意機構の考え方、文脈ベクトル、query・key・valueの一般化、注意重みの解釈上の注意を説明した。", ["attention", "context-vector"]),
@@ -60,7 +61,7 @@ def setup(base):
     project = {"format": "portable-publishing-job", "format_version": "0.2",
                "book": {"title": "注意機構から大規模言語モデルへ", "description": "注意機構の原理から学習・評価までを一貫して解説する小冊子",
                         "target_readers": "機械学習の基礎を知るエンジニア", "target_pages": 8, "language": "ja", "author": "BookOrder Mini-E2E"},
-               "user_instructions": "すべての供給資料を反映すること。", "research": {"allow_web_research": True, "prefer_primary_sources": True, "keep_provenance": True, "require_supplied_coverage": True},
+               "user_instructions": USER_INSTRUCTIONS, "research": {"allow_web_research": True, "prefer_primary_sources": True, "keep_provenance": True, "require_supplied_coverage": True},
                "citations": {"style": "numeric"},
                "figures": {"tables": True, "diagrams": True, "charts": True, "generative_images": False},
                "outputs": {"canonical_markdown": True, "docx": True, "semantic_html": True, "pdf": True, "static_site": True, "epub": True},
@@ -86,7 +87,7 @@ def cli(*args, expect=0):
 
 class MockAgent:
     def __init__(self, base):
-        self.base = base; self.log = []
+        self.base = base; self.log = []; self.intent_tasks = set()
 
     def ids(self):
         index = json.loads((WORK / "research/index.json").read_text(encoding="utf-8"))
@@ -110,9 +111,24 @@ class MockAgent:
     def copy(self, fixture, relative, own=None):
         self.put(relative, self.render((AGENT / fixture).read_text(encoding="utf-8"), own))
 
+    def check_intent(self, task):
+        """Every research/writing/editing/review/design task carries the user's verbatim instructions."""
+        phases = ("supplementary_research", "corpus_analysis", "architecture", "editorial_planning", "drafting", "chapter_review", "integration",
+                  "asset_planning", "asset_generation", "audit", "rewrite", "prose_audit", "prose_editing", "final_audit", "design", "layout", "validation", "build")
+        block = task.get("user_intent")
+        if task["phase"] in phases:
+            assert block and block["verbatim"] == USER_INSTRUCTIONS, f"{task['id']} lacks the verbatim user intent"
+            assert any("Read this before" in rule for rule in block["rules"]), task["id"]
+            if task["phase"] not in ("supplementary_research", "corpus_analysis", "audit", "prose_audit", "final_audit", "build"):
+                assert block["before_done"], f"{task['id']} has no pre-done intent check"
+            self.intent_tasks.add(task["phase"])
+        else:
+            assert block is None, f"{task['id']} ({task['phase']}) should not carry user intent"
+
     def handle(self, task):
         identifier = task["id"]; kind, _, target = identifier.partition(":")
         self.log.append(identifier)
+        self.check_intent(task)
         mapping, sources = self.ids()
         if kind == "ingest":
             source = sources[target]
@@ -144,6 +160,16 @@ class MockAgent:
             packet_check = []
             self.copy("plan/book-bible.yaml", "plan/book-bible.yaml")
             self.copy("plan/outline.yaml", "source/metadata/outline.yaml")
+            seeded = (WORK / "plan/user-intent.yaml").read_text(encoding="utf-8")
+            assert "verbatim" in seeded and "章末まとめ" in seeded, "BookOrder seeds the interpretation file with the verbatim text"
+            self.put("plan/user-intent.yaml", json.dumps({
+                "directives": [{"id": "intent-001", "source_quote": "すべての供給資料を反映すること", "interpretation": "Every supplied source is used in the book.",
+                                "applies_to": ["architecture", "drafting"]},
+                               {"id": "intent-002", "source_quote": "章末まとめは付けず", "interpretation": "No routine chapter-end summary.",
+                                "applies_to": ["editorial_planning", "drafting", "prose_editing"], "overrides": ["chapter_end_missing"]}],
+                "conflicts": [{"instruction": "key_points の囲みも使わない", "stage": "editorial_planning", "category": "technical",
+                               "resolution": "Key-point boxes inside sections were kept where the fixture plans them.", "reason": "Mini-E2E fixture keeps its prepared plans."}]},
+                ensure_ascii=False))
         elif kind == "editorial":
             packet = (WORK / f"plan/chapter-packets/{target}.yaml").read_text(encoding="utf-8")
             assert "editorial_plan" in packet, "packet names the editorial plan"
@@ -156,7 +182,9 @@ class MockAgent:
             draft = AGENT / f"chapters/{target}.draft.md"
             self.copy(f"chapters/{target}.draft.md" if draft.exists() else f"chapters/{target}.md", self.chapter_file(target))
             summary, concepts = SUMMARIES[target]
-            self.put(f"plan/summaries/{target}.yaml", json.dumps({"summary": summary, "introduced_concepts": concepts, "key_terms": [], "handoff": "次章へ渡す前提を明記した。"}, ensure_ascii=False))
+            assert "user_intent:" in packet and "章末まとめ" in packet, "chapter packet carries the verbatim user intent"
+            self.put(f"plan/summaries/{target}.yaml", json.dumps({"summary": summary, "introduced_concepts": concepts, "key_terms": [], "handoff": "次章へ渡す前提を明記した。",
+                                                                  "intent_check": "全供給資料の反映を維持し、章末まとめは付けていない。"}, ensure_ascii=False))
         elif kind in ("expand", "review"):
             self.copy(f"chapters/{target}.md", self.chapter_file(target))
         elif identifier == "integrate":
@@ -171,10 +199,10 @@ class MockAgent:
             else: self.put(f"plan/audit/{target}.yaml", json.dumps({"chapter": target, "reviewed": True, "checks": ["facts vs notes", "citations", "terminology"], "issues": []}))
         elif identifier == "prose:audit":
             self.put("plan/prose-audit.yaml", json.dumps({"reviewed_chapters": ["ch-foundations", "ch-mechanism", "ch-training", "ch-evaluation"],
-                "candidates": [], "lexical_comparison": [], "role_comparison": [], "protected_passages": []}, ensure_ascii=False))
+                "candidates": [], "lexical_comparison": [], "role_comparison": [], "protected_passages": [], "intent_check": "章末まとめの不在はユーザー指示どおりで候補にしない。"}, ensure_ascii=False))
         elif identifier == "prose:edit":
             self.put("plan/prose-editing.yaml", json.dumps({"reviewed_chapters": ["ch-foundations", "ch-mechanism", "ch-training", "ch-evaluation"],
-                "edits": [], "preserved": [], "citation_reaudit": []}, ensure_ascii=False))
+                "edits": [], "preserved": [], "citation_reaudit": [], "intent_check": "章末まとめを追加せず、ユーザー指示の構成を維持した。"}, ensure_ascii=False))
         elif kind == "rewrite":
             ledger = json.loads((WORK / "reports/audit-ledger.json").read_text(encoding="utf-8"))
             items = [e for e in ledger["issues"].values() if e["status"] == "open" and e["severity"] in ("high", "medium") and (e.get("chapter") or "book") == target]
@@ -194,7 +222,8 @@ class MockAgent:
             info = subprocess.run(["pdfinfo", str(pdf)], capture_output=True) if shutil.which("pdfinfo") else None
             pages = info.stdout.decode("utf-8", errors="replace") if info else "pdfinfo unavailable"
             self.put("reports/layout-review.md", "# Layout review (mini-E2E mock agent)\n\nAutomated fixture run: the mock agent cannot look at pages. "
-                     "It recorded PDF metadata only; visual inspection is performed separately by a human/agent.\n\n```\n" + pages + "\n```\n")
+                     "It recorded PDF metadata only; visual inspection is performed separately by a human/agent.\n\n```\n" + pages + "\n```\n"
+                     "\n## User intent\n\nChecked against the user's instructions: no chapter-end summaries were added; conflicts are in plan/user-intent.yaml.\n")
         else:
             raise AssertionError(f"Unexpected task {identifier}:\n" + "\n".join(task["instructions"]) + "\nFailing: " + json.dumps(task.get("failing_checks"), ensure_ascii=False))
 
@@ -310,7 +339,14 @@ def assertions(agent, urls):
     assert placed and placed[0]["geometry"]["width_mm"] == 96 and placed[0]["geometry"]["legibility"] == "ok", placed
     assert (WORK / "publish/result.zip").is_file()
     gates = json.loads((WORK / "reports/completion-gates.json").read_text(encoding="utf-8"))
-    assert gates["passed"] and len(gates["gates"]) == 21 and all(g["passed"] for g in gates["gates"] if g["id"] in (17, 18, 19, 20, 21))
+    assert gates["passed"] and len(gates["gates"]) == 22 and all(g["passed"] for g in gates["gates"] if g["id"] in (17, 18, 19, 20, 21, 22))
+    intent_gate = next(g for g in gates["gates"] if g["id"] == 22)
+    assert "1 conflicts reported" in intent_gate["detail"] and "chapter_end_missing" in intent_gate["detail"], intent_gate
+    assert {"architecture", "drafting", "prose_editing", "design", "layout", "audit"} <= agent.intent_tasks, agent.intent_tasks
+    review = (WORK / "reports/editorial-review.md").read_text(encoding="utf-8")
+    assert "## User intent" in review and "key_points の囲みも使わない" in review and "technical" in review, "conflicts reach the final report"
+    assert summary["user_intent"]["present"] and summary["user_intent"]["overrides"] == ["chapter_end_missing"], summary["user_intent"]
+    assert json.loads((WORK / "project.json").read_text(encoding="utf-8"))["user_instructions"] == USER_INSTRUCTIONS, "verbatim text kept"
     plan = (WORK / "reports/editorial-plan.yaml").read_text(encoding="utf-8")
     assert 'schema: "bookorder/editorial-plan@1"' in plan and "ok: true" in plan, "editorial plan report"
     assert "editorial:ch-mechanism" in done and done.index("editorial:ch-mechanism") < done.index("draft:ch-mechanism"), "planned before drafting"

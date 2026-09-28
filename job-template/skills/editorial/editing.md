@@ -10,7 +10,8 @@ Read the manuscript in order as one book, not a set of essays. BookOrder's deter
 drift against glossary/Bible `forbidden`/`avoid` variants, concepts used before their introducing chapter,
 duplicated paragraphs and sentences, broken cross references, missing hand-offs, chapter size imbalance) are
 listed in the task and in `reports/audit-report.yaml`. Also look for what tools cannot see: inconsistent
-definitions, contradictions, missing callbacks, abrupt transitions, weak hand-offs, inconsistent voice.
+definitions, contradictions, missing callbacks, abrupt transitions, weak hand-offs, voice inconsistent with the
+one the user asked for (as recorded in the Book Bible).
 
 Fix the canonical chapters, keep contracts satisfied, update summaries/glossary, then write
 `plan/integration-review.yaml` with `reviewed_chapters` (all IDs), `changes` and `remaining_issues`.
@@ -22,5 +23,9 @@ After rewriting update citations, cross references, the chapter summary, glossar
 source coverage. Close agent-reported issues with `bookorder audit resolve <id> --note "what changed"`.
 Deterministic issues close automatically when the re-audit no longer detects them. A medium issue may be waived
 with `--wontfix --note "reason"`; high-severity issues must be fixed. Rewritten chapters are re-audited.
+
+Integration and rewrites make the book consistent with the voice, structure and scope the user asked for — not
+with a generic house style. Do not reintroduce summaries, counterarguments or scaffolding the user excluded while
+fixing an issue. Write `intent_check` in plan/integration-review.yaml when the user wrote instructions.
 
 A successful build is not evidence of successful editing.

@@ -327,7 +327,10 @@ def packet(chapter, chapters, scale):
     others = [{"id": c["id"], "title": c["title"], "introduces": c["introduces"]} for c in chapters if c["id"] != chapter["id"]]
     import editorial_plan
     plan = editorial_plan.load_plan(chapter["id"])
+    import user_intent
     data = {
+        # The user's own words come first: they govern voice, density, scope and structure (docs/user-intent.md).
+        **({"user_intent": user_intent.packet_entry()} if user_intent.present() else {}),
         "chapter": chapter["id"], "title": chapter["title"], "file": chapter["file"], "purpose": chapter["purpose"],
         "target_characters": chapter["target_characters"], "minimum_characters": chapter["minimum_characters"],
         "required_sections": chapter["required_sections"], "required_topics": [t["term"] for t in chapter["required_topics"]],

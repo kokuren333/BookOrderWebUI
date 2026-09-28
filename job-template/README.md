@@ -36,6 +36,8 @@ After PDF rendering, `reports/art-direction-check.yaml` audits visual consistenc
 see [`docs/art-direction-qa.md`](docs/art-direction-qa.md). High findings block completion gate 20.
 Accepted pictorial images use the provider-independent request and VisualAsset pipeline; see
 [`docs/image-generation.md`](docs/image-generation.md). Required image QA failures block gate 21.
+The user's additional instructions govern the book over BookOrder defaults and are repeated in every task; see
+[`docs/user-intent.md`](docs/user-intent.md). Gate 22 checks that every phase recorded its intent check.
 
 When project.json has `runtime.bundled: true`, use `bookorder.cmd <command>` on Windows or
 `sh bookorder <command>` on macOS/Linux. The launchers verify and unpack the bundled Python, Pandoc, Typst and

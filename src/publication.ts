@@ -5,7 +5,8 @@
 //   Scale (Profile):      target scale (book.target_pages) -> automatic tier  <  explicit tier override
 //   PDF appearance:       theme tokens (Design Spec)  <  style template (style_preset, else genre)  <  profile art direction
 //                         <  style_controls (incl. values derived from explicit Visual grammar edits)  <  style_bible (explicit accent)
-//   Free-text instructions supplement the structured settings; structured settings are authoritative.
+//   Free text (user_instructions) is authoritative for the editorial choices it states (voice, density, scope, structure,
+//   apparatus) over BookOrder defaults; structured settings stay authoritative for the fields they represent (docs/USER_INTENT.md).
 // A "publication preset" only fills genre + layout preset + style preset + theme at once; it writes nothing of its own.
 //
 // The WebUI is an input frontend for the job's existing resolvers (PublicationProfile, LayoutSpec, StyleBible).

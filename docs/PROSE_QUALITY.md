@@ -4,6 +4,12 @@ Review of generated development histories, essays/criticism and medical teaching
 
 The editor reads the completed book and compares opening, ending and rhetorical role across chapters. `prose-signals.json` gives configurable phrase counts, per-chapter distribution, per-1000-character rates, paragraph/section lengths, lexical n-grams and repeated openings/endings. Python emits no genre mismatch or rhetorical verdict. The reviewer classifies roles from context, compares their rates and sequences, and records evidence and reader work. The editor then makes the minimum effective edit: delete, merge, move, consolidate or keep. It does not regenerate the manuscript. Each edit records citation impact; changed or uncertain cited claims require a supported source recheck before the prose phase can complete, followed by the existing final audit of changed chapters.
 
+The goal of prose editing is the book the user asked for, with less mechanical repetition and over-explanation —
+not a humanised or normalised house style. The user's verbatim instructions come before genre: a requested rough
+first-person voice, a one-sided critical stance, or the absence of summaries and counterarguments is protected
+(`protected_passages`), and neither developmental nor cadence editing may restore balance, scaffolding or summaries
+the user excluded. Both editing files record an `intent_check`; see [USER_INTENT.md](USER_INTENT.md).
+
 Genre comes from the resolved publication profile. Medical/scientific prose retains necessary uncertainty, warning and definitions, while avoiding duplicated explanations. Technical teaching can retain useful scaffolding; repeated summaries still need a purpose. Essay and criticism can use stronger authorial voice and fewer automatic counterarguments. These are qualitative policies rather than numeric thresholds. The StyleBible supplies the existing voice context.
 
 ## External work reviewed

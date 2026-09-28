@@ -110,5 +110,52 @@ class WebUI(unittest.TestCase):
         self.assertEqual(design, golden["design"])
         self.assertEqual(project["book"]["target_pages"], 150)
 
+    def instructions(self, page):
+        return page.locator("label", has_text="Additional user instructions")
+
+    def test_user_instructions_field_explains_precedence_and_is_saved_verbatim(self):
+        text = ("教科書的にせず、批評性を残す。\n各章末にまとめを付けない。反論を毎回併記しない。\n"
+                "<script>alert('x')</script> & \"quotes\" `code` **bold**\n" + "長い指示の本文。" * 400 + "\n  末尾の空白も保持  \n")
+        for width in (1200, 390):
+            page = self.open(); page.set_viewport_size({"width": width, "height": 1600})
+            field = self.instructions(page)
+            head = field.inner_text().split("\n")[0]
+            self.assertIn("本全体への優先指示", head)
+            area = field.locator("textarea")
+            placeholder = area.get_attribute("placeholder")
+            for words in ("文体", "説明の濃さ", "章構成", "扱う／扱わないテーマ", "事例", "図表", "教科書的にしない"): self.assertIn(words, placeholder)
+            self.assertNotIn("TASK.md", placeholder)
+            hint = " ".join(field.locator("small").all_inner_texts())
+            for words in ("優先指示", "原文のまま", "各工程", "既定方針", "上書きしません", "引用", "最終レポート"): self.assertIn(words, hint)
+            self.assertNotIn("補足・追加の制約", hint)
+            box = area.bounding_box(); page_width = page.evaluate("document.documentElement.scrollWidth")
+            self.assertLessEqual(box["x"] + box["width"], width, "textarea fits the viewport")
+            self.assertLessEqual(page_width, width, "no horizontal scroll")
+        area.fill(text)
+        self.assertEqual(area.input_value(), text)
+        self.assertEqual(page.locator("script", has_text="alert('x')").count(), 0, "the text is not injected as HTML")
+        page.get_by_label("Book title").fill("Intent"); page.get_by_label("Book description / goal").fill("goal"); page.get_by_label("Target readers").fill("readers")
+        page.locator("label", has_text="OS / CPU").locator("select").select_option("none")
+        with page.expect_download() as info: page.get_by_role("button", name="Generate Publishing Job").click()
+        with zipfile.ZipFile(io.BytesIO(Path(info.value.path()).read_bytes())) as z:
+            project = json.loads(z.read("publishing-job/project.json")); task = z.read("publishing-job/TASK.md").decode("utf-8")
+            self.assertIn("publishing-job/docs/user-intent.md", z.namelist())
+        self.assertEqual(project["user_instructions"], text)
+        self.assertIn("## Additional user instructions (verbatim)\n" + text + "\n", task)
+        self.assertIn("Do not improve the book against the user's explicit intent", task)
+        self.assertFalse(self.errors, self.errors)
+
+    def test_empty_user_instructions_still_generate(self):
+        page = self.open()
+        self.assertEqual(self.instructions(page).locator("textarea").input_value(), "")
+        page.get_by_label("Book title").fill("Empty"); page.get_by_label("Book description / goal").fill("goal"); page.get_by_label("Target readers").fill("readers")
+        page.locator("label", has_text="OS / CPU").locator("select").select_option("none")
+        with page.expect_download() as info: page.get_by_role("button", name="Generate Publishing Job").click()
+        with zipfile.ZipFile(io.BytesIO(Path(info.value.path()).read_bytes())) as z:
+            project = json.loads(z.read("publishing-job/project.json")); task = z.read("publishing-job/TASK.md").decode("utf-8")
+        self.assertEqual(project["user_instructions"], "")
+        self.assertIn("## Additional user instructions (verbatim)\n\n\n## Precedence of settings", task)
+        self.assertFalse(self.errors, self.errors)
+
 
 if __name__ == "__main__": unittest.main()

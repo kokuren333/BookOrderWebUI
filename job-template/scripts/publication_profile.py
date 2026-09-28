@@ -325,7 +325,9 @@ def summary_lines(profile):
     """Planning instructions that state the profile to the author."""
     s, st, d, r = profile["scale"], profile["structure"], profile["devices"], profile["rhythm"]
     rng = lambda x: f"{x['min']}–{x['max']} (target {x['target']})"
-    return [f"Publication profile {profile['id']} (plan/profile.resolved.yaml) is binding for the plan:",
+    return [f"Publication profile {profile['id']} (plan/profile.resolved.yaml): its scale and chapter range are binding; its device counts, "
+            "chapter lead and end, section sizes and pause rhythm are defaults for what the user did not specify. Where the user's "
+            "explicit instructions say otherwise, follow them and record the override in plan/user-intent.yaml (docs/user-intent.md):",
             f"- {s['target_body_chars']:,} body characters, about {s['target_pages']} pages; {rng(st['chapters'])} chapters"
             + (f", {rng(st['parts'])} parts" if st["parts"]["max"] else "") + f"; headings to level {st['heading_depth_max']}.",
             f"- Sections {rng(st['section_chars'])} characters; paragraphs at most {st['paragraph_chars_max']} characters; "

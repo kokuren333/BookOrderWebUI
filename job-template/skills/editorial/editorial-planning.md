@@ -1,5 +1,8 @@
 # Editorial planning (tasks `editorial:<chapter>`, then drafting)
 
+The user's instructions (printed verbatim with every task; docs/user-intent.md) govern this book. This Skill gives defaults for what they leave open; it is not a higher authority. Invariants — facts, citations, provenance, safety, the build — still bind. The profile's device counts, pauses and
+chapter-end items below are defaults; a device the user excluded is not planned (docs/user-intent.md, `overrides`).
+
 Plan what each section does for the reader, where the reader rests and which content becomes a device *before*
 drafting. Do not write the chapter and look for figures afterwards. One file per chapter:
 `plan/editorial/<chapter-id>.yaml`. BookOrder checks every plan against the resolved profile
@@ -43,7 +46,7 @@ chapter_end:
   - {type: key_points}
   - {type: open_question}
   - {type: bridge_to_next}
-waivers:                                   # only for medium/low findings, always with a reason
+waivers:                                   # only for medium/low findings, always with a reason (user-excluded defaults: plan/user-intent.yaml overrides)
   - {rule: device_count_under, reason: この章の材料には他者の発言の引用がなく、pull quote を作ると捏造になる}
 ```
 
@@ -53,7 +56,7 @@ figure, table, chart, timeline (visual intents), key_point, definition, glossary
 checklist, pull_quote, case_study, column (sidebar), chapter_summary (chapter end only). Every device has `id`,
 `type`, `why` and `placement` (`intent`, `position`: section_start | early | middle | late | section_end).
 
-Use a device only when its condition holds:
+Use a device only when its condition holds and the user's instructions do not exclude it:
 
 - key_point — the section is over 1,500 characters and has 3+ summary points.
 - definition / glossary — a new, technical or coined term appears for the first time (`new_terms`, `terms`).
@@ -65,7 +68,9 @@ Use a device only when its condition holds:
 - table — a comparison of 3+ items on 3+ attributes.
 - figure / chart — only an information shape the visual review can accept (a branching process, a hierarchy,
   5+ values …); never an illustrative arrangement, never a straight A→B→C chain.
-- chapter end — what the profile requires (`structure.chapter_end`), in every chapter.
+- chapter end — by default what the profile lists (`structure.chapter_end`), in every chapter. If the user's
+  instructions exclude an item (for example no chapter-end summaries), leave it out and switch the default off in
+  plan/user-intent.yaml (`overrides: [chapter_end_missing]`); do not add it back as "good pedagogy".
 
 Source ids must exist in the research registry; an unknown id is a planning error. Do not invent quotes, cases,
 dates or data to fill a device.

@@ -4,7 +4,10 @@
 
 After all supplied sources are ingested, skim the corpus and list gaps: missing definitions, primary or official
 references, standards, statistics, historical background, newer developments, contradictory evidence,
-terminology. Respect `research.allow_web_research` in project.json; when it is false, discover nothing and record
+terminology. That list is a default; the user's instructions set the scope. A topic they exclude is not a gap, a
+case or region they emphasise comes first, a part they want brief is not deepened, and sources they prefer (for
+example Japanese materials) are searched first. Do not widen the scope for completeness; do keep factual accuracy
+and provenance for whatever is covered. Respect `research.allow_web_research` in project.json; when it is false, discover nothing and record
 gaps as limitations.
 
 Persist everything — conversation memory is not storage:

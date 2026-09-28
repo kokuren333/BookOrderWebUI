@@ -13,7 +13,7 @@ responsibilities and resolvers. Only the user-facing grouping and the WebUI stat
 | 01 | Language | `form.language` | `book.language` (normalised) | profile chars/page, tokens | profile, design-tokens |
 | 01 | Target scale | `form.targetPages` | `book.target_pages` | `publication_profile.request` (tier from pages + body size) | plan/profile.resolved.yaml |
 | 02 資料と追加指示 | URLs / files | `form.urls`, files | `input.urls`, `input/urls.txt`, `input/sources/*` | sources.py | research/ |
-| 02 | Additional instructions | `form.instructions` | `user_instructions`, TASK.md (verbatim) | agent | — (precedence undefined) |
+| 02 | Additional instructions (本全体への優先指示) | `form.instructions` | `user_instructions`, TASK.md (verbatim) | every agent task (verbatim), chapter packets, plan/user-intent.yaml | gate 22 (docs/USER_INTENT.md) |
 | 03 調査と図表の方針 | Research toggles, citation style | `form.research`, `form.citationStyle` | `research`, `citations.style` | research/citations | — |
 | 03 | Tables/diagrams/charts/generative images | `form.figures` | `figures` | planning/assets (agent) | assets-plan |
 | 04 希望する出力 | Output formats | `form.outputs` | `outputs` | build.py, renderer capability check | publish/* |
@@ -62,7 +62,7 @@ responsibilities and resolvers. Only the user-facing grouping and the WebUI stat
 | Section | Basic (always visible) | Advanced |
 |---|---|---|
 | 01 本の企画 | Title, goal, readers, language, **Target scale** (the only scale input) | Tier override (collapsed; shows the automatic tier) |
-| 02 資料と指示 | URLs, files, additional instructions (stated as *supplementary*; structured settings win) | — |
+| 02 資料と指示 | URLs, files, additional instructions (book-wide priority instruction: wins over BookOrder defaults; structured settings win for their own fields) | — |
 | 03 調査とコンテンツの方針 | Research toggles, citation style; Visual content = *whether* tables/diagrams/charts/images may be made | — |
 | 04 希望する出力 | Output formats (unchanged) | — |
 | 05 出版形式とデザイン | **Publication preset** (bundle), Genre, Theme, Layout, Page size, Columns, theme samples | **Geometry**: custom size, orientation, margins, gutter, figure/table span, writing mode · **Typography**: fonts, sizes, weights · **Visual grammar**: PDF style preset, density, accent, chapter opener, figures, tables (rules + row density), callouts (frame + emphasis) · **Expert**: visual tone, art direction, custom.css |
@@ -101,8 +101,11 @@ margins · **Theme** = typefaces, colour, component look.
    `style_controls` (including values derived from explicit Visual grammar edits) < `style_bible` (explicit accent).
 4. **Publication preset** — fills genre + layout preset + style preset + theme once; every later edit wins and the
    preset is shown as "変更あり".
-5. **Free text** — additional instructions and art direction supplement the structured settings; on conflict the
-   structured setting wins and the agent reports the conflict (TASK.md "Precedence of settings").
+5. **Free text** — the additional instructions are authoritative for the editorial and semantic choices they state
+   (voice, density, scope, structure, apparatus) over genre/tier defaults and Skill heuristics; a structured setting
+   stays authoritative for the field it represents (A5 selected + "A4 please" → A5), and invariants (citations,
+   facts, build) are never waived. Conflicts are recorded in plan/user-intent.yaml and reported (TASK.md "Precedence
+   of settings", [USER_INTENT.md](USER_INTENT.md)).
 
 ## Settings: before → after
 

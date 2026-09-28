@@ -34,3 +34,6 @@ design_intent:
   typography: "本文明朝、見出しゴシック"
   figure_style: "関係は図、比較は表、計算は式で示す"
   callout_policy: "要点と注意だけを囲む"
+user_intent:
+  governs: ["すべての供給資料を反映する (intent-001): 各章の出典割り当てで全資料を使う"]
+  defaults_used: ["プロファイルの章末要素と節の長さ", "番号式引用"]

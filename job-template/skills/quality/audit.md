@@ -6,7 +6,10 @@ supplied-source coverage, terminology drift, concepts before introduction, dupli
 references, missing or unplanned assets, uncaptioned figures, equation IDs, chapter balance, visual pacing,
 Design Spec validity) and keeps every finding in `reports/audit-ledger.json` / `reports/audit-report.yaml`.
 
-Your part is the semantic audit that tools cannot do.
+Your part is the semantic audit that tools cannot do. Audit against the user's instructions as well as the sources:
+a choice the user explicitly asked for (no chapter summaries, a one-sided critical stance, a rough voice, an omitted
+topic) is not a defect and must not be sent to rewriting. A departure from the user's instructions is an issue with
+`type: user-intent`. Factual, citation and provenance errors are always issues, whatever the instructions say.
 
 ## Chapter audit (tasks `audit:<chapter>`, parallel)
 
@@ -30,7 +33,8 @@ repetition, terminology, weak transition; low = polish. Report real problems onl
 
 Cross-chapter contradictions, narrative progression, chapter balance, supplied-source coverage
 (`reports/source-coverage.json`), bibliography and design consistency. Write `plan/audit/book.yaml` with
-`reviewed_chapters` (all) and `issues`.
+`reviewed_chapters` (all), `issues` and, when the user wrote instructions, `intent_check` (how the whole book
+matches them).
 
 ## Re-audit (tasks `reaudit:<chapter>`)
 
