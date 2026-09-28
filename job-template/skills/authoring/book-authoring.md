@@ -53,7 +53,7 @@ citations → transitions → review against the contract. Introduce concepts be
 re-explaining (`@ch:`, `@sec:`). Cite with `[cite:src-XXXX]`. Then write `plan/summaries/<chapter>.yaml`
 (summary, introduced_concepts, key_terms, examples_used, handoff) — later chapters depend on it.
 
-The packet also carries the chapter's editorial plan (`plan/editorial/<chapter>.yaml`, skills/editorial-planning.md):
+The packet also carries the chapter's editorial plan (`plan/editorial/<chapter>.yaml`, skills/editorial/editorial-planning.md):
 write its sections in order with their purpose, role and size, and reserve every planned device as a slot
 (`::: {.slot #id kind=type}`) at its placement, or write a component device directly with the same id. The
 contract fails while a planned device has neither.

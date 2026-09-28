@@ -1,4 +1,8 @@
-# Whole-book editing
+# Structural integration and fact correction
+
+This skill owns integration before the fact audit and targeted rewrites of ledger issues after it. The separate
+prose audit diagnoses book-wide rhetoric; developmental and cadence editing act on that diagnosis after factual
+issues are resolved. Do not repeat those later prose passes here.
 
 ## Integration pass (task `integrate`)
 

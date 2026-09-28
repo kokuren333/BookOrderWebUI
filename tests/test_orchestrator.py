@@ -524,12 +524,12 @@ class Observability(unittest.TestCase):
         pairs = {(e["stage"], e["event"]) for e in events}
         self.assertIn(("source_ingestion", "start"), pairs); self.assertIn(("source_ingestion", "complete"), pairs)
         self.assertTrue(any(e.get("tool") == "fetch-sources" for e in events))
-        self.assertTrue(any(e.get("skill") == "skills/research.md" and e["event"] == "invoke" for e in events))
+        self.assertTrue(any(e.get("skill") == "skills/research/research.md" and e["event"] == "invoke" for e in events))
         orch.report_done("research:supplementary", "done")
         self.assertTrue(any(json.loads(x)["event"] == "agent_done" for x in (root / "run-events.jsonl").read_text(encoding="utf-8").splitlines()))
         summary = json.loads((root / "execution-summary.json").read_text(encoding="utf-8"))
         self.assertEqual(summary["sources"]["supplied"]["fully_ingested"], 1)
-        self.assertIn("skills/research.md", summary["skills_invoked"])
+        self.assertIn("skills/research/research.md", summary["skills_invoked"])
 
 
 class DesignTokens(unittest.TestCase):

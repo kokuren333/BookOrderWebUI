@@ -225,10 +225,14 @@ class Ledger(unittest.TestCase):
 class Orchestrator(unittest.TestCase):
     def test_layout_phase_turns_walls_into_chapter_tasks(self):
         import audit, orchestrator
-        folder = Path(tempfile.mkdtemp()); saved = (audit.LEDGER, audit.REPORT, pacing.check, orchestrator.log_event)
+        # Other test modules re-import the job runtime for temporary jobs. Patch the
+        # module that orchestrator imports now, not a stale collection-time reference.
+        import importlib
+        active_pacing = importlib.import_module("pacing")
+        folder = Path(tempfile.mkdtemp()); saved = (audit.LEDGER, audit.REPORT, active_pacing.check, orchestrator.log_event)
         audit.LEDGER, audit.REPORT = folder / "ledger.json", folder / "report.yaml"
         _, result = judge(LONG, ("ch1", ["", *text(6)]), ("ch2", ["", *text(3)]))
-        pacing.check = lambda project=None: result
+        active_pacing.check = lambda project=None: result
         orchestrator.log_event = lambda *args, **fields: None  # keep run-events.jsonl out of the template
 
         class Ctx:
@@ -238,7 +242,7 @@ class Orchestrator(unittest.TestCase):
         try:
             outcome = orchestrator.layout_pacing(Ctx())
         finally:
-            audit.LEDGER, audit.REPORT, pacing.check, orchestrator.log_event = saved
+            audit.LEDGER, audit.REPORT, active_pacing.check, orchestrator.log_event = saved
         shutil.rmtree(folder)
         self.assertEqual([t["id"] for t in outcome.tasks], ["pacing:ch1"])
         task = outcome.tasks[0]

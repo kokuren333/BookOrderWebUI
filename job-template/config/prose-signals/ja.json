@@ -1,0 +1,6 @@
+{
+  "description": "Weak lexical signals for context review; no phrase is prohibited or a verdict.",
+  "phrases": ["ではなく", "一方で", "しかし", "ただし", "ここで", "前章", "本章", "次章", "まとめ", "要点", "定義"],
+  "lexical_window": 24,
+  "ngram_size": 8
+}

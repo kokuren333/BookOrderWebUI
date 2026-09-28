@@ -28,13 +28,15 @@ def package():
             raise RuntimeError(f"Missing human/agent QA record: reports/{review}. Inspect the outputs and record actual checks.")
     target = ROOT / "publish/result.zip"
     temporary = ROOT / "publish/.result.tmp"
-    folders = ("source", "input", "interchange", "publish", "reports", "scripts", "skills", "templates", "third-party", "themes", "schemas", "docs")
+    folders = ("source", "input", "interchange", "publish", "reports", "scripts", "skills", "config", "templates", "third-party", "themes", "schemas", "docs")
     files = [ROOT / name for name in ("project.json", "TASK.md", "README.md", "AGENTS.md", "run.cmd", "run.sh", "bookorder.cmd", "bookorder", "book.design.yaml", "custom.css", "custom.typ") if (ROOT / name).is_file()]
     # Keep original runtime archives/fonts/licenses, not unpacked executable caches.
     for folder in ("runtime/archives", "runtime/fonts"):
         files += [p for p in (ROOT / folder).rglob("*") if p.is_file()]
     files += [p for p in (ROOT / "runtime").glob("*") if p.is_file()]
     files += [p for folder in folders for p in (ROOT / folder).rglob("*") if p.is_file()]
+    # The editorial review links to these decisions, which must travel with the result ZIP.
+    files += [p for p in (ROOT / "plan/prose-audit.yaml", ROOT / "plan/prose-editing.yaml") if p.is_file()]
     with zipfile.ZipFile(temporary, "w", zipfile.ZIP_DEFLATED) as archive:
         for path in sorted(set(files)):
             if path in (target, temporary) or "__pycache__" in path.parts or path.suffix in (".pyc", ".tmp") or path.name == ".DS_Store": continue

@@ -16,21 +16,23 @@ from common import ROOT, read_project, write_json, as_list, yaml_data, fingerpri
 # outline (architecture) -> EditorialPlan -> section drafting -> VisualPlan / assets -> integration -> layout.
 PHASES = ["source_ingestion", "supplementary_research", "corpus_analysis", "research_frozen", "architecture",
           "reference_assignment", "editorial_planning", "drafting", "chapter_review", "asset_planning", "asset_generation",
-          "integration", "audit", "rewrite", "final_audit", "design", "layout", "build", "validation", "package", "complete"]
+          "integration", "audit", "rewrite", "prose_audit", "prose_editing", "final_audit", "design", "layout", "build", "validation", "package", "complete"]
 # EditorialPlan is an explicit semantic input to each downstream publication artifact.
 EDITORIAL_PLAN_DOWNSTREAM = ["drafting", "chapter_review", "asset_planning", "asset_generation", "integration",
-                            "audit", "rewrite", "final_audit", "design", "layout", "build", "validation", "package", "complete"]
+                            "audit", "rewrite", "prose_audit", "prose_editing", "final_audit", "design", "layout", "build", "validation", "package", "complete"]
 STATES = ("pending", "running", "complete", "blocked", "failed")
 STATE_FILE = ROOT / "project-state.json"
 EVENTS = ROOT / "run-events.jsonl"
 SUMMARY = ROOT / "execution-summary.json"
-SKILLS = {"source_ingestion": ["skills/source-ingestion.md"], "supplementary_research": ["skills/research.md"],
-          "corpus_analysis": ["skills/research.md"], "architecture": ["skills/book-authoring.md"],
-          "editorial_planning": ["skills/editorial-planning.md"],
-          "drafting": ["skills/book-authoring.md", "skills/editorial-planning.md"], "chapter_review": ["skills/book-authoring.md"], "integration": ["skills/editing.md"],
-          "asset_planning": ["skills/figures.md"], "asset_generation": ["skills/figures.md"], "audit": ["skills/audit.md"],
-          "rewrite": ["skills/editing.md", "skills/audit.md"], "final_audit": ["skills/audit.md"], "design": ["skills/editorial-design.md"],
-          "layout": ["skills/editorial-design.md", "skills/publication-qa.md"], "build": ["skills/publication-qa.md"]}
+SKILL_IDS = {"source_ingestion": ("source-ingestion",), "supplementary_research": ("research",),
+             "corpus_analysis": ("research",), "architecture": ("book-authoring",),
+             "editorial_planning": ("editorial-planning",), "drafting": ("book-authoring", "editorial-planning"),
+             "chapter_review": ("book-authoring",), "integration": ("editing",),
+             "asset_planning": ("figures",), "asset_generation": ("figures",), "audit": ("audit",),
+             "prose_audit": ("prose-audit", "whole-book-review"),
+             "rewrite": ("editing", "audit"), "prose_editing": ("developmental-editing", "cadence-editing"),
+             "final_audit": ("audit",), "design": ("editorial-design",),
+             "layout": ("editorial-design", "publication-qa"), "build": ("publication-qa",)}
 MAX_REVIEW_ROUNDS = 6
 MAX_REWRITE_PASSES = 6
 INGEST_TIME_BUDGET = float(os.environ.get("BOOKORDER_INGEST_SECONDS", "150"))
@@ -167,7 +169,8 @@ class Context:
 
 
 def task(identifier, phase, title, instructions, outputs=(), inputs=(), group=None, checks=None, kind="agent"):
-    return {"id": identifier, "phase": phase, "kind": kind, "title": title, "skills": SKILLS.get(phase, []),
+    from skills import resolve
+    return {"id": identifier, "phase": phase, "kind": kind, "title": title, "skills": resolve(*SKILL_IDS.get(phase, ())),
             "inputs": list(inputs), "outputs": list(outputs), "instructions": instructions if isinstance(instructions, list) else [instructions],
             "parallel_group": group, "failing_checks": checks or [], "done": f"bookorder done {identifier}"}
 
@@ -363,7 +366,7 @@ def h_editorial_planning(ctx):
             problems = by_chapter.get(chapter["id"])
             if not problems: continue
             tasks.append(task(f"editorial:{chapter['id']}", "editorial_planning", f"Editorial plan for {chapter['id']} — {chapter['title']}", [
-                f"Plan the chapter before drafting it: read plan/chapter-packets/{chapter['id']}.yaml, plan/book-bible.yaml and the outline entry, then write plan/editorial/{chapter['id']}.yaml (skills/editorial-planning.md).",
+                f"Plan the chapter before drafting it: read plan/chapter-packets/{chapter['id']}.yaml, plan/book-bible.yaml and the outline entry, then write plan/editorial/{chapter['id']}.yaml (skills/editorial/editorial-planning.md).",
                 "Fields: chapter_id, chapter_title, chapter_role (" + "|".join(ep.CHAPTER_ROLES) + "), reader_before, reader_after, target_chars "
                 f"({chapter['target_characters']:,} in the outline), lead, density_profile, sections, chapter_end, waivers.",
                 "Each section: id, heading, purpose, rhetorical_role (" + "|".join(ep.RHETORICAL_ROLES) + "), intended_reader_effect, expected_density (light|medium|heavy), "
@@ -519,7 +522,7 @@ def h_asset_planning(ctx):
             "Now that substantive text exists, read each chapter and decide where a non-prose representation materially improves understanding. Do not add decorative visuals.",
             f"Figure policy: {json.dumps(policy)}. Route comparisons to tables, quantities to charts, structure to diagrams, and formulas to equations. Consider generated images only for accepted abstract/pictorial concepts or chapter openers; never for factual data or density targets.",
             "Write plan/assets-plan.yaml: assets: [{id (fig-/tbl-/eq- prefix), chapter, section, placement, purpose, type (diagram|chart|table|equation|image|screenshot|cover), source (diagram: source/assets/diagrams/<name>.yaml) or data/prompt, path (chart/image), caption, provenance, style}], or none_needed with a reason.",
-            "Each visual is a candidate BookOrder judges (skills/figures.md, reports/visual-review.yaml): give information_shape {kind: comparison|quantity|chronology|hierarchy|process|causal|relation|formula|abstract|sequence|source_image, plus counts}, improvement_claim {kinds: [reduce_working_memory|reveal_structure|show_quantity_shape|anchor_abstraction|orient_reader], statement: what the reader gains over prose, in one sentence}, factual_basis (data|source|derived_from_text|illustrative) and source_ids. For images add role, factuality, provider-neutral subject, PNG path and print geometry; keep all lettering in the renderer.",
+            "Each visual is a candidate BookOrder judges (skills/design/figures.md, reports/visual-review.yaml): give information_shape {kind: comparison|quantity|chronology|hierarchy|process|causal|relation|formula|abstract|sequence|source_image, plus counts}, improvement_claim {kinds: [reduce_working_memory|reveal_structure|show_quantity_shape|anchor_abstraction|orient_reader], statement: what the reader gains over prose, in one sentence}, factual_basis (data|source|derived_from_text|illustrative) and source_ids. For images add role, factuality, provider-neutral subject, PNG path and print geometry; keep all lettering in the renderer.",
             "Profile visual density is a health check, not a quota: never add a figure to reach it. Keep rejected ideas in the plan with decision: rejected and decision_reason.",
             "Every figure, chart, timeline and table intent in plan/editorial/*.yaml becomes a candidate here with the same id and device: <device id>; "
             "decide rows/columns, nodes, renderer, geometry and caption from its information_shape. Do not invent visuals outside the editorial plan without adding them there.",
@@ -611,7 +614,7 @@ def slot_tasks(ctx):
     for chapter, slots in open_slots(ctx).items():
         plan = ep.load_plan(chapter) or ep.normalize({"chapter_id": chapter})
         planned = {d.get("id"): d for _, d in ep.devices(plan, include_end=True)}
-        lines = [f"Replace each open slot in {by_id[chapter]['file']} with the device it reserves, keeping the id (skills/editorial-planning.md):"]
+        lines = [f"Replace each open slot in {by_id[chapter]['file']} with the device it reserves, keeping the id (skills/editorial/editorial-planning.md):"]
         for ident in slots:
             d = planned.get(ident, {})
             lines.append(f"- {ident} ({d.get('type', 'unplanned')}): {ep.placement(d)['intent'] if d else 'not in the plan: remove it or add it to plan/editorial/' + chapter + '.yaml'}"
@@ -661,6 +664,30 @@ def h_audit(ctx):
     return Result(done=True)
 
 
+def h_prose_audit(ctx):
+    import audit, prose_signals
+    import publication_profile
+    profile = publication_profile.load_resolved() or {}
+    signals = prose_signals.run(ctx.outline(), profile.get("genre", "general"))
+    ids = [c["id"] for c in ctx.outline()]
+    path = ROOT / "plan/prose-audit.yaml"
+    errors = audit.check_review_file(path, ids)
+    if path.is_file():
+        report = yaml_data(path)
+        for field in ("candidates", "lexical_comparison", "role_comparison", "protected_passages"):
+            if field not in report: errors.append(f"plan/prose-audit.yaml: missing {field}")
+    if errors or not agent_reported(ctx.state, "prose:audit"):
+        return Result(tasks=[task("prose:audit", "prose_audit", "Review prose across the complete manuscript", [
+            "Read every chapter in order, then compare chapter and section openings/endings and recurring rhetorical roles across chapters.",
+            "Use reports/prose-signals.json as descriptive evidence. Inspect meta discourse, repeated contrasts, paragraph mini-summaries, scaffolding, duplicated argument and uniform structure in context; a frequency alone never warrants an edit.",
+            f"Genre context: {signals['genre_context']}. Preserve necessary medical/scientific qualifications, definitions and citations.",
+            "Classify rhetorical roles from context: orientation, recap, preview, claim, qualification, counterargument, definition, summary and exercise. Compare role sequences and chapter-opening recap/preview rates, summary endings and qualification density across chapters. Keep lexical repetition separate from rhetorical repetition.",
+            "Write plan/prose-audit.yaml with reviewed_chapters: [all IDs], candidates: [{chapter, section, category, evidence, reader_work, proposed_action}], lexical_comparison: [...], role_comparison: [...], and protected_passages: [{chapter, reason}]. Use [] for no findings. No manuscript edits in this task."],
+            outputs=["plan/prose-audit.yaml"], checks=errors)])
+    accept(ctx.state, "prose_audit", fingerprint=ctx.manuscript_fingerprint())
+    return Result(done=True)
+
+
 def requires_rewrite(issue):
     """Warnings remain visible in reports, but only high paragraph/pacing findings block the workflow."""
     if issue.get("severity") not in ("high", "medium"): return False
@@ -706,6 +733,32 @@ def h_rewrite(ctx):
         if passes >= MAX_REWRITE_PASSES:
             return Result(blockers=[{"category": "editorial inconsistency", "detail": f"{len(tasks)} rewrite targets remain after {passes} passes"}], tasks=tasks)
         return Result(tasks=tasks)
+    return Result(done=True)
+
+
+def h_prose_editing(ctx):
+    import audit
+    path = ROOT / "plan/prose-editing.yaml"
+    errors = audit.check_review_file(path, [c["id"] for c in ctx.outline()])
+    if path.is_file():
+        report = yaml_data(path)
+        for field in ("edits", "preserved", "citation_reaudit"):
+            if field not in report: errors.append(f"plan/prose-editing.yaml: missing {field}")
+        rechecked = {(entry.get("chapter"), entry.get("section")) for entry in as_list(report.get("citation_reaudit")) if isinstance(entry, dict) and entry.get("result") == "supported" and entry.get("source_ids")}
+        for edit in as_list(report.get("edits")):
+            if not isinstance(edit, dict) or edit.get("citation_impact") not in ("unchanged", "changed", "uncertain"):
+                errors.append("plan/prose-editing.yaml: each edit needs citation_impact: unchanged|changed|uncertain")
+            elif edit["citation_impact"] in ("changed", "uncertain") and (edit.get("chapter"), edit.get("section")) not in rechecked:
+                errors.append(f"plan/prose-editing.yaml: {edit.get('chapter')}/{edit.get('section')} changed a cited claim without a supported source recheck")
+    if errors or not agent_reported(ctx.state, "prose:edit"):
+        return Result(tasks=[task("prose:edit", "prose_editing", "Developmental and cadence edit", [
+            "Read plan/prose-audit.yaml, reports/prose-signals.json, the complete manuscript, the Book Bible and the resolved publication profile.",
+            "For each candidate ask what new work it does for the reader. Delete redundancy, merge duplication, move misplaced argument, consolidate important repetition, and keep useful or genre-required passages. Make the minimum effective edit; do not rewrite the whole book.",
+            "Then review recurring openings, transitions, contrasts and paragraph endings for cadence. Do not randomize sentence lengths, swap synonyms mechanically, or make technical writing colloquial.",
+            "Preserve source claims, citation anchors, figures, IDs and authorial voice. If an edit changes the meaning of a cited claim, reopen fact/citation review for that passage and record it in the report.",
+            "Write plan/prose-editing.yaml: reviewed_chapters: [all IDs], edits: [{chapter, section, action, reason, citation_impact: unchanged|changed|uncertain}], preserved: [...], citation_reaudit: [{chapter, section, claim, source_ids, result: supported}]. Recheck changed or uncertain cited claims against their sources before marking supported. Use [] when no entries."],
+            outputs=["plan/prose-editing.yaml"], checks=errors)])
+    accept(ctx.state, "prose_editing", fingerprint=ctx.manuscript_fingerprint())
     return Result(done=True)
 
 
@@ -866,12 +919,16 @@ def write_editorial_review(ctx):
     ledger = audit.load_ledger()
     lines = ["# Editorial review (generated from the audit ledger)", "",
              f"Integration accepted: {accepted(ctx.state, 'integrate') and accepted(ctx.state, 'integrate')['at']}",
+             f"Whole-book prose audit accepted: {accepted(ctx.state, 'prose_audit') and accepted(ctx.state, 'prose_audit')['at']}",
+             f"Prose edit accepted: {accepted(ctx.state, 'prose_editing') and accepted(ctx.state, 'prose_editing')['at']}",
              f"Final audit accepted: {accepted(ctx.state, 'final_audit') and accepted(ctx.state, 'final_audit')['at']}", "",
              "| ID | Severity | Status | Chapter | Type | Detail |", "|---|---|---|---|---|---|"]
     for entry in sorted(ledger["issues"].values(), key=lambda e: e["id"]):
         lines.append(f"| {entry['id']} | {entry['severity']} | {entry['status']} | {entry.get('chapter') or ''} | {entry['type']} | {str(entry['detail']).replace('|', '/')[:160]} |")
     integration = ROOT / "plan/integration-review.yaml"
     if integration.is_file(): lines += ["", "## Integration review", "", "See plan/integration-review.yaml."]
+    if (ROOT / "plan/prose-audit.yaml").is_file():
+        lines += ["", "## Whole-book prose review", "", "See plan/prose-audit.yaml, plan/prose-editing.yaml and reports/prose-signals.json. Signals are descriptive; editorial decisions are recorded in the plan files."]
     (ROOT / "reports/editorial-review.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
@@ -902,7 +959,8 @@ HANDLERS = {"source_ingestion": h_source_ingestion, "supplementary_research": h_
             "research_frozen": h_research_frozen, "architecture": h_architecture, "reference_assignment": h_reference_assignment,
             "editorial_planning": h_editorial_planning,
             "drafting": h_drafting, "chapter_review": h_chapter_review, "integration": h_integration, "asset_planning": h_asset_planning,
-            "asset_generation": h_asset_generation, "audit": h_audit, "rewrite": h_rewrite, "final_audit": h_final_audit, "design": h_design,
+            "asset_generation": h_asset_generation, "audit": h_audit, "prose_audit": h_prose_audit,
+            "rewrite": h_rewrite, "prose_editing": h_prose_editing, "final_audit": h_final_audit, "design": h_design,
             "layout": h_layout, "build": h_build, "validation": h_validation, "package": h_package, "complete": h_complete}
 
 

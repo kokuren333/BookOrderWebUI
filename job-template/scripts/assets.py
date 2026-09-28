@@ -45,7 +45,7 @@ def check_plan(chapters, project=None):
         if kind in ("chart", "image", "screenshot", "cover") and not str(asset.get("path", "")).startswith("source/assets/"): errors.append(f"{identifier}: path must be under source/assets/")
         from visual_review import completeness
         missing = completeness(asset)
-        if missing: errors.append(f"{identifier}: visual candidate needs {', '.join(missing)} (skills/figures.md)")
+        if missing: errors.append(f"{identifier}: visual candidate needs {', '.join(missing)} (skills/design/figures.md)")
         if "geometry" in asset:
             from figure_spec import check_geometry
             errors.extend(f"{identifier}: {message}" for message in check_geometry(asset["geometry"]))

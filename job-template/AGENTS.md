@@ -61,21 +61,23 @@ you as an `ingest:` task; fetch it with your own browsing tool and submit the fu
 
 source_ingestion → supplementary_research → corpus_analysis → research_frozen → architecture →
 reference_assignment → editorial_planning → drafting → chapter_review → asset_planning → asset_generation → integration → audit →
-rewrite → final_audit → design → layout → build → validation → package → complete
+rewrite → prose_audit → prose_editing → final_audit → design → layout → build → validation → package → complete
 
 Each task names the skill file(s) to read first:
 
 | Skill | Used for |
 | --- | --- |
-| skills/source-ingestion.md | reading every supplied source completely and submitting what the fetcher could not |
-| skills/research.md | supplementary research, per-source notes, whole-corpus synthesis |
-| skills/book-authoring.md | Book Bible, architecture, chapter drafting from packets, expansion |
-| skills/editorial-planning.md | per-chapter EditorialPlan before drafting: section roles, devices, pauses, slots, visual fallbacks |
-| skills/editing.md | whole-book integration and targeted rewrites |
-| skills/figures.md | asset planning, Diagram IR, tables, equations, images |
-| skills/audit.md | chapter and whole-book audits, re-audits |
-| skills/editorial-design.md | Design Spec, themes, fonts, CSS, layout and pacing |
-| skills/publication-qa.md | visual inspection of PDF / web / DOCX / EPUB |
+| skills/research/source-ingestion.md | reading every supplied source completely and submitting what the fetcher could not |
+| skills/research/research.md | supplementary research, per-source notes, whole-corpus synthesis |
+| skills/authoring/book-authoring.md | Book Bible, architecture, chapter drafting from packets, expansion |
+| skills/editorial/editorial-planning.md | per-chapter EditorialPlan before drafting: section roles, devices, pauses, slots, visual fallbacks |
+| skills/editorial/editing.md | integration and fact-audit-targeted rewrites |
+| skills/editorial/prose-audit.md and whole-book-review.md | completed-manuscript prose diagnosis |
+| skills/editorial/developmental-editing.md and cadence-editing.md | minimum effective prose edit and rhythm |
+| skills/design/figures.md | asset planning, Diagram IR, tables, equations, images |
+| skills/quality/audit.md | claim, citation and chapter audits, re-audits |
+| skills/design/editorial-design.md | Design Spec, themes, fonts, CSS, layout and pacing |
+| skills/quality/publication-qa.md | visual inspection of PDF / web / DOCX / EPUB |
 
 ## Canonical source and conventions
 

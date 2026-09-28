@@ -169,6 +169,12 @@ class MockAgent:
             fixture = AGENT / f"audit/{target}.yaml"
             if fixture.exists(): self.copy(f"audit/{target}.yaml", f"plan/audit/{target}.yaml")
             else: self.put(f"plan/audit/{target}.yaml", json.dumps({"chapter": target, "reviewed": True, "checks": ["facts vs notes", "citations", "terminology"], "issues": []}))
+        elif identifier == "prose:audit":
+            self.put("plan/prose-audit.yaml", json.dumps({"reviewed_chapters": ["ch-foundations", "ch-mechanism", "ch-training", "ch-evaluation"],
+                "candidates": [], "lexical_comparison": [], "role_comparison": [], "protected_passages": []}, ensure_ascii=False))
+        elif identifier == "prose:edit":
+            self.put("plan/prose-editing.yaml", json.dumps({"reviewed_chapters": ["ch-foundations", "ch-mechanism", "ch-training", "ch-evaluation"],
+                "edits": [], "preserved": [], "citation_reaudit": []}, ensure_ascii=False))
         elif kind == "rewrite":
             ledger = json.loads((WORK / "reports/audit-ledger.json").read_text(encoding="utf-8"))
             items = [e for e in ledger["issues"].values() if e["status"] == "open" and e["severity"] in ("high", "medium") and (e.get("chapter") or "book") == target]
@@ -257,11 +263,11 @@ def assertions(agent, urls):
     assert not any(t.startswith("rewrite:ch-foundations") for t in done), "rewrite stayed targeted"
     stages = {e["stage"] for e in events if e["event"] == "complete"}
     for phase in ("source_ingestion", "supplementary_research", "corpus_analysis", "research_frozen", "architecture", "reference_assignment",
-                  "editorial_planning", "drafting", "chapter_review", "asset_planning", "asset_generation", "integration", "audit", "rewrite", "final_audit",
+                  "editorial_planning", "drafting", "chapter_review", "asset_planning", "asset_generation", "integration", "audit", "rewrite", "prose_audit", "prose_editing", "final_audit",
                   "design", "layout", "build", "validation", "package", "complete"):
         assert phase in stages, f"phase {phase} never completed"
     skills = {e.get("skill") for e in events if e["event"] == "invoke"}
-    for skill in ("skills/source-ingestion.md", "skills/research.md", "skills/book-authoring.md", "skills/editing.md", "skills/figures.md", "skills/audit.md", "skills/editorial-design.md"):
+    for skill in ("skills/research/source-ingestion.md", "skills/research/research.md", "skills/authoring/book-authoring.md", "skills/editorial/editing.md", "skills/editorial/prose-audit.md", "skills/editorial/whole-book-review.md", "skills/editorial/developmental-editing.md", "skills/editorial/cadence-editing.md", "skills/design/figures.md", "skills/quality/audit.md", "skills/design/editorial-design.md"):
         assert skill in skills, f"{skill} never invoked"
     ledger = json.loads((WORK / "reports/audit-ledger.json").read_text(encoding="utf-8"))
     agent_issues = [e for e in ledger["issues"].values() if e["source"].startswith("agent")]

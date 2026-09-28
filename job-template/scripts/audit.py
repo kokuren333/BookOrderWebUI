@@ -221,7 +221,7 @@ def legibility_issues(records):
         if figure["status"] == "fail":
             smallest = ", ".join(f"{b['text']!r} {b['pt']}pt" for b in figure["below_min"][:3])
             issues.append(issue("figure", "high", figure["chapter"], f"{figure['id']} prints text below {minimum}pt at its placed width "
-                                f"{figure['placed_width_mm']} mm ({smallest}); redraw it at its printed size (skills/figures.md)", action="generate"))
+                                f"{figure['placed_width_mm']} mm ({smallest}); redraw it at its printed size (skills/design/figures.md)", action="generate"))
         elif figure["status"] == "unverified" and figure.get("type") == "chart":
             issues.append(issue("figure", "medium", figure["chapter"], f"{figure['id']}: printed text size cannot be verified; "
                                 "render the chart with scripts/chartkit.py (SVG, or PNG with its render record)", action="generate"))

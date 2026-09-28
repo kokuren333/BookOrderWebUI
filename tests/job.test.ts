@@ -48,7 +48,7 @@ test('generated job includes complete executable template, exact source bytes an
   const result = await generateJob(form, files, await templateFiles());
   const zip = await JSZip.loadAsync(result.data);
   const root = 'publishing-job/';
-  for (const path of ['AGENTS.md', 'TASK.md', 'project.json', 'source/metadata/outline.yaml', 'skills/research.md', 'templates/technical-book/book.typ', 'templates/docx/styles.json', 'templates/web/search.js', 'scripts/check_env.py', 'scripts/build.py', 'scripts/validate.py', 'scripts/package.py', 'scripts/cli.py']) assert.ok(zip.file(root + path), path);
+  for (const path of ['AGENTS.md', 'TASK.md', 'project.json', 'source/metadata/outline.yaml', 'skills/research/research.md', 'templates/technical-book/book.typ', 'templates/docx/styles.json', 'templates/web/search.js', 'scripts/check_env.py', 'scripts/build.py', 'scripts/validate.py', 'scripts/package.py', 'scripts/cli.py']) assert.ok(zip.file(root + path), path);
   const project = JSON.parse(await zip.file(root + 'project.json')!.async('string'));
   assert.equal(project.format_version, '0.2'); assert.equal(project.citations.style, 'numeric'); assert.equal(project.research.require_supplied_coverage, true); assert.equal(project.book.language, 'ja');
   assert.equal(project.outputs.canonical_markdown, true); assert.equal(project.book.target_pages, 50);
@@ -62,7 +62,7 @@ test('generated job includes complete executable template, exact source bytes an
   }
   const task = await zip.file(root + 'TASK.md')!.async('string');
   assert.ok(task.includes('## Additional user instructions (verbatim)\n' + form.instructions + '\n')); assert.ok(task.includes('/goal'));
-  for (const path of ['scripts/orchestrator.py', 'scripts/sources.py', 'scripts/research.py', 'scripts/planning.py', 'scripts/audit.py', 'skills/source-ingestion.md', 'skills/audit.md', 'templates/csl/numeric.csl', 'research/.gitkeep', 'plan/.gitkeep']) assert.ok(zip.file(root + path), path);
+  for (const path of ['scripts/orchestrator.py', 'scripts/sources.py', 'scripts/research.py', 'scripts/planning.py', 'scripts/audit.py', 'scripts/skills.py', 'scripts/prose_signals.py', 'config/prose-signals/ja.json', 'skills/research/source-ingestion.md', 'skills/quality/audit.md', 'skills/editorial/prose-audit.md', 'skills/editorial/whole-book-review.md', 'skills/editorial/developmental-editing.md', 'skills/editorial/cadence-editing.md', 'templates/csl/numeric.csl', 'research/.gitkeep', 'plan/.gitkeep']) assert.ok(zip.file(root + path), path);
   for (const file of files) assert.deepEqual(await zip.file(root + 'input/sources/' + file.name)!.async('uint8array'), file.data);
   await mkdir('.test-output', { recursive: true }); await writeFile('.test-output/generated-job.zip', result.data);
 });

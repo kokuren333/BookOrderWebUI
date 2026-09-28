@@ -40,7 +40,7 @@ Record how many times you had to re-issue it — that is a runtime limit, not a 
 
 | File | Confirms |
 | --- | --- |
-| `execution-summary.json` | `publication_status: "complete"`, all 20 phases `complete`, counts, invoked skills/tools, outputs, `completion_gates.passed: true` |
+| `execution-summary.json` | `publication_status: "complete"`, all current phases `complete`, counts, invoked skills/tools, outputs, `completion_gates.passed: true` |
 | `project-state.json` | phases, locked `scale`, accepted reviews, counters (review rounds, rewrite passes, reopenings) |
 | `run-events.jsonl` | the workflow actually executed (see §4) |
 | `research/index.json`, `research/source-status.json` | every supplied source with ID, status, attempts, chars, SHA-256, limitations |

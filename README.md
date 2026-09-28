@@ -70,3 +70,7 @@ See [the design system guide](job-template/docs/design-system.md). Section 05 of
 
 Design integration: python tests/design.py (PANDOC/TYPST must be available). Portable integration: node --experimental-strip-types tools/make-portable-fixture.mjs, then python tests/e2e.py --portable.
 
+## Editorial prose review
+
+Generated jobs now run a whole-book prose audit after fact/citation correction, followed by targeted developmental and cadence editing and a final fact/citation audit. The deterministic `reports/prose-signals.json` records lexical and structural signals only; its Japanese phrase list is configurable in `config/prose-signals/ja.json`. The agent records contextual decisions in `plan/prose-audit.yaml` and `plan/prose-editing.yaml`. See [Skill architecture](docs/SKILLS_ARCHITECTURE.md) and [prose quality](docs/PROSE_QUALITY.md).
+

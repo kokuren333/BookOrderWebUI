@@ -1,5 +1,7 @@
 # BookOrder vNext — audit, gap analysis and architecture
 
+Historical snapshot: paths such as `skills/research.md` below describe the pre-migration flat tree. Current paths and loading rules are in [SKILLS_ARCHITECTURE.md](SKILLS_ARCHITECTURE.md).
+
 ## 1. How `/goal` actually ran before this change (v0.1)
 
 BookOrder is a static web app that packages a *publishing job* ZIP (`src/job.ts`). There is no model inside
