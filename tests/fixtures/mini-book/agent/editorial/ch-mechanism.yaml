@@ -1,0 +1,53 @@
+chapter_id: ch-mechanism
+chapter_title: 自己注意とTransformer
+chapter_role: development
+reader_before: 文脈ベクトルとquery・key・valueの考え方を知っている
+reader_after: スケール化内積注意の式、マルチヘッド注意、位置エンコーディング、計算量の制約と効率化の方式を説明できる
+target_chars: 1400
+sections:
+  - id: sec-mechanism-scaled
+    heading: スケール化内積注意
+    purpose: 式と計算の流れで自己注意の中核を示す
+    rhetorical_role: thesis
+    intended_reader_effect: QとKが合流して重みになり、Vと合流して出力になる流れを掴む
+    expected_density: heavy
+    target_chars: 500
+    summary_points: [同じ系列内の相互参照, 平方根で割る理由]
+    devices:
+      - id: fig-attention-flow
+        type: figure
+        why: 二つの合流点をもつ計算の流れは、文章だと一度に保持しにくい
+        placement: {intent: 式と平方根の説明の後, position: late}
+        information_shape: {kind: process, merging: true, steps: 7}
+        basis: source
+        source_ids: ["{{src:transformer-architecture}}"]
+  - id: sec-mechanism-multihead
+    heading: マルチヘッド注意と位置
+    purpose: 複数の射影と位置の情報がなぜ必要かを説明する
+    rhetorical_role: evidence
+    intended_reader_effect: ヘッドの分業が設計ではなく学習の結果であることを理解する
+    expected_density: medium
+    target_chars: 450
+    summary_points: [複数の低次元空間で注意を計算, 自己注意は順序を区別しない]
+  - id: sec-mechanism-cost
+    heading: 計算量と効率化
+    purpose: 二乗の計算量と、効率化の方式の取捨選択を比べる
+    rhetorical_role: contrast
+    intended_reader_effect: 方式ごとの品質・計算量・実装の違いを一つの表で比較できる
+    expected_density: heavy
+    target_chars: 450
+    summary_points: [系列長の二乗に比例, 近似と厳密な工夫]
+    visual_opportunities:
+      - {information_shape: {kind: comparison, items: 4, attributes: 3}, note: 四つの注意方式の比較}
+    devices:
+      - id: tbl-attention-variants
+        type: table
+        why: 四つの方式を計算量と特徴で並べると取捨選択が一度に見える
+        placement: {intent: 二つの方向性を述べた直後, position: middle}
+        information_shape: {kind: comparison, items: 4, attributes: 3}
+        basis: source
+        source_ids: ["{{src:efficient-attention}}"]
+chapter_end:
+  - {type: key_points}
+waivers:
+  - {rule: device_count_under, reason: 式・図・表が休止を担う計算の章で、独立した要点ボックスを足すと同じ内容の繰り返しになる}

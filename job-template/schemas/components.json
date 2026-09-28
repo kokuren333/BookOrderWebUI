@@ -59,6 +59,14 @@
     "docx_style": "Sidebar",
     "label": "Sidebar"
   },
+  "case-study": {
+    "docx_style": "Case Study",
+    "label": "Case Study"
+  },
+  "counterpoint": {
+    "docx_style": "Counterpoint",
+    "label": "Counterpoint"
+  },
   "step-by-step": {
     "docx_style": "Step By Step",
     "label": "Step By Step"

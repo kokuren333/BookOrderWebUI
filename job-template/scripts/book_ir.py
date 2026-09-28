@@ -43,6 +43,13 @@ def prepare_ast(ir, output, tokens=None):
         if value.get('t') == 'Div':
             identifier, classes, attributes = value['c'][0]
             kind = next((name for name in classes if name in components), None)
+            if 'slot' in classes:  # proof placeholder for a planned device
+                label = {'t': 'Strong', 'c': [{'t': 'Str', 'c': f"［slot {dict(attributes).get('kind', '')}: {identifier}］"}]}
+                body = transform(value['c'][1])
+                if body and body[0]['t'] in ('Para', 'Plain'): body[0] = {**body[0], 'c': [label, {'t': 'Space'}] + body[0]['c']}
+                else: body.insert(0, {'t': 'Para', 'c': [label]})
+                extra = [['custom-style', 'Note']] if output == 'docx' else []
+                return {'t': 'Div', 'c': [[identifier, ['slot-placeholder'], extra], body]}
             if kind == 'equation':
                 body = transform(value['c'][1]); number = dict(attributes).get('data-number', '')
                 label = {'t': 'Str', 'c': f'({number})'} if number else None

@@ -1,0 +1,32 @@
+chapter_id: ch-training
+chapter_title: 学習とスケーリング
+chapter_role: development
+reader_before: Transformerの構成を知っている
+reader_after: 学習の安定化と、スケーリング則の結論が実験条件によって修正された経緯を説明できる
+target_chars: 1000
+sections:
+  - id: sec-training-procedure
+    heading: 学習の手順
+    purpose: 次単語予測の学習とウォームアップ・安定化の工夫を示す
+    rhetorical_role: evidence
+    intended_reader_effect: 再現性を左右する実装上の細部に気づく
+    expected_density: medium
+    target_chars: 450
+    summary_points: [ウォームアップ, 層正規化と勾配クリッピング]
+  - id: sec-training-scaling
+    heading: スケーリング則とその修正
+    purpose: 2020年と2022年の結論の違いと、その条件を比べる
+    rhetorical_role: contrast
+    intended_reader_effect: 経験則を条件と切り離さずに読む
+    expected_density: heavy
+    target_chars: 550
+    summary_points: [べき乗則, 計算最適な配分, 実験条件の差]
+    counterarguments: [二つの結論は矛盾しているという読み方]
+    devices:
+      - id: wn-training-conditions
+        type: warning
+        why: 二つの結論を単一の法則として扱う誤読を防ぐ
+        placement: {intent: 2022年の結論の後, position: middle}
+        source_ids: ["{{src:scaling-debate}}"]
+chapter_end:
+  - {type: key_points}

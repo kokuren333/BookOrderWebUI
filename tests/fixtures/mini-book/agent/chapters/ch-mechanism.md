@@ -33,4 +33,11 @@ $$\operatorname{Attention}(Q, K, V) = \operatorname{softmax}\left(\frac{QK^{\top
 
 Table: 注意の方式の比較 {#tbl-attention-variants}
 
-@tbl:attention-variants のように、どの方式も品質、実装の複雑さ、ハードウェア効率の間で異なる取捨選択をしている [cite:{{src:efficient-attention}}]。評価では、品質と実際の処理時間の両方を現実的な系列長で報告する必要がある。こうして構成されたモデルを大規模なデータで学習する方法を、@ch:training で扱う。
+@tbl:attention-variants のように、どの方式も品質、実装の複雑さ、ハードウェア効率の間で異なる取捨選択をしている [cite:{{src:efficient-attention}}]。評価では、品質と実際の処理時間の両方を現実的な系列長で報告する必要がある。
+
+::: {.summary #ch-mechanism-key-points}
+- 自己注意は同じ系列内の全位置を並列に参照する。
+- 計算量は系列長の二乗に比例し、効率化には近似と厳密な工夫の二方向がある。
+:::
+
+こうして構成されたモデルを大規模なデータで学習する方法を、@ch:training で扱う。

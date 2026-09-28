@@ -1,0 +1,31 @@
+# Chapter 2 as printed (pp. 18-32): four sections, one concept map (fig. 2.1) captioned as an editorial arrangement.
+chapter_id: ch-2
+chapter_title: 上昇、地域、孤独
+chapter_role: development
+reader_before: 学校内の評価の比喩を読んだ
+reader_after: 家庭・地域・移動の資源が上昇の手触りを変えることを理解する
+target_chars: 14800
+sections:
+  - {id: sec-2-1, heading: 家庭から持ち込む資源, purpose: 家庭の資源と情報の回路, rhetorical_role: evidence, intended_reader_effect: 資源の非対称に気づく, expected_density: medium, target_chars: 4400,
+     summary_points: [数えられない資源, t出身k, 親ガチャ, 情報インフラ], new_terms: [t出身k]}
+  - {id: sec-2-2, heading: 関西という地図, purpose: 関西を地図として読む, rhetorical_role: evidence, intended_reader_effect: 移動の足場の違いを知る, expected_density: medium, target_chars: 3500,
+     summary_points: [第二関西速度, 五大文明論, 東京という夢の街]}
+  - id: sec-2-3
+    heading: 上京と回復地点
+    purpose: 上京と回復の場所
+    rhetorical_role: evidence
+    intended_reader_effect: 移動のたびに資源が入れ替わることを見る
+    expected_density: medium
+    target_chars: 3300
+    summary_points: [上京の費用, 帰省, 回復地点]
+    devices:
+      - id: fig-2-1
+        type: figure
+        why: 移動に伴って変わる資源と回復地点を示す
+        placement: {intent: 節の末尾, position: section_end}
+        information_shape: {kind: relation, nodes: 5}
+        basis: illustrative
+  - {id: sec-2-4, heading: 上昇の孤独, purpose: 達成後の孤独, rhetorical_role: evidence, intended_reader_effect: 成功と所属の違いを知る, expected_density: medium, target_chars: 3600,
+     summary_points: [成功は所属の証明ではない, 共通語彙と境界, 章の出口]}
+chapter_end:
+  - {type: bridge_to_next}

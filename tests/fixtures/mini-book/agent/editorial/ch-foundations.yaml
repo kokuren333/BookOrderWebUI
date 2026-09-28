@@ -1,0 +1,40 @@
+chapter_id: ch-foundations
+chapter_title: 注意機構の誕生
+chapter_role: introduction
+reader_before: 系列を固定長ベクトルに圧縮する翻訳モデルの構成を知らない
+reader_after: 固定長ベクトルの限界と、出力ごとに参照先を選び直す注意機構の発想を説明できる
+target_chars: 1000
+lead: 注意機構が解決した問題を、機械翻訳の歴史に沿って示す
+sections:
+  - id: sec-foundations-bottleneck
+    heading: 固定長ベクトルの限界
+    purpose: エンコーダ・デコーダ構成が長い文で失敗する理由を示す
+    rhetorical_role: thesis
+    intended_reader_effect: 情報のボトルネックという問題設定を自分の言葉で言える
+    expected_density: medium
+    target_chars: 450
+    summary_points: [固定長ベクトルに文全体を詰める, 長い文で品質が落ちる]
+    citation_needs: [{claim: 長い文で翻訳品質が低下する, source_ids: ["{{src:attention-basics}}"]}]
+  - id: sec-foundations-idea
+    heading: 注意機構の考え方
+    purpose: 関連度・ソフトマックス・加重平均で文脈ベクトルを作る仕組みを説明する
+    rhetorical_role: thesis
+    intended_reader_effect: 文脈ベクトルが出力ごとに計算し直されることを理解する
+    expected_density: heavy
+    target_chars: 550
+    summary_points: [関連度をソフトマックスで重みにする, 文脈ベクトルは加重平均, query・key・valueへの一般化]
+    new_terms: [文脈ベクトル]
+    counterarguments: [注意重みを判断根拠とみなす読み方]
+    cross_refs: ["@ch:mechanism"]
+    devices:
+      - id: kp-foundations-idea
+        type: key_point
+        why: 章の中心命題を一文で固定し、次章の一般化の足場にする
+        placement: {intent: 文脈ベクトルの説明の直後, position: middle}
+      - id: wn-foundations-weights
+        type: warning
+        why: 注意重みを説明根拠とみなす誤読が多い
+        placement: {intent: query・key・valueの一般化の後, position: late}
+        source_ids: ["{{src:attention-basics}}"]
+chapter_end:
+  - {type: key_points}

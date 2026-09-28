@@ -233,13 +233,55 @@ def local_path(url):
 def fingerprint():
     digest = hashlib.sha256()
     paths = [ROOT / name for name in ('project.json', 'TASK.md', 'book.design.yaml', 'custom.css', 'custom.typ')]
-    for folder in ("source", "templates", "scripts", "input", "themes", "schemas"):
+    for folder in ("source", "templates", "scripts", "input", "themes", "styles", "schemas"):
         paths.extend(p for p in (ROOT / folder).rglob("*") if p.is_file() and "__pycache__" not in p.parts)
     for path in sorted(paths):
         if path.is_file():
             digest.update(path.relative_to(ROOT).as_posix().encode())
             digest.update(path.read_bytes())
+    # These are explicit semantic inputs to publication. Do not hash plan/ wholesale:
+    # reports and generated planning aids live there too, and would self-invalidate.
+    for path in semantic_artifact_paths():
+        if path.is_file():
+            digest.update(path.relative_to(ROOT).as_posix().encode())
+            digest.update(json.dumps(_semantic_yaml(path), ensure_ascii=False, sort_keys=True,
+                                     separators=(",", ":")).encode("utf-8"))
     return digest.hexdigest()
+
+
+def semantic_artifact_paths():
+    """The small, explicit set of planning artifacts that affect the published book."""
+    paths = [ROOT / "plan/profile.resolved.yaml", ROOT / "plan/layout-spec.yaml", ROOT / "plan/style-bible.yaml",
+             ROOT / "source/metadata/outline.yaml",
+             ROOT / "plan/assets-plan.yaml", ROOT / "source/metadata/figures.yaml",
+             ROOT / "reports/visual-review.yaml"]
+    editorial = ROOT / "plan/editorial"
+    if editorial.is_dir(): paths.extend(editorial.glob("*.yaml"))
+    return sorted(set(paths))
+
+
+def editorial_plan_fingerprint():
+    """Fingerprint only the semantic EditorialPlan source artifacts."""
+    digest = hashlib.sha256()
+    folder = ROOT / "plan/editorial"
+    paths = sorted(folder.glob("*.yaml")) if folder.is_dir() else []
+    for path in paths:
+        digest.update(path.name.encode("utf-8"))
+        digest.update(json.dumps(_semantic_yaml(path), ensure_ascii=False, sort_keys=True,
+                                 separators=(",", ":")).encode("utf-8"))
+    return digest.hexdigest()
+
+
+def _semantic_yaml(path):
+    """Canonical parsed YAML: formatting/comments and generated time fields do not affect freshness."""
+    value = yaml_data(path)
+    ignored = {"generated_at", "updated_at", "created_at", "timestamp"}
+    def clean(item):
+        if isinstance(item, dict):
+            return {key: clean(val) for key, val in item.items() if str(key).lower() not in ignored}
+        if isinstance(item, list): return [clean(val) for val in item]
+        return item
+    return clean(value)
 
 
 def report(name, content):

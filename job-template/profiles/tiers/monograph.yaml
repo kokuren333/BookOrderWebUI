@@ -1,0 +1,35 @@
+# Length tier: a research monograph (450+ A5 pages); text-first, parts required.
+tier: monograph
+scale:
+  target_body_chars: 220000
+  nonprose_share_target: 0.18
+  minimum_ratio: 0.8
+  front_matter_pages: 8
+  back_matter_share: 0.08
+structure:
+  parts: {min: 2, target: 4, max: 6}
+  chapters: {min: 10, target: 15, max: 30}
+  heading_depth_max: 3
+  section_chars: {min: 800, target: 1300, max: 2200}
+  paragraph_chars_max: 500
+  chapter_lead: required
+  chapter_end: [key_points, further_reading]
+devices:
+  visuals_per_10k: {min: 1.0, target: 2.0, max: 4.0}
+  tables_per_chapter: {min: 0, target: 1, max: 4}
+  callouts_per_chapter: {min: 0, target: 2, max: 4}
+  case_studies_per_chapter: {min: 0, target: 1, max: 3}
+  columns_per_chapter: {min: 0, target: 0.5, max: 1}
+  pull_quotes_per_chapter: {min: 0, target: 1, max: 3}
+rhythm:
+  max_text_only_pages: 6
+  pause_every_chars: {target: 3600, max: 4800}
+  abstract_run_chars_max: 2000
+citations:
+  style: numeric
+  inline_markers_per_page_max: 2.0
+  further_reading_per_chapter: {min: 2, target: 4, max: 8}
+art_direction:
+  weight: standard
+  ornament_level: low
+  generative_images: {allowed: [part_opener], max_total: 6}

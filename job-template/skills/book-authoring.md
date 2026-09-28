@@ -2,8 +2,11 @@
 
 ## Book Bible and architecture (task `architecture`)
 
-The task states the binding scale: requested pages, target characters and the minimum. Page targets are budgets,
-not suggestions; characters exclude whitespace, code and math.
+The task states the binding scale and the publication profile (plan/profile.resolved.yaml): body characters and
+their minimum, the chapter range, section and paragraph lengths, device densities (figures/tables per 10,000
+characters, callouts, case studies, pull quotes per chapter), the chapter lead and chapter-end elements, and the
+text-wall limit. Plan the outline to fit it: the page count is only an estimate derived from the body size.
+Characters exclude whitespace, code and math.
 
 `plan/book-bible.yaml` is shared by every chapter job: title, subtitle, purpose, audience, tone, central_thesis,
 scope (included/excluded), terminology (preferred_terms with `avoid` variants, definitions, aliases),
@@ -35,7 +38,7 @@ chapters:
     handoff: "what the next chapter may assume"
 ```
 
-Budgets must add up to the target. Large books need many chapters (roughly one per 40 pages at least); chapters
+Budgets must add up to the target. The chapter count must fall within the profile's range; chapters
 over 60,000 characters must be split. Every relevant supplied source must be assigned somewhere.
 
 ## Drafting (tasks `draft:<chapter>`)
@@ -49,6 +52,11 @@ Write the chapter section by section: skeleton → each required section → sou
 citations → transitions → review against the contract. Introduce concepts before use; refer back instead of
 re-explaining (`@ch:`, `@sec:`). Cite with `[cite:src-XXXX]`. Then write `plan/summaries/<chapter>.yaml`
 (summary, introduced_concepts, key_terms, examples_used, handoff) — later chapters depend on it.
+
+The packet also carries the chapter's editorial plan (`plan/editorial/<chapter>.yaml`, skills/editorial-planning.md):
+write its sections in order with their purpose, role and size, and reserve every planned device as a slot
+(`::: {.slot #id kind=type}`) at its placement, or write a component device directly with the same id. The
+contract fails while a planned device has neither.
 
 ## Contracts and expansion (tasks `expand:` / `review:`)
 

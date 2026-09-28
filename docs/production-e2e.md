@@ -56,7 +56,7 @@ Record how many times you had to re-issue it — that is a runtime limit, not a 
 | `plan/assets-plan.yaml`, `source/assets/diagrams/*.yaml`, `source/assets/figures/*.svg` | planned assets |
 | `plan/integration-review.yaml`, `plan/audit/*.yaml`, `reports/audit-ledger.json`, `reports/audit-report.yaml` | integration, audit, rewrite, re-audit |
 | `plan/design-decisions.yaml`, `reports/design-report.json`, `reports/layout-review.md` | design and layout |
-| `reports/build-report.json`, `reports/validation-report.json`, `reports/completion-gates.json` | build, validation, 16 gates |
+| `reports/build-report.json`, `reports/validation-report.json`, `reports/completion-gates.json` | build, validation, 19 gates |
 | `publish/book.pdf`, `publish/site/`, `publish/book.epub`, `interchange/book.docx`, `interchange/book.html`, `interchange/book-ir.json`, `publish/result.zip` | deliverables |
 
 ## 4. Verification checklist (with commands)
@@ -90,7 +90,7 @@ Use Python from the job (`runtime\python\python.exe` on Windows) or any Python 3
    deterministic audit invocations, and — if issues were found — `rewrite:<ch>` for only the affected chapters
    followed by `reaudit:<ch>`. `reports/audit-report.yaml` → `summary.open.high == 0` and `open.medium == 0`.
 9. **No premature finish.** `execution-summary.json` → `complete: true` only after `package` and `complete`
-   phases; `reports/completion-gates.json` → 16 gates passed; `project-state.json` → no blockers. Run
+   phases; `reports/completion-gates.json` → 19 gates passed; `project-state.json` → no blockers. Run
    `bookorder gates` yourself — it re-evaluates everything and must print 16 × PASS.
 10. **Genuine publication vs preview.** A genuine result has all of: STATUS COMPLETE from `bookorder goal`,
     gates 1–16 PASS, `total_actual ≥ minimum`, the page count of `publish/book.pdf` in the requested range

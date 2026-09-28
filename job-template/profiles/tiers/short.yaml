@@ -1,0 +1,35 @@
+# Length tier: a booklet or short introduction (roughly 30-80 A5 pages).
+tier: short
+scale:
+  target_body_chars: 30000
+  nonprose_share_target: 0.30
+  minimum_ratio: 0.8
+  front_matter_pages: 4
+  back_matter_share: 0.04
+structure:
+  parts: {min: 0, target: 0, max: 0}
+  chapters: {min: 2, target: 6, max: 12}
+  heading_depth_max: 2
+  section_chars: {min: 300, target: 700, max: 1400}
+  paragraph_chars_max: 350
+  chapter_lead: optional
+  chapter_end: [key_points]
+devices:
+  visuals_per_10k: {min: 2.0, target: 3.0, max: 6.0}
+  tables_per_chapter: {min: 0, target: 1, max: 3}
+  callouts_per_chapter: {min: 1, target: 2, max: 4}
+  case_studies_per_chapter: {min: 0, target: 0, max: 1}
+  columns_per_chapter: {min: 0, target: 0, max: 1}
+  pull_quotes_per_chapter: {min: 0, target: 0, max: 2}
+rhythm:
+  max_text_only_pages: 3
+  pause_every_chars: {target: 1800, max: 2400}
+  abstract_run_chars_max: 1200
+citations:
+  style: numeric
+  inline_markers_per_page_max: 2.0
+  further_reading_per_chapter: {min: 0, target: 0, max: 3}
+art_direction:
+  weight: light
+  ornament_level: low
+  generative_images: {allowed: [], max_total: 0}

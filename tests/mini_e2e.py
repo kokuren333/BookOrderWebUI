@@ -141,7 +141,12 @@ class MockAgent:
             packet_check = []
             self.copy("plan/book-bible.yaml", "plan/book-bible.yaml")
             self.copy("plan/outline.yaml", "source/metadata/outline.yaml")
+        elif kind == "editorial":
+            packet = (WORK / f"plan/chapter-packets/{target}.yaml").read_text(encoding="utf-8")
+            assert "editorial_plan" in packet, "packet names the editorial plan"
+            self.copy(f"editorial/{target}.yaml", f"plan/editorial/{target}.yaml")
         elif kind == "draft":
+            assert any("slot" in line for line in task["instructions"]), "drafting is told to reserve slots"
             packet = (WORK / f"plan/chapter-packets/{target}.yaml").read_text(encoding="utf-8")
             assert "plan/book-bible.yaml" in packet and "source/metadata/glossary.yaml" in packet, "packet lacks shared state"
             if target != "ch-foundations": assert "prerequisite_summaries" in packet and "summary:" in packet.split("prerequisite_summaries")[1], f"{target} packet lacks prerequisite summaries"
@@ -177,7 +182,8 @@ class MockAgent:
             self.copy("plan/design-decisions.yaml", "plan/design-decisions.yaml")
         elif identifier == "layout-review":
             pdf = WORK / "publish/book.pdf"
-            pages = subprocess.run(["pdfinfo", str(pdf)], capture_output=True, text=True).stdout if shutil.which("pdfinfo") else "pdfinfo unavailable"
+            info = subprocess.run(["pdfinfo", str(pdf)], capture_output=True) if shutil.which("pdfinfo") else None
+            pages = info.stdout.decode("utf-8", errors="replace") if info else "pdfinfo unavailable"
             self.put("reports/layout-review.md", "# Layout review (mini-E2E mock agent)\n\nAutomated fixture run: the mock agent cannot look at pages. "
                      "It recorded PDF metadata only; visual inspection is performed separately by a human/agent.\n\n```\n" + pages + "\n```\n")
         else:
@@ -248,7 +254,7 @@ def assertions(agent, urls):
     assert not any(t.startswith("rewrite:ch-foundations") for t in done), "rewrite stayed targeted"
     stages = {e["stage"] for e in events if e["event"] == "complete"}
     for phase in ("source_ingestion", "supplementary_research", "corpus_analysis", "research_frozen", "architecture", "reference_assignment",
-                  "drafting", "chapter_review", "integration", "asset_planning", "asset_generation", "audit", "rewrite", "final_audit",
+                  "editorial_planning", "drafting", "chapter_review", "asset_planning", "asset_generation", "integration", "audit", "rewrite", "final_audit",
                   "design", "layout", "build", "validation", "package", "complete"):
         assert phase in stages, f"phase {phase} never completed"
     skills = {e.get("skill") for e in events if e["event"] == "invoke"}
@@ -279,10 +285,80 @@ def assertions(agent, urls):
         text = subprocess.run(["pdftotext", str(WORK / "publish/book.pdf"), "-"], capture_output=True, text=True).stdout
         assert "(2.1)" in text and re.search(r"図\s?2\.1", text) and "[1]" in text, "PDF numbering/citations"
     assert (WORK / "source/assets/figures/attention-flow.svg").is_file()
+    layout = json.loads((WORK / "reports/layout-metrics.json").read_text(encoding="utf-8"))
+    assert layout["schema"] == "bookorder/layout-metrics@1" and len(layout["chapters"]) == 4, "layout metrics per chapter"
+    assert [c["id"] for c in layout["chapters"]] == list(SUMMARIES), "chapters identified by outline id"
+    assert layout["totals"]["elements"]["figure"] == 1 and layout["totals"]["elements"]["table"] == 1 and layout["totals"]["elements"]["equation"] == 1
+    assert layout["totals"]["callouts"] >= 3 and len(layout["pages"]) == layout["totals"]["pages"]
+    assert json.loads((WORK / "reports/build-report.json").read_text(encoding="utf-8"))["layout"]["ok"]
+    figures = json.loads((WORK / "reports/figure-check.json").read_text(encoding="utf-8"))
+    flow = next(f for f in figures["figures"] if f["id"] == "fig-attention-flow")
+    assert flow["status"] == "ok" and flow["planned_width_mm"] == 96 and abs(flow["scale"] - 1) < 0.01, flow
+    assert flow["min_text_pt"] >= figures["tokens"]["min_label_pt"], "diagram text prints at token size"
+    placed = [e for p in layout["pages"] for e in p["elements"] if e.get("label") == "fig-attention-flow"]
+    walls = json.loads((WORK / "reports/pacing-report.json").read_text(encoding="utf-8"))
+    assert walls["verdict"] == "pass" and walls["limits"]["tier"] == "short", walls["limits"]
+    assert placed and placed[0]["geometry"]["width_mm"] == 96 and placed[0]["geometry"]["legibility"] == "ok", placed
     assert (WORK / "publish/result.zip").is_file()
     gates = json.loads((WORK / "reports/completion-gates.json").read_text(encoding="utf-8"))
-    assert gates["passed"] and len(gates["gates"]) == 16
+    assert gates["passed"] and len(gates["gates"]) == 21 and all(g["passed"] for g in gates["gates"] if g["id"] in (17, 18, 19, 20, 21))
+    plan = (WORK / "reports/editorial-plan.yaml").read_text(encoding="utf-8")
+    assert 'schema: "bookorder/editorial-plan@1"' in plan and "ok: true" in plan, "editorial plan report"
+    assert "editorial:ch-mechanism" in done and done.index("editorial:ch-mechanism") < done.index("draft:ch-mechanism"), "planned before drafting"
+    manuscript_final = (WORK / "source/manuscript/02-mechanism.md").read_text(encoding="utf-8")
+    assert ".slot" not in manuscript_final and "{#tbl-attention-variants}" in manuscript_final, "the table slot was filled"
     return summary
+
+
+def real_pdf_pacing_loop():
+    """Run gate 17 fail -> deterministic editorial pause -> fresh Typst proof -> pass."""
+    target = WORK.parent / "pacing-e2e-job"
+    if target.exists(): shutil.rmtree(target)
+    shutil.copytree(WORK, target, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+    chapter = target / "source/manuscript/01-foundations.md"
+    original = chapter.read_text(encoding="utf-8")
+    paras = ["この長い説明段落は、概念の前提、観察できる条件、反例との違いを順に示し、読者が一つの論点を追い続けるための統合試験用本文です。" * 5 for _ in range(14)]
+    wall = "\n\n".join(paras)
+    # Put the intentionally long uninterrupted run before the existing chapter summary.
+    marker = "::: {.summary #ch-foundations-key-points}"
+    assert marker in original
+    chapter.write_text(original.replace(marker, wall + "\n\n" + marker), encoding="utf-8")
+
+    script = ("import json, orchestrator; p,s=orchestrator.load_state(); c=orchestrator.Context(p,s); "
+              "r=orchestrator.h_layout(c); g=orchestrator.completion_gates(c,include_package=False); "
+              "print(json.dumps({'tasks':[t['id'] for t in r.tasks], 'gate17':next(x for x in g if x['id']==17)['passed']}))")
+    env = {**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1", "PYTHONDONTWRITEBYTECODE": "1",
+           "PYTHONPATH": str(target / "scripts") + os.pathsep + os.environ.get("PYTHONPATH", "")}
+    def run_layout():
+        result = subprocess.run([sys.executable, "-c", script], cwd=target, capture_output=True, text=True, encoding="utf-8", env=env)
+        if result.returncode: raise AssertionError("pacing E2E orchestration failed:\n" + result.stdout[-3000:] + result.stderr[-3000:])
+        return json.loads(next(line for line in reversed(result.stdout.splitlines()) if line.startswith("{")))
+
+    prior = json.loads((target / "reports/layout-metrics.json").read_text(encoding="utf-8"))["generated_at"]
+    failed = run_layout()
+    assert not failed["gate17"] and "pacing:ch-foundations" in failed["tasks"], failed
+    first_metrics = json.loads((target / "reports/layout-metrics.json").read_text(encoding="utf-8"))
+    first_pacing = json.loads((target / "reports/pacing-report.json").read_text(encoding="utf-8"))
+    assert first_metrics["generated_at"] != prior and first_pacing["verdict"] == "fail"
+
+    # Deterministic agent-fix simulation: preserve the paragraphs, add a short editorial summary pause every two.
+    pauses = []
+    for i in range(0, len(paras), 2):
+        pauses.extend(paras[i:i + 2])
+        pauses.append(f"\n\n::: {{.summary #pacing-pause-{i // 2 + 1}}}\n\n" +
+                      "この節では、前提と観察条件を合わせて読み、論点の違いを確認しました。" * 2 + "\n:::")
+    chapter.write_text(original.replace(marker, "\n\n".join(pauses) + "\n\n" + marker), encoding="utf-8")
+    passed = run_layout()
+    assert passed["gate17"] and not any(t.startswith("pacing:") for t in passed["tasks"]), passed
+    second_metrics = json.loads((target / "reports/layout-metrics.json").read_text(encoding="utf-8"))
+    second_pacing = json.loads((target / "reports/pacing-report.json").read_text(encoding="utf-8"))
+    build = json.loads((target / "reports/build-report.json").read_text(encoding="utf-8"))
+    assert second_metrics["generated_at"] != first_metrics["generated_at"]
+    assert build["layout"]["generated_at"] == second_metrics["generated_at"] == second_pacing["metrics_generated_at"]
+    assert second_pacing["verdict"] == "pass"
+    shutil.rmtree(target)
+    return {"first": {"gate17": failed["gate17"], "task": "pacing:ch-foundations", "metrics_at": first_metrics["generated_at"]},
+            "fixed": {"gate17": passed["gate17"], "metrics_at": second_metrics["generated_at"], "verdict": second_pacing["verdict"]}}
 
 
 def main():
@@ -292,8 +368,10 @@ def main():
         agent = MockAgent(base)
         result, steps = run_goal(agent)
         summary = assertions(agent, urls)
+        pacing_result = real_pdf_pacing_loop()
         print(f"PASS mini-E2E in {steps} goal iterations; tasks handled: {len(agent.log)}")
         print(json.dumps({k: summary[k] for k in ("publication_status", "sources", "chapters", "rewrite_passes", "renderer_outputs")}, ensure_ascii=False, indent=2))
+        print("PASS real-PDF pacing E2E:", json.dumps(pacing_result, ensure_ascii=False))
         print("Workspace:", WORK)
     finally:
         server.shutdown()

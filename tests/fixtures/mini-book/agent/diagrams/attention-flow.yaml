@@ -1,13 +1,17 @@
 type: flow
 title: スケール化内積注意の計算の流れ
 nodes:
-  - {id: q, label: "問い合わせ Q と鍵 K"}
+  - {id: q, label: "問い合わせ Q"}
+  - {id: k, label: "鍵 K"}
   - {id: dot, label: "内積 QK^T"}
   - {id: scale, label: "√d_k で割る"}
   - {id: softmax, label: "ソフトマックスで正規化"}
-  - {id: sum, label: "値 V を加重平均"}
+  - {id: v, label: "値 V"}
+  - {id: sum, label: "重み付き和 = 出力"}
 edges:
   - {from: q, to: dot}
+  - {from: k, to: dot}
   - {from: dot, to: scale}
   - {from: scale, to: softmax}
-  - {from: softmax, to: sum}
+  - {from: softmax, to: sum, label: "重み"}
+  - {from: v, to: sum}

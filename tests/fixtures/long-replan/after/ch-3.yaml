@@ -1,0 +1,235 @@
+# Chapter 3 re-planned under long.criticism. The 15-page text-only run (pp. 38-52) is split by what the
+# chapter already contains: the author's path as a case, the faculty "prognosis" claims as a table, the later
+# self-critique as a counterpoint, two coined terms as definitions, the survey caveat as a column, the
+# hourly-wage index as a hypothetical worked case, the transfer conditions as a checklist, and table 3.1 kept at the close.
+chapter_id: ch-3
+chapter_title: 勝ち筋のあとに
+chapter_role: development
+reader_before: 出身環境と移動によって効く資源が変わることを読んだ
+reader_after: 合格・資格・内定のあとも評価軸が入れ替わり続けることを理解し、自分の進路の問いを「次の勝ち筋」ではなく選び直せる余地として立てられる
+target_chars: 17000
+lead: 大学・資格・就活・入社後の適応を、「勝ったあとにどのゲームをするか」を選び直す場面として読む
+sections:
+  - id: sec-3-1-1
+    parent: sec-3-1
+    heading: 合格は物語の終点ではない
+    purpose: 「勝ち筋」という著者の語で章の問いを立てる
+    rhetorical_role: thesis
+    intended_reader_effect: 合格を「上がり」とみなす筋書きを疑い始める
+    expected_density: light
+    target_chars: 1000
+    summary_points: [入試は選抜の一区切りにすぎない, 勝ち筋はゴールではない]
+    devices:
+      - id: pq-3-kachisuji
+        type: pull_quote
+        why: 章全体がこの語の含意を検討するので、読者は著者の言い方そのものを先に見ておく必要がある
+        placement: {intent: 語を紹介した段落の直後, position: section_end}
+        source_ids: [src-0015]
+        locator: 大学進学を「勝ち筋」と呼ぶ記事の該当段落
+  - id: sec-3-1-2
+    parent: sec-3-1
+    heading: 著者の進路の折れ曲がり
+    purpose: 法学部・司法試験準備・会社員という著者自身の経路を事例として置く
+    rhetorical_role: example
+    intended_reader_effect: 同じ合格の先で専門選択が自動的に定まらないことを一人の時間として見る
+    expected_density: light
+    target_chars: 1000
+    summary_points: [2016年の進学, 司法試験準備, 会社員としての現在]
+    devices:
+      - id: cs-3-author-path
+        type: case_study
+        basis: real
+        why: 「勝ち筋」の抽象論に入る前に、著者の経路を事例として具体化する（平均的な進路モデルではないと明示する）
+        placement: {intent: 節の冒頭, position: section_start}
+        source_ids: [src-0016, src-0017, src-0057, src-0058]
+  - id: sec-3-1-3
+    parent: sec-3-1
+    heading: 学部と専門をどう使うか
+    purpose: 学部別の「予後」論を、主張・根拠の種類・読むときの注意で読み分ける
+    rhetorical_role: evidence
+    intended_reader_effect: 「この学部なら安心」という断定を、根拠の範囲で受け取り直す
+    expected_density: heavy
+    target_chars: 1500
+    summary_points: [学部の予後は著者の観察, 採用基準は年度と職種で変わる, 高校名による上書きの主張は検証されていない]
+    visual_opportunities:
+      - {information_shape: {kind: comparison, items: 3, attributes: 3}, note: 法学部・経済学部・数学が得意な文系}
+    devices:
+      - id: tbl-3-faculty
+        type: table
+        why: 三つの「予後」論を同じ観点で並べると、断定の強さと根拠の種類の落差が一度に見える
+        placement: {intent: 三つの主張を紹介した直後, position: middle}
+        information_shape: {kind: comparison, items: 3, attributes: 3}
+        basis: source
+        source_ids: [src-0015, src-0062, src-0063]
+  - id: sec-3-1-4
+    parent: sec-3-1
+    heading: 早く始めよという助言の圧力
+    purpose: 入学直後から資格・インターン・AIを重ねる助言と、その圧力を並べる
+    rhetorical_role: contrast
+    intended_reader_effect: 助言を著者の最終結論として固定しない
+    expected_density: heavy
+    target_chars: 1400
+    summary_points: [早期準備の助言, 大学生活が履歴書の工場になる圧力]
+    counterarguments: [行動量を積むこと自体が決断を遅らせるという著者自身の後年の指摘]
+    example_needs: [京都大学の学生文化, 大学一年から企業イベントに出る東京出身者]
+    devices:
+      - id: cp-3-collection
+        type: counterpoint
+        why: 著者は後の文章で「行動量のコレクション」を落とし穴と呼んでおり、同じ著者の別の読みを本文から切り出す
+        placement: {intent: 助言の紹介の後, position: middle}
+        source_ids: [src-0064, src-0065, src-0066, src-0067]
+  - id: sec-3-1-5
+    parent: sec-3-1
+    heading: 先送りした夢と取り戻せない時間
+    purpose: 後悔に完全な答えを置かない著者の態度を示す
+    rhetorical_role: concession
+    intended_reader_effect: 成功者の後日談という一本道の読みを避ける
+    expected_density: medium
+    target_chars: 1000
+    summary_points: [後悔に答えを置かない]
+  - id: sec-3-2-1
+    parent: sec-3-2
+    heading: 資格は肩書ではなく選択肢を作る道具
+    purpose: 資格・会社・専門性を崇める対象でなく道具として見る視点を示す
+    rhetorical_role: thesis
+    intended_reader_effect: 資格を「何を選べるようになるか」で評価する
+    expected_density: medium
+    target_chars: 1100
+    summary_points: [応募できる職種が変わる, 崇める対象にしない]
+    example_needs: [資格の有無で応募できる職種が変わる場面]
+    devices:
+      - id: pq-3-skytree
+        type: pull_quote
+        why: 節の主張は「砂の上にスカイツリーを建てるな」という著者の比喩から始まる
+        placement: {intent: 比喩を導入する段落, position: early}
+        source_ids: [src-0068]
+        locator: 「砂の上にスカイツリーを建てるな」の段落
+  - id: sec-3-2-2
+    parent: sec-3-2
+    heading: 専門性と「ギュ」に備えるという想像
+    purpose: 「ギュ」の語を定義し、第4章の自動化の議論へ橋を架ける
+    rhetorical_role: transition
+    intended_reader_effect: 「AIに奪われない仕事」当てではなく、役割の圧縮として考える
+    expected_density: light
+    target_chars: 1000
+    summary_points: [ギュは役割の圧縮の比喩]
+    new_terms: [ギュ]
+    devices:
+      - id: df-3-gyu
+        type: definition
+        why: 書名にもなる語が本書で初めて出るので、比喩であることと射程をここで固定する
+        placement: {intent: 語の初出の段落, position: section_start}
+        terms: [ギュ]
+        source_ids: [src-0069]
+  - id: sec-3-2-3
+    parent: sec-3-2
+    heading: 現在の職場調査と未来予測を分ける
+    purpose: 2025年の雇用者調査と厚生労働省の公表資料が示すことと示さないことを分ける
+    rhetorical_role: evidence
+    intended_reader_effect: 利用前後の印象を因果効果と取り違えない
+    expected_density: heavy
+    target_chars: 1400
+    summary_points: [層化割付の調査, 印象は因果ではない, 公式資料は制度の状況]
+    devices:
+      - id: co-3-survey
+        type: column
+        basis: source
+        why: 層化割付の意味と「利用前後」の印象が因果効果ではない理由を本文から外に出すと、本文は調査の示す範囲だけを追える
+        placement: {intent: 調査結果を紹介した直後, position: middle}
+        source_ids: [src-0071, src-0072]
+  - id: sec-3-3-1
+    parent: sec-3-3
+    heading: 学歴は入口であり、選考のすべてではない
+    purpose: 学歴無意味論と学歴決定論の両方を退ける
+    rhetorical_role: concession
+    intended_reader_effect: 入口の有利と選考の中身を分けて考える
+    expected_density: medium
+    target_chars: 1200
+    summary_points: [学歴は入口]
+    example_needs: [コネ・インターン・企業分析が選考で効く場面（著者の記述の範囲で）]
+  - id: sec-3-3-2
+    parent: sec-3-3
+    heading: 大学生活を「就活の素材」に変える
+    purpose: 「シャカチカ」「偽装シャカチカ」の語で、経験が価値の差に見える構造を示す
+    rhetorical_role: thesis
+    intended_reader_effect: 経験の有無を自分の価値の差と取り違えない
+    expected_density: heavy
+    target_chars: 1300
+    summary_points: [シャカチカ, 偽装シャカチカ]
+    new_terms: [シャカチカ, 偽装シャカチカ]
+    devices:
+      - id: df-3-shakachika
+        type: definition
+        why: 二つの造語が節の議論を運ぶので、初出で区別して定義する
+        placement: {intent: 語が初めて出る段落, position: section_start}
+        terms: [シャカチカ, 偽装シャカチカ]
+        source_ids: [src-0073]
+  - id: sec-3-3-3
+    parent: sec-3-3
+    heading: 第二の新卒選考という再挑戦
+    purpose: 転職を「第二の本選考」として考える著者の提案を、条件つきで示す
+    rhetorical_role: application
+    intended_reader_effect: 自分の転職可能性を年齢・職種・地域の条件で点検する
+    expected_density: light
+    target_chars: 1100
+    summary_points: [第二の本選考, 選択肢のポートフォリオ化]
+    devices:
+      - id: ck-3-second-round
+        type: checklist
+        why: 本文が挙げる条件（年齢・職種・地域・雇用市場・これまでの経験）を、読者が自分の転職可能性に当てはめて点検できる形にする
+        placement: {intent: 条件を列挙する段落の代わりに, position: middle}
+  - id: sec-3-4-1
+    parent: sec-3-4
+    heading: 新しい評価環境への移行
+    purpose: 入社後に評価の物差しがふたたび変わることを示す
+    rhetorical_role: transition
+    intended_reader_effect: 内定もまた一区切りにすぎないと受け取る
+    expected_density: light
+    target_chars: 900
+    summary_points: [配属と上司で評価が変わる]
+  - id: sec-3-4-2
+    parent: sec-3-4
+    heading: 「シン時給指数」で仕事と生活を測る
+    purpose: 年収だけで仕事を比べない指標を、計算の手順で示す
+    rhetorical_role: application
+    intended_reader_effect: 自分の時間と費用で仕事を測り直せる
+    expected_density: medium
+    target_chars: 1300
+    summary_points: [費やした時間と残る自由]
+    devices:
+      - id: cs-3-hourly
+        type: case_study
+        basis: hypothetical
+        why: 指数の計算を仮の一例で追うと、本文の比較が読者自身の数字に置き換わる（仮の例と明示する）
+        placement: {intent: 指数の定義の直後, position: early}
+  - id: sec-3-4-3
+    parent: sec-3-4
+    heading: 成功の複利と比較の負荷
+    purpose: 節目を手にしても次の勝利条件が現れる比較の負荷を示す
+    rhetorical_role: contrast
+    intended_reader_effect: 比較をやめられない状態を自分の問題として見る
+    expected_density: heavy
+    target_chars: 1000
+    summary_points: [節目のあとに新しい勝利条件]
+  - id: sec-3-4-4
+    parent: sec-3-4
+    heading: 職業的役割だけで自分を定義しない
+    purpose: 進学・資格・就職・進路変更の機会と負担と不確実性をまとめ、章を閉じる
+    rhetorical_role: synthesis
+    intended_reader_effect: 次の仕事を当てるより、選び直せる余地を問いとして持つ
+    expected_density: medium
+    target_chars: 1000
+    summary_points: [役割の自動化, 選び直せる余地]
+    devices:
+      - id: tbl-3-routes
+        type: table
+        why: 四つの進路の機会・負担・不確実性を並べて章の議論を一望させる（既存の表3.1）
+        placement: {intent: 章のまとめの直前, position: section_end}
+        information_shape: {kind: comparison, items: 4, attributes: 3}
+        basis: derived_from_text
+        source_ids: [src-0015, src-0026, src-0035]
+chapter_end:
+  - {type: key_points}
+  - {type: open_question}
+  - {type: bridge_to_next}
+  - {type: further_reading, source_ids: [src-0015, src-0026, src-0064, src-0071]}

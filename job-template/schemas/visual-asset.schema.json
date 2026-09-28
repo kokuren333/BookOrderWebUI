@@ -1,0 +1,19 @@
+{
+  "type": "object",
+  "required": ["schema", "asset_id", "kind", "source_request_id", "provider", "model", "created_at", "file_path", "dimensions_px", "final_width_mm", "final_height_mm", "effective_dpi", "prompt_hash", "prompt_version", "source_ids", "generation_status", "qa_status", "accepted", "rejection_reasons", "seed", "required", "art_direction", "placement", "preferred_aspect_ratio", "typography_policy"],
+  "properties": {
+    "schema": {"type": "string", "enum": ["bookorder/visual-asset@1"]},
+    "asset_id": {"type": "string"}, "kind": {"type": "string", "enum": ["generated-image"]},
+    "source_request_id": {"type": "string"}, "provider": {"type": "string"},
+    "model": {}, "created_at": {}, "file_path": {"type": "string"}, "dimensions_px": {},
+    "final_width_mm": {"type": "number", "minimum": 1}, "final_height_mm": {"type": "number", "minimum": 1},
+    "effective_dpi": {}, "prompt_hash": {"type": "string"}, "prompt_version": {"type": "string"},
+    "source_ids": {"type": "array", "items": {"type": "string"}},
+    "generation_status": {"type": "string", "enum": ["pending_provider", "generated", "failed"]},
+    "qa_status": {"type": "string"}, "accepted": {"type": "boolean"},
+    "rejection_reasons": {"type": "array", "items": {"type": "string"}},
+    "seed": {}, "required": {"type": "boolean"}, "art_direction": {"type": "object"},
+    "placement": {"type": "string"}, "preferred_aspect_ratio": {"type": "string"},
+    "typography_policy": {"type": "string", "enum": ["forbidden"]}
+  }
+}

@@ -124,9 +124,9 @@
 
 // ---------------------------------------------------------------- semantic components
 #let labels-ja = ("warning": "注意", "note": "補足", "tip": "ヒント", "definition": "定義", "key-point": "要点", "example": "例",
-  "exercise": "演習", "summary": "まとめ", "checklist": "確認事項", "sidebar": "コラム", "step-by-step": "手順", "terminal-session": "端末", "code-listing": "コード")
+  "exercise": "演習", "summary": "まとめ", "checklist": "確認事項", "sidebar": "コラム", "case-study": "事例", "counterpoint": "反論・別解釈", "step-by-step": "手順", "terminal-session": "端末", "code-listing": "コード")
 #let labels-en = ("warning": "Warning", "note": "Note", "tip": "Tip", "definition": "Definition", "key-point": "Key point", "example": "Example",
-  "exercise": "Exercise", "summary": "Summary", "checklist": "Checklist", "sidebar": "Sidebar", "step-by-step": "Steps", "terminal-session": "Terminal", "code-listing": "Code")
+  "exercise": "Exercise", "summary": "Summary", "checklist": "Checklist", "sidebar": "Sidebar", "case-study": "Case study", "counterpoint": "Counterpoint", "step-by-step": "Steps", "terminal-session": "Terminal", "code-listing": "Code")
 #let book-component(kind, title: "", body) = context {
   set par(first-line-indent: 0pt)
   let labels = if text.lang == "ja" { labels-ja } else { labels-en }

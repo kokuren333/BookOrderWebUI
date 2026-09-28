@@ -88,6 +88,8 @@ def validate(source_only=False):
                     errors.append(f"Unrendered diagram in {path.name}; compile it to a figure")
                 if node["t"] in ("RawInline", "RawBlock"):
                     errors.append(f"Raw markup is not portable across all outputs: {path.name}; use Pandoc Markdown")
+                if node["t"] == "Div" and "slot" in node["c"][0][1] and not source_stage:
+                    errors.append(f"Unresolved slot #{node['c'][0][0]} ({dict(node['c'][0][2]).get('kind', '?')}) in {path.name}: produce the planned device or fall it back")
         for identifier, count in Counter(ids).items():
             if count > 1: errors.append(f"Duplicate stable ID: {identifier}")
         for identifier in internal_links:

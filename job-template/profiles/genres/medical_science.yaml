@@ -1,0 +1,17 @@
+# Genre template: medical and science textbooks. Data-driven figures and tables, callouts for common
+# misreadings, dense numeric citations, check questions at chapter end; no generated imagery of facts.
+genre: medical_science
+multiply:
+  devices.visuals_per_10k: 1.1
+  devices.tables_per_chapter: 1.3
+  devices.callouts_per_chapter: 1.2
+  devices.case_studies_per_chapter: 0.8
+  devices.pull_quotes_per_chapter: 0.0
+set:
+  citations.style: numeric
+  citations.inline_markers_per_page_max: 2.0
+  citations.further_reading_per_chapter: {min: 1, target: 2, max: 4}
+  structure.chapter_end: [key_points, check_questions]
+  art_direction.weight: standard
+  art_direction.ornament_level: low
+  art_direction.generative_images: {allowed: [chapter_opener], max_total: 12}

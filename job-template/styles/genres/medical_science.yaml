@@ -1,0 +1,42 @@
+tone:
+  overall: "clinical clarity and careful evidence"
+  formality: "high"
+  restraint: "high"
+  ornament: "low"
+palette:
+  accent: "#116B78"
+  secondary_accent: "#184C5A"
+  surface: "#EDF4F5"
+lines:
+  normal_pt: 0.7
+  strong_pt: 1.2
+spacing:
+  section_gap_mm: 4
+typography:
+  heading_2: {weight: 700}
+  heading_3: {weight: 600}
+table:
+  border_style: "horizontal"
+  header_style: "strong-rule-and-weight"
+  row_spacing: "compact"
+callout:
+  fill_style: "surface"
+  border_style: "left-rule"
+accessibility:
+  grayscale_safe: true
+  color_independent_encoding: true
+visual_grammar:
+  components:
+    warning: {priority: primary, treatment: filled-box, fill_policy: surface, space_before_mm: 3, space_after_mm: 3}
+    key_point: {priority: secondary, treatment: side-rule, fill_policy: none}
+    definition: {priority: quiet, treatment: plain-emphasis, border_policy: none, fill_policy: none}
+    evidence_note: {priority: secondary, treatment: top-rule, use_policy: allowed}
+    pull_quote: {priority: quiet, treatment: plain-emphasis, use_policy: avoid}
+    source_note: {priority: supporting, treatment: plain-emphasis}
+  hierarchy: {heading_2: secondary, heading_3: tertiary, caption: supporting, source_note: supporting}
+  rhythm: {pattern: compact, interruption: evidence-led, section_space: compact}
+  table: {border_density: horizontal, header_emphasis: strong-rule, row_spacing: compact, numeric_alignment: decimal, zebra: false, source_note: adjacent, mode: compact}
+  diagram: {node_shape: rectangle, edge_emphasis: directional, hierarchy: levels, label_placement: inside, whitespace: compact, annotation_style: near-edge}
+  chart: {grid_intensity: light, axis_emphasis: strong, direct_labels: true, legend_use: only-if-needed, annotation: outside-data, baseline_emphasis: strong, uncertainty: interval}
+  caption: {figure_relationship: tight, weight: supporting, source_binding: same-block}
+  chapter_opener: {hierarchy: evidence-first, lead: compact, number_prominence: medium}

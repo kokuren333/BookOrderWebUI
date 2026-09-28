@@ -1,0 +1,82 @@
+{
+  "type": "object",
+  "required": ["schema", "id", "page_size", "orientation", "writing_mode", "text_direction", "page", "body", "regions", "spans", "writing", "vertical"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {"type": "string", "enum": ["bookorder/layout-spec@1"]},
+    "id": {"type": "string", "pattern": "[a-z][a-z0-9-]*"},
+    "page_size": {"type": "string", "enum": ["A5", "B5", "A4", "Letter"]},
+    "orientation": {"type": "string", "enum": ["portrait", "landscape"]},
+    "writing_mode": {"type": "string", "enum": ["horizontal-tb", "vertical-rl"]},
+    "text_direction": {"type": "string", "enum": ["ltr", "rtl"]},
+    "page": {
+      "type": "object", "additionalProperties": false,
+      "required": ["width_mm", "height_mm", "margin_top_mm", "margin_bottom_mm", "margin_inner_mm", "margin_outer_mm", "bleed_mm"],
+      "properties": {
+        "width_mm": {"type": "number", "minimum": 50, "maximum": 1000},
+        "height_mm": {"type": "number", "minimum": 50, "maximum": 1000},
+        "margin_top_mm": {"type": "number", "minimum": 2, "maximum": 200},
+        "margin_bottom_mm": {"type": "number", "minimum": 2, "maximum": 200},
+        "margin_inner_mm": {"type": "number", "minimum": 2, "maximum": 200},
+        "margin_outer_mm": {"type": "number", "minimum": 2, "maximum": 200},
+        "bleed_mm": {"type": "number", "minimum": 0, "maximum": 30}
+      }
+    },
+    "body": {
+      "type": "object", "additionalProperties": false,
+      "required": ["columns", "gutter_mm", "baseline_grid", "column_balance", "paragraph_flow"],
+      "properties": {
+        "columns": {"type": "integer", "minimum": 1, "maximum": 8},
+        "gutter_mm": {"type": "number", "minimum": 0, "maximum": 50},
+        "baseline_grid": {"type": "string", "enum": ["none", "body-line"]},
+        "column_balance": {"type": "string", "enum": ["none", "chapter-end"]},
+        "paragraph_flow": {"type": "string", "enum": ["continuous"]}
+      }
+    },
+    "regions": {
+      "type": "object", "additionalProperties": false,
+      "required": ["header", "footer", "margin_notes", "chapter_opener", "full_width", "full_page"],
+      "properties": {
+        "header": {"type": "object", "required": ["enabled"], "additionalProperties": false, "properties": {"enabled": {"type": "boolean"}}},
+        "footer": {"type": "object", "required": ["enabled"], "additionalProperties": false, "properties": {"enabled": {"type": "boolean"}}},
+        "margin_notes": {"type": "object", "required": ["enabled"], "additionalProperties": false, "properties": {"enabled": {"type": "boolean"}}},
+        "chapter_opener": {"type": "object", "required": ["span"], "additionalProperties": false, "properties": {"span": {"enum": ["full"]}}},
+        "full_width": {"type": "object", "required": ["enabled"], "additionalProperties": false, "properties": {"enabled": {"type": "boolean"}}},
+        "full_page": {"type": "object", "required": ["enabled"], "additionalProperties": false, "properties": {"enabled": {"type": "boolean"}}}
+      }
+    },
+    "spans": {
+      "type": "object", "additionalProperties": false,
+      "required": ["figure", "table", "callout", "quote", "code", "equation"],
+      "properties": {
+        "figure": {"enum": [1, 2, "full"]},
+        "table": {"enum": [1, 2, "full"]},
+        "callout": {"enum": [1, 2, "full"]},
+        "quote": {"enum": [1, 2, "full"]},
+        "code": {"enum": [1, 2, "full"]},
+        "equation": {"enum": [1, 2, "full"]}
+      }
+    },
+    "writing": {
+      "type": "object", "additionalProperties": false, "required": ["horizontal", "vertical"],
+      "properties": {
+        "horizontal": {"type": "object", "required": ["text_direction"], "additionalProperties": false, "properties": {"text_direction": {"type": "string", "enum": ["ltr", "rtl"]}}},
+        "vertical": {"type": "object", "required": ["figure_orientation", "table_orientation", "caption_orientation"], "additionalProperties": false,
+          "properties": {"figure_orientation": {"type": "string", "enum": ["horizontal", "vertical"]}, "table_orientation": {"type": "string", "enum": ["horizontal", "vertical"]}, "caption_orientation": {"type": "string", "enum": ["horizontal", "vertical"]}}}
+      }
+    },
+    "vertical": {
+      "type": "object", "additionalProperties": false,
+      "required": ["enabled", "line_direction", "page_progression", "punctuation_policy", "latin_rotation", "numeral_policy", "ruby_policy"],
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "line_direction": {"type": "string", "enum": ["top-to-bottom"]},
+        "page_progression": {"type": "string", "enum": ["right-to-left", "left-to-right"]},
+        "punctuation_policy": {"type": "string", "enum": ["locale", "upright", "rotate"]},
+        "latin_rotation": {"type": "string", "enum": ["auto", "upright", "rotate"]},
+        "numeral_policy": {"type": "string", "enum": ["auto", "tate-chu-yoko", "rotate"]},
+        "ruby_policy": {"type": "string", "enum": ["auto", "none", "native"]}
+      }
+    }
+  }
+}

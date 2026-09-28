@@ -14,7 +14,7 @@ from validate import validate
 from design import load_design, normalize, write_theme_css
 from book_ir import create_ir, prepare_ast, editorial_candidates, registry
 from diagrams import generate as generate_diagrams
-from renderers import renderer
+from renderers import renderer, assess_outputs
 
 
 # Keep conventional OOXML prefixes when Word parts are re-serialized (Word tooling expects them).
@@ -264,10 +264,36 @@ def build(theme=None):
         # Preserve the selected design in result.zip so a later default build reproduces it.
         (ROOT / 'book.design.yaml').write_text(json.dumps(spec, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     tokens = normalize(spec, require_pdf=bool(outputs.get('pdf')))
+    import layout_spec
+    layout_definition = layout_spec.load_or_create(project=project, design=spec)
+    tokens = layout_spec.apply_to_tokens(tokens, layout_definition)
+    import style_bible
+    visual_language = style_bible.load_or_resolve(project=project, design=spec)
+    tokens = style_bible.compile_tokens(visual_language, layout_definition, tokens)
+    import visual_grammar
+    visual_grammar.report(visual_language)
+    import image_assets, assets, visual_review
+    image_decisions = visual_review.decisions() or {}
+    image_assets.prepare(assets.assets(), image_decisions, visual_language, layout_definition, project)
+    image_check = image_assets.check(assets.assets(), image_decisions)
+    if image_check['summary']['high']:
+        raise RuntimeError(f"Generated image QA failed: {image_check['summary']['high']} required issue(s); see reports/image-assets-check.yaml")
+    capabilities = assess_outputs(layout_definition, outputs, tokens['pdf_backend'])
+    report('layout-capabilities.json', capabilities)
+    if not capabilities['ok']:
+        raise RuntimeError('LayoutSpec exceeds renderer capability: ' + '; '.join(
+            f"{name}: {', '.join(reasons)}" for name, reasons in capabilities['errors'].items()))
     tokens['language'] = str(project['book'].get('language', 'en')).split('-')[0].lower()
     tokens['cover'] = cover_image()
     for folder in ('.build', 'interchange', 'publish'): (ROOT / folder).mkdir(exist_ok=True)
     diagrams = generate_diagrams(tokens, raster=bool(outputs.get('docx') or outputs.get('epub')))
+    import style_check
+    style_findings = style_check.run(visual_language, tokens)
+    import figure_check, figure_spec
+    figure_spec.write_reference(tokens)
+    figures = figure_check.check(tokens)['summary']  # read by the Typst renderer for printed widths
+    if figures.get('fail', 0):
+        raise RuntimeError(f"Figure legibility check failed: {figures['fail']} figure(s) print text below the minimum label size; see reports/figure-check.json")
     result = validate(source_only=True)
     if not result['ok']: raise ValueError('Source validation failed: ' + '; '.join(result['errors']))
     from check_env import main as check_env
@@ -283,17 +309,40 @@ def build(theme=None):
         pandoc(absolute_images(prepare_ast(ir, 'docx'), raster=True), '-t', 'docx', '--reference-doc', reference, '--toc', '-o', path)
         docx_styles(path, tokens)
     if outputs.get('semantic_html'): semantic_html(html_doc, project, tokens)
-    if outputs.get('pdf'): renderer(tokens['pdf_backend']).render(ir, tokens, ROOT / 'publish/book.pdf')
+    layout = None
+    if outputs.get('pdf'):
+        renderer(tokens['pdf_backend']).render(ir, tokens, ROOT / 'publish/book.pdf', layout_definition)
+        if not project['book'].get('preview'): layout = measure_layout(tokens)
     if outputs.get('epub'):
         path = ROOT / 'publish/book.epub'
         _, css = write_theme_css(tokens, ROOT / '.build/epub-theme')
         pandoc(absolute_images(prepare_ast(ir, 'epub', tokens), raster=True), '-t', 'epub3', '--toc', '--split-level=1', '--css', css, '-o', path)
         repair_epub_links(path); notes.append(epub_check(path))
     if outputs.get('static_site'): website(html_doc, project, items, tokens)
+    import art_direction_qa
+    art_check = art_direction_qa.run(visual_language, tokens,
+        pdf_path=ROOT / 'publish/book.pdf' if outputs.get('pdf') else False)
     hashes = artifact_hashes(project)
     report('build-report.json', {'ok': True, 'fingerprint': fingerprint(), 'theme': tokens['theme'],
-        'outputs': [p.relative_to(ROOT).as_posix() for p in output_paths(project)], 'artifact_hashes': hashes, 'notes': notes, 'diagrams': diagrams})
+        'outputs': [p.relative_to(ROOT).as_posix() for p in output_paths(project)], 'artifact_hashes': hashes, 'notes': notes, 'diagrams': diagrams,
+        'layout': layout, 'layout_capabilities': capabilities, 'style_check': style_findings['summary'],
+        'art_direction_check': art_check['summary'], 'image_assets_check': image_check['summary'], 'figures': figures})
     print('Build complete. Inspect publications, then run validate.py and package.py.')
+
+
+def measure_layout(tokens):
+    """Page-level metrics of the PDF just built (reports/layout-metrics.json). A measuring failure is reported,
+    not fatal: the PDF itself is valid."""
+    import layout_metrics
+    from planning import load_outline
+    try:
+        metrics = layout_metrics.measure(tokens, outline_chapters=load_outline())
+    except Exception as exc:
+        print(f'Layout metrics unavailable: {exc}')
+        return {'ok': False, 'error': str(exc)[:500]}
+    print(layout_metrics.summary(metrics))
+    return {'ok': True, 'report': 'reports/layout-metrics.json', 'generated_at': metrics['generated_at'],
+            'summary': layout_metrics.summary(metrics), 'totals': metrics['totals']}
 
 
 def cover_image():

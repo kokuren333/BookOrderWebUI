@@ -509,6 +509,27 @@
             "numbered",
             "named"
           ]
+        },
+        "print": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "min_label_pt": { "type": "number", "minimum": 0, "maximum": 40 },
+            "preferred_label_pt": { "type": "number", "minimum": 0, "maximum": 40 },
+            "axis_label_pt": { "type": "number", "minimum": 0, "maximum": 40 },
+            "tick_label_pt": { "type": "number", "minimum": 0, "maximum": 40 },
+            "annotation_pt": { "type": "number", "minimum": 0, "maximum": 40 },
+            "legend_pt": { "type": "number", "minimum": 0, "maximum": 40 },
+            "stroke_width_pt": { "type": "number", "minimum": 0, "maximum": 40 },
+            "hairline_pt": { "type": "number", "minimum": 0, "maximum": 40 },
+            "strong_pt": { "type": "number", "minimum": 0, "maximum": 40 },
+            "min_stroke_pt": { "type": "number", "minimum": 0, "maximum": 40 },
+            "node_padding_mm": { "type": "number", "minimum": 0, "maximum": 40 },
+            "node_gap_mm": { "type": "number", "minimum": 0, "maximum": 40 },
+            "corner_radius_mm": { "type": "number", "minimum": 0, "maximum": 40 },
+            "marker_size_pt": { "type": "number", "minimum": 0, "maximum": 40 },
+            "line_height": { "type": "number", "minimum": 0, "maximum": 40 }
+          }
         }
       },
       "required": [

@@ -1,0 +1,32 @@
+# Chapter 3 as printed (pp. 33-53): four sections of 3-6 pages; the only device is table 3.1 at the very end.
+# The typeset proof has a 15-page text-only run (pp. 38-52).
+chapter_id: ch-3
+chapter_title: 勝ち筋のあとに
+chapter_role: development
+reader_before: 出身環境と移動の資源を読んだ
+reader_after: 大学・資格・就活・適応を「勝ち筋のあと」の選択として考える
+target_chars: 17000
+sections:
+  - {id: sec-3-1, heading: 大学での分岐, purpose: 合格後の分岐, rhetorical_role: evidence, intended_reader_effect: 合格が終点でないと知る, expected_density: medium, target_chars: 5900,
+     summary_points: [勝ち筋, 学部の予後, 先送りした夢, 行動量のコレクション]}
+  - {id: sec-3-2, heading: 資格とキャリアの選択, purpose: 資格とギュ, rhetorical_role: evidence, intended_reader_effect: 資格を道具として見る, expected_density: medium, target_chars: 3000,
+     summary_points: [資格は道具, ギュに備える, 調査と予測を分ける], new_terms: [ギュ]}
+  - {id: sec-3-3, heading: 就職活動の情報格差, purpose: 就活の情報格差, rhetorical_role: evidence, intended_reader_effect: 学歴は入口にすぎないと知る, expected_density: medium, target_chars: 3000,
+     summary_points: [学歴は入口, シャカチカ, 第二の新卒選考], new_terms: [シャカチカ]}
+  - id: sec-3-4
+    heading: 選抜後の適応
+    purpose: 選抜後の適応
+    rhetorical_role: evidence
+    intended_reader_effect: 比較の負荷を知る
+    expected_density: medium
+    target_chars: 5100
+    summary_points: [新しい評価環境, シン時給指数, 成功の複利, 役割だけで自分を定義しない]
+    devices:
+      - id: tbl-3-1
+        type: table
+        why: 進路選択の機会・負担・不確実性をまとめる
+        placement: {intent: 章の末尾, position: section_end}
+        information_shape: {kind: comparison, items: 4, attributes: 3}
+        basis: derived_from_text
+chapter_end:
+  - {type: bridge_to_next}

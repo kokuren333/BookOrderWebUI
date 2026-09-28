@@ -13,6 +13,17 @@ fall back and are recorded in reports/design-report.json. Record your decisions 
 ## Layout and pacing (task `layout-review`)
 
 BookOrder builds a proof and lists pacing heuristics (very long prose runs, consecutive tables, callout density).
+Every PDF build also writes reports/layout-metrics.json, measured from the typeset pages: text-only page runs,
+elements per page and spread, and per-chapter visuals, callouts, prose characters per page and non-prose share
+(`bookorder layout` re-measures without rebuilding). Start the review from its longest text-only runs.
+
+Text walls are a completion gate (17), judged on those measured pages (reports/pacing-report.json): no more
+than the limit of consecutive text-only pages (short 3, standard 4, long 4, monograph 6), and never two runs at
+the limit in one chapter. Only a figure, table, callout, pull quote, case study, chapter summary or chapter
+opener taking at least three lines of the page breaks a run; headings, lists, code, equations and white space
+do not. A `pacing:<chapter>` task lists each wall with pages and ranked candidates (split_section,
+convert_comparison_to_table, add_visual, insert_summary, add_case_study, add_counterpoint, add_pull_quote,
+shorten_paragraphs). Prefer turning existing text into the device over adding material.
 Open the actual outputs and check representative pages: chapter openers, dense tables, figures, equations, code,
 footnotes, bibliography, running heads and folios; awkward page breaks, orphan headings, figures separated from
 their explanation, overflow, missing glyphs, extreme density differences between chapters. On the website check

@@ -21,6 +21,7 @@ def prose_text(value):
         if not isinstance(node, dict) or "t" not in node: return
         kind = node["t"]
         if kind in SKIP_BLOCKS or kind in SKIP_INLINES: return
+        if kind == "Div" and "slot" in node["c"][0][1]: return  # a reserved device, not the chapter's prose
         if kind == "Str": parts.append(node["c"]); return
         if kind in ("Space", "SoftBreak", "LineBreak"): parts.append(" "); return
         if kind == "Cite": return  # rendered citation text is not authored prose
@@ -43,7 +44,7 @@ def analyze_file(path):
     text = path.read_text(encoding="utf-8")
     ast = parse_markdown(text)
     blocks = ast["blocks"]
-    headings = []; cites = []; refs = []; figures = []; tables = []; equations = []; images = []; components = []
+    headings = []; cites = []; refs = []; figures = []; tables = []; equations = []; images = []; components = []; slots = []
     section = None; chapter_id = None
     for node in walk(blocks):
         kind = node["t"]
@@ -65,6 +66,8 @@ def analyze_file(path):
         elif kind == "Div":
             classes = node["c"][0][1]
             if "equation" in classes: equations.append(node["c"][0][0])
+            elif "slot" in classes:
+                slots.append({"id": node["c"][0][0], "kind": dict(node["c"][0][2]).get("kind", ""), "section": section, "text": plain(node["c"][1])})
             elif classes: components.append({"type": classes[0], "id": node["c"][0][0]})
         elif kind == "Image": images.append(node["c"][2][0])
         elif kind == "Link" and node["c"][2][0].startswith("#"):
@@ -75,7 +78,7 @@ def analyze_file(path):
         if node["t"] in ("Div", "Span", "CodeBlock") and node["c"][0][0]: anchors.add(node["c"][0][0])
     return {"path": path.relative_to(ROOT).as_posix(), "id": chapter_id, "text": text, "sha256": sha(text), "ast": ast,
             "prose": prose, "chars": count_chars(prose), "headings": headings, "cites": cites, "refs": refs,
-            "figures": figures, "tables": tables, "equations": equations, "images": images, "components": components,
+            "figures": figures, "tables": tables, "equations": equations, "images": images, "components": components, "slots": slots,
             "anchors": sorted(anchors), "placeholders": bool(PLACEHOLDER.search(text)),
             "h1_count": sum(1 for h in headings if h["level"] == 1),
             "starts_with_h1": bool(blocks) and blocks[0]["t"] == "Header" and blocks[0]["c"][0] == 1}

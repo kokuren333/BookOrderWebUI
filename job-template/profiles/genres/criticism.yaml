@@ -1,0 +1,17 @@
+# Genre template: criticism, humanities and argued non-fiction. Text-first, but walls are broken with
+# argument devices: source quotations, counterpoints, comparison tables and timelines; chapter-end notes.
+genre: criticism
+multiply:
+  devices.visuals_per_10k: 0.8
+  devices.callouts_per_chapter: 0.8
+  devices.case_studies_per_chapter: 1.0
+  structure.paragraph_chars_max: 1.1
+set:
+  devices.pull_quotes_per_chapter: {min: 1, target: 2, max: 3}
+  devices.columns_per_chapter: {min: 0, target: 0.5, max: 1}
+  citations.style: endnotes_per_chapter
+  citations.inline_markers_per_page_max: 1.5
+  citations.further_reading_per_chapter: {min: 3, target: 4, max: 6}
+  structure.chapter_lead: required
+  structure.chapter_end: [key_points, open_question, bridge_to_next]
+  art_direction.ornament_level: medium

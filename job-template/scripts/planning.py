@@ -1,5 +1,6 @@
 """Scale budgets, Book Bible, book architecture, chapter contracts and chapter research packets."""
 import math
+import statistics
 import re
 from pathlib import Path
 
@@ -15,26 +16,13 @@ PACKETS = PLAN / "chapter-packets"
 STATUS_DIR = ROOT / "reports/chapter-status"
 CHAPTER_ID = re.compile(r"ch-[a-z0-9][a-z0-9-]*")
 
-# Effective non-space characters per printed page for A5 / standard density, including headings, figures and
-# whitespace between blocks. These are planning estimates, not typesetting guarantees; override in project.json.
-CHARS_PER_PAGE = {"ja": 500, "zh": 520, "ko": 450, "default": 1400}
-PAGE_AREA = {"A5": 1.0, "B5": 1.42, "A4": 2.0, "Letter": 1.95}
-DENSITY = {"compact": 1.15, "standard": 1.0, "spacious": 0.85}
-
-
-def compute_scale(project, design=None):
-    book = project["book"]; overrides = project.get("scale", {})
-    pages = as_int(book.get("target_pages"), 0)
-    language = str(book.get("language", "en")).split("-")[0].lower()
-    design = design or {}
-    size = design.get("page", {}).get("size", "A5"); density = design.get("layout", {}).get("density", "standard")
-    per_page = as_int(overrides.get("characters_per_page"), 0) or round(CHARS_PER_PAGE.get(language, CHARS_PER_PAGE["default"]) * PAGE_AREA.get(size, 1.0) * DENSITY.get(density, 1.0))
-    ratio = float(overrides.get("minimum_ratio", 0.8))
-    target = as_int(overrides.get("target_characters"), 0) or pages * per_page
-    return {"requested_pages": pages, "language": language, "page_size": size, "density": density,
-            "characters_per_page": per_page, "target_characters": target, "minimum_characters": math.ceil(target * ratio),
-            "minimum_ratio": ratio, "chapter_minimum_ratio": float(overrides.get("chapter_minimum_ratio", 0.75)),
-            "estimate_note": "Characters exclude whitespace, code and math. Page counts are estimates; the minimum is enforced."}
+def compute_scale(project, design=None, write=True):
+    """Budgets derived from the PublicationProfile (scripts/publication_profile.py): the profile is resolved from
+    tier, genre and project overrides, written to plan/profile.resolved.yaml, and the scale is derived from it."""
+    import publication_profile
+    profile = publication_profile.resolve(project, design or {})
+    if write: publication_profile.write(profile)
+    return publication_profile.scale(profile)
 
 
 # ---------------------------------------------------------------- Book Bible
@@ -118,8 +106,13 @@ def check_outline(scale, project=None):
     project = project or read_project(); errors = []
     chapters = load_outline(scale)
     if not chapters: return ["source/metadata/outline.yaml must list chapters"], chapters
-    minimum_chapters = 2 if scale["requested_pages"] < 60 else max(4, scale["requested_pages"] // 40)
-    if len(chapters) < minimum_chapters: errors.append(f"A {scale['requested_pages']}-page book needs at least {minimum_chapters} chapters (found {len(chapters)})")
+    # States created before profiles existed carry no minimum_chapters; keep their old rule.
+    minimum_chapters = scale.get("minimum_chapters") or (2 if scale["requested_pages"] < 60 else max(4, scale["requested_pages"] // 40))
+    maximum_chapters = scale.get("maximum_chapters")
+    label = f"The {scale['profile']['id']} profile" if scale.get("profile") else f"A {scale['requested_pages']}-page book"
+    if len(chapters) < minimum_chapters: errors.append(f"{label} needs at least {minimum_chapters} chapters (found {len(chapters)})")
+    if maximum_chapters is not None and len(chapters) > maximum_chapters:
+        errors.append(f"{label} allows at most {maximum_chapters} chapters (found {len(chapters)})")
     ids = [c["id"] for c in chapters]
     if len(set(ids)) != len(ids): errors.append("Chapter IDs must be unique")
     index = registry.load_index(); known = registry.by_id(index)
@@ -200,6 +193,40 @@ def check_summary(identifier):
     return errors
 
 
+def paragraph_lengths(record):
+    """Reader-facing paragraph lengths; reserved slots are excluded until realised."""
+    from common import plain
+    from manuscript import count_chars
+    found = []
+    def visit(value):
+        if isinstance(value, list):
+            for item in value: visit(item)
+            return
+        if not isinstance(value, dict) or "t" not in value: return
+        kind = value["t"]
+        if kind == "Div" and "slot" in value["c"][0][1]: return
+        if kind in ("Para", "Plain"):
+            length = count_chars(plain(value.get("c", [])))
+            if length: found.append(length)
+            return
+        content = value.get("c")
+        if isinstance(content, (dict, list)): visit(content)
+    if record: visit(record["ast"].get("blocks", []))
+    return found
+
+
+def paragraph_statistics(record, maximum):
+    values = paragraph_lengths(record)
+    over = [n for n in values if n > maximum]
+    return {"paragraph_chars_max": maximum, "max_paragraph_chars": max(values, default=0),
+            "median_paragraph_chars": statistics.median(values) if values else 0,
+            "p90_paragraph_chars": sorted(values)[max(0, math.ceil(len(values) * 0.9) - 1)] if values else 0,
+            "violation_count": len(over), "paragraph_count": len(values),
+            "violation_ratio": len(over) / len(values) if values else 0,
+            "high": bool(values and (max(values) > maximum * 1.5 or len(over) / len(values) >= 0.10)),
+            "medium": bool(values and any(n > maximum * 1.15 for n in values))}
+
+
 def evaluate_contract(chapter, record, scale):
     """A chapter file existing is not completion: size, topics, sections, references and summary all count."""
     reasons = []
@@ -209,6 +236,9 @@ def evaluate_contract(chapter, record, scale):
               "required_sections": [s["id"] or s["title"] for s in chapter["required_sections"]],
               "assigned_sources": chapter["primary_sources"] + chapter["supporting_sources"],
               "required_references": chapter["required_references"], "required_assets": chapter["expected_assets"]}
+    paragraph_max = scale.get("paragraph_chars_max")
+    if paragraph_max:
+        status["paragraph_stats"] = paragraph_statistics(record, paragraph_max)
     if not record:
         reasons.append({"type": "missing_file", "detail": f"{chapter['file']} does not exist"})
     else:
@@ -226,6 +256,8 @@ def evaluate_contract(chapter, record, scale):
         uncited = [x for x in chapter["required_references"] if x not in cited]
         if uncited: reasons.append({"type": "references", "detail": "Required references not cited: " + ", ".join(uncited), "missing": uncited})
         if record["placeholders"]: reasons.append({"type": "placeholders", "detail": "Placeholder/unfinished text remains"})
+        import editorial_plan
+        reasons += editorial_plan.contract_reasons(chapter["id"], record)
         status["cited_sources"] = sorted(cited)
         status["unused_assigned_sources"] = [x for x in status["assigned_sources"] if x not in cited]
     summary_errors = check_summary(chapter["id"])
@@ -245,10 +277,19 @@ def write_contracts(chapters, records, scale):
     for stale in STATUS_DIR.glob("*.json"):
         if stale.stem not in {r["id"] for r in results}: stale.unlink()
     total = sum(r["actual_characters"] for r in results)
+    paragraph_values = [r["paragraph_stats"] for r in results if "paragraph_stats" in r]
+    paragraph_count = sum(r["paragraph_count"] for r in paragraph_values)
+    paragraph_violations = sum(r["violation_count"] for r in paragraph_values)
     aggregate = {"total_target": sum(r["target_characters"] for r in results), "total_actual": total,
                  "book_minimum": scale["minimum_characters"], "book_target": scale["target_characters"],
                  "book_deficit": max(0, scale["minimum_characters"] - total),
-                 "complete": sum(1 for r in results if r["status"] == "complete"), "chapters": [
+                 "complete": sum(1 for r in results if r["status"] == "complete"),
+                 "paragraph_stats": {"paragraph_chars_max": scale.get("paragraph_chars_max"),
+                     "max_paragraph_chars": max((p["max_paragraph_chars"] for p in paragraph_values), default=0),
+                     "median_paragraph_chars": statistics.median([x for r in results for x in paragraph_lengths(mapped.get(r["id"]))]) if paragraph_count else 0,
+                     "p90_paragraph_chars": sorted([x for r in results for x in paragraph_lengths(mapped.get(r["id"]))])[max(0, math.ceil(paragraph_count * 0.9) - 1)] if paragraph_count else 0,
+                     "violation_count": paragraph_violations, "paragraph_count": paragraph_count,
+                     "violation_ratio": paragraph_violations / paragraph_count if paragraph_count else 0}, "chapters": [
                      {"id": r["id"], "status": r["status"], "target": r["target_characters"], "minimum": r["minimum_characters"],
                       "actual": r["actual_characters"], "deficit": r["deficit"], "reasons": [x["type"] for x in r["reasons"]]} for r in results]}
     write_json(ROOT / "reports/chapter-status.json", aggregate)
@@ -284,6 +325,8 @@ def packet(chapter, chapters, scale):
             summaries.append({"chapter": identifier, "summary": data.get("summary"), "introduced_concepts": as_list(data.get("introduced_concepts")),
                               "key_terms": as_list(data.get("key_terms")), "handoff": data.get("handoff")})
     others = [{"id": c["id"], "title": c["title"], "introduces": c["introduces"]} for c in chapters if c["id"] != chapter["id"]]
+    import editorial_plan
+    plan = editorial_plan.load_plan(chapter["id"])
     data = {
         "chapter": chapter["id"], "title": chapter["title"], "file": chapter["file"], "purpose": chapter["purpose"],
         "target_characters": chapter["target_characters"], "minimum_characters": chapter["minimum_characters"],
@@ -298,7 +341,13 @@ def packet(chapter, chapters, scale):
         "required_references": chapter["required_references"],
         "claims": claim_list, "concepts": list(concepts.values()), "other_chapters": others,
         "expected_assets": chapter["expected_assets"],
+        "editorial_plan": ({"file": f"plan/editorial/{chapter['id']}.yaml", "reader_before": plan.get("reader_before"), "reader_after": plan.get("reader_after"),
+                            "sections": [{"id": s.get("id"), "heading": s.get("heading"), "rhetorical_role": s.get("rhetorical_role"),
+                                          "expected_density": s.get("expected_density"), "target_chars": s.get("target_chars"),
+                                          "slots": [editorial_plan.slot_markdown(d) for d in s["devices"] if editorial_plan.live(d)]} for s in plan["sections"]],
+                            "chapter_end": [editorial_plan.slot_markdown(e, e.get("type")) for e in plan["chapter_end"]]} if plan else None),
         "syntax": {"citation": "[cite:src-0001] or [cite:src-0001,src-0002]", "cross_reference": "@ch:id @sec:id @fig:id @tbl:id @eq:id",
+                   "slot": "::: {.slot #device-id kind=type} one line: what the device will show :::",
                    "chapter_heading": f"# {chapter['title']} {{#{chapter['id']}}}"}}
     PACKETS.mkdir(parents=True, exist_ok=True)
     write_yaml(PACKETS / f"{chapter['id']}.yaml", data, "Generated chapter research packet. Regenerated before each chapter task.")

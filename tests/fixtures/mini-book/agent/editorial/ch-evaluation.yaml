@@ -1,0 +1,31 @@
+chapter_id: ch-evaluation
+chapter_title: 評価と限界
+chapter_role: synthesis
+reader_before: モデルの学習方法を知っている
+reader_after: 評価の得点を、データと条件とともに読む習慣を持ち帰る
+target_chars: 900
+sections:
+  - id: sec-evaluation-metrics
+    heading: 評価指標
+    purpose: パープレキシティと下流タスク評価の違い、データ汚染を示す
+    rhetorical_role: evidence
+    intended_reader_effect: 得点の背後の条件を問う
+    expected_density: heavy
+    target_chars: 500
+    summary_points: [パープレキシティと下流タスク, データ汚染, 多面的評価]
+    new_terms: [データ汚染]
+    devices:
+      - id: kp-evaluation-conditions
+        type: key_point
+        why: 評価を条件と一緒に読むという章の結論を固定する
+        placement: {intent: 節の終わり, position: section_end}
+  - id: sec-evaluation-conclusion
+    heading: 本書のまとめ
+    purpose: 各章の論点をつなぎ、読者が持ち帰る姿勢をまとめる
+    rhetorical_role: synthesis
+    intended_reader_effect: 仕組みと条件を併せて読む姿勢を持つ
+    expected_density: light
+    target_chars: 400
+    summary_points: [仕組みと条件を併せて読む]
+chapter_end:
+  - {type: key_points}

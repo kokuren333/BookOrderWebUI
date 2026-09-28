@@ -1,0 +1,215 @@
+# Resolved component presentation grammar; does not create editorial devices.
+schema: "bookorder/visual-grammar@1"
+style_id: "book-style"
+genre: "general"
+components:
+  case_study:
+    border_policy: "semantic"
+    break_behavior: "keep-together"
+    fill_policy: "none"
+    icon_policy: "none"
+    placement: "after-anchor"
+    priority: "secondary"
+    semantic_role: "grounded-example"
+    space_after_mm: 5.0
+    space_before_mm: 5.0
+    span_preference: "inherit"
+    title_required: true
+    treatment: "side-rule"
+    use_policy: "allowed"
+  chapter_summary:
+    border_policy: "semantic"
+    break_behavior: "keep-together"
+    fill_policy: "none"
+    icon_policy: "none"
+    placement: "chapter-end"
+    priority: "secondary"
+    semantic_role: "chapter-synthesis"
+    space_after_mm: 3.0
+    space_before_mm: 3.0
+    span_preference: "inherit"
+    title_required: true
+    treatment: "top-rule"
+    use_policy: "allowed"
+  checklist:
+    border_policy: "semantic"
+    break_behavior: "keep-together"
+    fill_policy: "none"
+    icon_policy: "none"
+    placement: "after-anchor"
+    priority: "secondary"
+    semantic_role: "action-verification"
+    space_after_mm: 3.0
+    space_before_mm: 3.0
+    span_preference: "inherit"
+    title_required: true
+    treatment: "side-rule"
+    use_policy: "allowed"
+  counterpoint:
+    border_policy: "semantic"
+    break_behavior: "keep-together"
+    fill_policy: "none"
+    icon_policy: "none"
+    placement: "after-anchor"
+    priority: "secondary"
+    semantic_role: "alternative-argument"
+    space_after_mm: 5.0
+    space_before_mm: 5.0
+    span_preference: "inherit"
+    title_required: true
+    treatment: "top-rule"
+    use_policy: "allowed"
+  definition:
+    border_policy: "semantic"
+    break_behavior: "keep-together"
+    fill_policy: "none"
+    icon_policy: "none"
+    placement: "after-anchor"
+    priority: "tertiary"
+    semantic_role: "term-definition"
+    space_after_mm: 3.0
+    space_before_mm: 3.0
+    span_preference: "inherit"
+    title_required: true
+    treatment: "inset-paragraph"
+    use_policy: "allowed"
+  evidence_note:
+    border_policy: "semantic"
+    break_behavior: "keep-together"
+    fill_policy: "none"
+    icon_policy: "none"
+    placement: "after-anchor"
+    priority: "supporting"
+    semantic_role: "evidence-context"
+    space_after_mm: 3.0
+    space_before_mm: 3.0
+    span_preference: "inherit"
+    title_required: false
+    treatment: "inset-paragraph"
+    use_policy: "allowed"
+  further_reading:
+    border_policy: "semantic"
+    break_behavior: "keep-together"
+    fill_policy: "none"
+    icon_policy: "none"
+    placement: "chapter-end"
+    priority: "supporting"
+    semantic_role: "reading-navigation"
+    space_after_mm: 3.0
+    space_before_mm: 3.0
+    span_preference: "inherit"
+    title_required: true
+    treatment: "plain-emphasis"
+    use_policy: "allowed"
+  glossary:
+    border_policy: "semantic"
+    break_behavior: "keep-together"
+    fill_policy: "none"
+    icon_policy: "none"
+    placement: "after-anchor"
+    priority: "supporting"
+    semantic_role: "terminology"
+    space_after_mm: 3.0
+    space_before_mm: 3.0
+    span_preference: "inherit"
+    title_required: false
+    treatment: "margin-label"
+    use_policy: "allowed"
+  key_point:
+    border_policy: "semantic"
+    break_behavior: "keep-together"
+    fill_policy: "none"
+    icon_policy: "none"
+    placement: "after-anchor"
+    priority: "secondary"
+    semantic_role: "synthesis"
+    space_after_mm: 3.0
+    space_before_mm: 3.0
+    span_preference: "inherit"
+    title_required: true
+    treatment: "side-rule"
+    use_policy: "allowed"
+  pull_quote:
+    border_policy: "semantic"
+    break_behavior: "keep-together"
+    fill_policy: "none"
+    icon_policy: "none"
+    placement: "after-anchor"
+    priority: "primary"
+    semantic_role: "editorial-emphasis"
+    space_after_mm: 6.0
+    space_before_mm: 6.0
+    span_preference: "inherit"
+    title_required: false
+    treatment: "pull-quote"
+    use_policy: "allowed"
+  source_note:
+    border_policy: "semantic"
+    break_behavior: "keep-together"
+    fill_policy: "none"
+    icon_policy: "none"
+    placement: "adjacent-to-figure"
+    priority: "quiet"
+    semantic_role: "attribution"
+    space_after_mm: 2.0
+    space_before_mm: 1.0
+    span_preference: "inherit"
+    title_required: false
+    treatment: "plain-emphasis"
+    use_policy: "allowed"
+  warning:
+    border_policy: "semantic"
+    break_behavior: "keep-together"
+    fill_policy: "surface"
+    icon_policy: "none"
+    placement: "after-anchor"
+    priority: "primary"
+    semantic_role: "risk"
+    space_after_mm: 3.0
+    space_before_mm: 3.0
+    span_preference: "inherit"
+    title_required: true
+    treatment: "filled-box"
+    use_policy: "allowed"
+hierarchy:
+  caption: "supporting"
+  heading_2: "secondary"
+  heading_3: "tertiary"
+  source_note: "quiet"
+rhythm:
+  box_budget: "avoid-adjacent-filled-boxes"
+  interruption: "occasional"
+  pattern: "balanced"
+  section_space: "regular"
+table:
+  border_density: "horizontal"
+  header_emphasis: "rule-and-weight"
+  mode: "auto"
+  numeric_alignment: "decimal"
+  row_spacing: "regular"
+  source_note: "adjacent"
+  zebra: false
+diagram:
+  annotation_style: "near-edge"
+  edge_emphasis: "directional"
+  hierarchy: "levels"
+  label_placement: "inside"
+  node_shape: "rounded-rectangle"
+  whitespace: "regular"
+chart:
+  annotation: "outside-data"
+  axis_emphasis: "regular"
+  baseline_emphasis: "regular"
+  direct_labels: true
+  grid_intensity: "light"
+  legend_use: "only-if-needed"
+  uncertainty: "label-or-interval"
+caption:
+  figure_relationship: "adjacent"
+  source_binding: "same-block"
+  weight: "supporting"
+chapter_opener:
+  hierarchy: "editorial"
+  lead: "quiet"
+  number_prominence: "large"
+note: "Presentation only; EditorialPlan device counts and LayoutSpec geometry are unchanged."

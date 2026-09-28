@@ -1,0 +1,22 @@
+# Genre template: essays. Text-only by nature: few or no figures and callouts, longer paragraphs and runs,
+# minimal citation, no chapter-end apparatus; illustration only as chapter openers.
+genre: essay
+multiply:
+  devices.visuals_per_10k: 0.2
+  devices.tables_per_chapter: 0.0
+  devices.callouts_per_chapter: 0.25
+  devices.case_studies_per_chapter: 0.0
+  devices.columns_per_chapter: 0.0
+  devices.pull_quotes_per_chapter: 0.5
+  structure.paragraph_chars_max: 1.25
+  scale.nonprose_share_target: 0.4
+add:
+  rhythm.max_text_only_pages: 2
+set:
+  citations.style: minimal
+  citations.inline_markers_per_page_max: 0.5
+  citations.further_reading_per_chapter: {min: 0, target: 0, max: 2}
+  structure.chapter_end: []
+  art_direction.weight: light
+  art_direction.ornament_level: low
+  art_direction.generative_images: {allowed: [chapter_opener], max_total: 12}

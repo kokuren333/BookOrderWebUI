@@ -1,0 +1,35 @@
+# Length tier: a regular single-volume book (roughly 80-200 A5 pages).
+tier: standard
+scale:
+  target_body_chars: 75000
+  nonprose_share_target: 0.28
+  minimum_ratio: 0.8
+  front_matter_pages: 6
+  back_matter_share: 0.05
+structure:
+  parts: {min: 0, target: 0, max: 4}
+  chapters: {min: 4, target: 10, max: 16}
+  heading_depth_max: 3
+  section_chars: {min: 500, target: 900, max: 1600}
+  paragraph_chars_max: 400
+  chapter_lead: required
+  chapter_end: [key_points, bridge_to_next]
+devices:
+  visuals_per_10k: {min: 1.8, target: 3.0, max: 5.0}
+  tables_per_chapter: {min: 0, target: 1, max: 4}
+  callouts_per_chapter: {min: 1, target: 3, max: 5}
+  case_studies_per_chapter: {min: 0, target: 0.5, max: 2}
+  columns_per_chapter: {min: 0, target: 0.5, max: 2}
+  pull_quotes_per_chapter: {min: 0, target: 0.5, max: 2}
+rhythm:
+  max_text_only_pages: 4
+  pause_every_chars: {target: 2400, max: 3200}
+  abstract_run_chars_max: 1500
+citations:
+  style: numeric
+  inline_markers_per_page_max: 1.5
+  further_reading_per_chapter: {min: 0, target: 2, max: 5}
+art_direction:
+  weight: standard
+  ornament_level: low
+  generative_images: {allowed: [chapter_opener], max_total: 12}

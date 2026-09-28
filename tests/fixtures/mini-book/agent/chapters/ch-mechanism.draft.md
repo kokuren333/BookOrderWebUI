@@ -23,3 +23,12 @@ $$\operatorname{Attention}(Q, K, V) = \operatorname{softmax}\left(\frac{QK^{\top
 ## 計算量と効率化 {#sec-mechanism-cost}
 
 自己注意の計算量は系列長の二乗に比例する [cite:{{src:transformer-architecture}}]。
+
+::: {.slot #tbl-attention-variants kind=table}
+注意の方式（標準・疎・低ランク近似・タイル化）を計算量と特徴で比較
+:::
+
+::: {.summary #ch-mechanism-key-points}
+- 自己注意は同じ系列内の全位置を並列に参照する。
+- 計算量は系列長の二乗に比例し、効率化には近似と厳密な工夫の二方向がある。
+:::

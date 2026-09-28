@@ -60,7 +60,10 @@
       ]
     ]
   }
-  set page(header: run-head, footer: folio, numbering: "1")
+  set page(header: if d.layout_spec.regions.header.enabled { run-head } else { none },
+    footer: if d.layout_spec.regions.footer.enabled { folio } else { none }, numbering: "1")
+  set page(columns: d.layout_spec.body.columns)
+  set columns(gutter: d.layout_spec.body.gutter_mm * 1mm)
   show outline: set par(first-line-indent: 0pt, justify: false)
   show outline.entry.where(level: 1): it => {
     v(.9em, weak: true)

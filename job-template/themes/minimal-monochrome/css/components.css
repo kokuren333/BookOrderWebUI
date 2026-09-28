@@ -16,3 +16,5 @@ blockquote,.quote{border-left:2px solid var(--book-color-secondary);margin:1.5re
 .book-equation>p{flex:1;margin:0;text-align:center;text-indent:0}
 .book-equation .eq-number{flex:none;font-variant-numeric:tabular-nums;color:var(--book-color-muted)}
 .equation:not(.book-equation){margin:1.4rem 0;text-align:center}
+.case-study{padding:.95rem 1.15rem;border:1px solid var(--book-color-secondary);border-radius:4px}
+.counterpoint{padding:.95rem 1.15rem;border-left:3px solid var(--book-color-accent);background:var(--book-color-surface)}

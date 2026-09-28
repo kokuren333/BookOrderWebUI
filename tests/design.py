@@ -53,7 +53,7 @@ ast = {'pandoc-api-version': [1, 23, 1, 1], 'meta': {}, 'blocks': [
     {'t': 'Div', 'c': [[f'component-{kind}', [kind], [['title', kind]]], [{'t': 'Para', 'c': [{'t': 'Str', 'c': '本文'}]}]]}
     for kind in registry() if kind != 'equation']}
 ir = create_ir(ast)
-assert len(ir['components']) == 24  # plus the separately numbered equation type
+assert len(ir["components"]) == 26  # plus the separately numbered equation type
 assert all('custom-style' not in str(block) for block in ir['ast']['blocks'])
 assert all('custom-style' in str(block) for block in prepare_ast(ir, 'docx')['blocks'])
 assert all('book-component' in str(block) for block in prepare_ast(ir, 'html')['blocks'])
@@ -103,4 +103,4 @@ selected = subprocess.run([sys.executable, str(outputs[-1] / 'scripts/cli.py'), 
 assert selected.returncode == 0, selected.stdout + selected.stderr
 assert json.loads((outputs[-1] / 'book.design.yaml').read_text(encoding='utf-8'))['theme'] == 'academic-jp'
 before = fingerprint(); (WORK / 'custom.css').write_text('/* changed */', encoding='utf-8'); assert fingerprint() != before
-print('PASS: strict schema, independent fonts/fallback, 24 components, nine SVG types, five real all-format previews, shared IR, CSS overrides and preview isolation.')
+print('PASS: strict schema, independent fonts/fallback, 26 components, nine SVG types, five real all-format previews, shared IR, CSS overrides and preview isolation.')

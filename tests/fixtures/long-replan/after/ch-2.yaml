@@ -1,0 +1,224 @@
+# Chapter 2 re-planned under long.criticism. Fig. 2.1 (concept map, illustrative, disclaimed) becomes a table of
+# what each stage of the move draws on, built from the chapter's own cited observations.
+chapter_id: ch-2
+chapter_title: 上昇、地域、孤独
+chapter_role: development
+reader_before: 学校内の評価を「通貨」として読む比喩を知っている
+reader_after: 家庭・地域・移動の段階ごとに効く資源が入れ替わり、達成が所属を保証しないことを自分の経験に当てはめて考えられる
+target_chars: 14800
+lead: 同じ教室を出た人が別々の速度で暮らし始める理由を、家庭・地域・移動の資源から読む
+sections:
+  - id: sec-2-1-1
+    parent: sec-2-1
+    heading: 「5/4 成人式」と初期条件
+    purpose: 同級生が別の速度で暮らし始めるという著者の観察から章の問いを立てる
+    rhetorical_role: thesis
+    intended_reader_effect: 初期条件の影が成人後に伸びるという感覚を、統計ではなく観察として受け取る
+    expected_density: light
+    target_chars: 1100
+    summary_points: [同じ学校を出ても別の速度で暮らす, 随筆であり統計ではない]
+    devices:
+      - id: pq-2-seijinshiki
+        type: pull_quote
+        why: 章の議論はこの随筆の一節から始まり、読者が著者の言葉そのものに触れる必要がある
+        placement: {intent: 観察を紹介し、随筆であると断った直後, position: section_end}
+        source_ids: [src-0035]
+        locator: 「5/4 成人式」本文、職業の時計を刻み始めるくだり
+  - id: sec-2-1-2
+    parent: sec-2-1
+    heading: 数えられない家庭の資源
+    purpose: 進路の調べ方、相談相手、失敗の余白といった数えにくい資源を示す
+    rhetorical_role: evidence
+    intended_reader_effect: 努力の量より、努力の向け先を早く知る条件の差に目を向ける
+    expected_density: heavy
+    target_chars: 1300
+    summary_points: [見えない壁は著者の観察語, 努力の向け先を知る条件の非対称]
+    citation_needs: [{claim: 帰国子女・エリート層と一般受験組の見えない壁, source_ids: [src-0005]}]
+  - id: sec-2-1-3
+    parent: sec-2-1
+    heading: 学校選択という回路
+    purpose: 中学受験・私立進学の動機と、選抜を前倒しするコストを並べる
+    rhetorical_role: evidence
+    intended_reader_effect: 学校が進路情報の環境でもあることを理解し、公立・私立の単純な優劣論から離れる
+    expected_density: medium
+    target_chars: 900
+    summary_points: [学校は情報環境, 前倒しのコスト]
+    example_needs: [公立中の経験を振り返る著者の記事]
+  - id: sec-2-1-4
+    parent: sec-2-1
+    heading: 「t 出身 k」という名前
+    purpose: 著者の界隈語を定義し、成功の証明が所属の証明にならないことを示す
+    rhetorical_role: thesis
+    intended_reader_effect: 達成と所属を分けて考える語彙を得る
+    expected_density: medium
+    target_chars: 1000
+    summary_points: [統計分類ではない界隈語, 成功は所属の証明ではない]
+    new_terms: [t出身k]
+    devices:
+      - id: df-2-tk
+        type: definition
+        why: 章の後半と第6章で繰り返し使う独自語で、初出で意味と射程を固定する必要がある
+        placement: {intent: 語が初めて出る段落の冒頭, position: section_start}
+        terms: [t出身k]
+        source_ids: [src-0018, src-0034]
+  - id: sec-2-1-5
+    parent: sec-2-1
+    heading: 「親ガチャ」の比喩が崩すもの、崩しすぎるもの
+    purpose: 自己責任論を崩す比喩の効き目と、運命論への滑りを同時に示す
+    rhetorical_role: concession
+    intended_reader_effect: 比喩を使いながら、予測の公式として読まない
+    expected_density: heavy
+    target_chars: 1100
+    summary_points: [初期設定の比喩, 資源は単純に移転しない]
+    counterarguments: [親の資源で進路が決まるという運命論的な読み]
+    devices:
+      - id: cp-2-oyagacha
+        type: counterpoint
+        origin: author
+        why: 本書はこの比喩を採りつつ留保を置く立場であり、その留保を本文から切り出して示す
+        placement: {intent: 比喩の効き目を述べた後, position: late}
+  - id: sec-2-2-1
+    parent: sec-2-2
+    heading: 西宮という生活圏
+    purpose: 散策記事から、豊かさと「何もない」感覚の同居を示す
+    rhetorical_role: example
+    intended_reader_effect: 地元への愛着と不満が並ぶ具体的な場面を持つ
+    expected_density: light
+    target_chars: 900
+    summary_points: [生活圏の密度, 何もないという体感]
+  - id: sec-2-2-2
+    parent: sec-2-2
+    heading: 「第二関西速度」の三つの型
+    purpose: 著者の三分類を、家族の基盤・移動の足場・著者自身の留保で読み分ける
+    rhetorical_role: evidence
+    intended_reader_effect: 移動できるかどうかが意志だけでなく家族の基盤に支えられることを比較で掴む
+    expected_density: heavy
+    target_chars: 1300
+    summary_points: [事業基盤の家庭, 転勤族, 給与所得者の家庭]
+    visual_opportunities:
+      - {information_shape: {kind: comparison, items: 3, attributes: 3}, note: 三つの型の比較}
+    devices:
+      - id: tbl-2-kansai-types
+        type: table
+        why: 三つの型を同じ観点で並べると、上京時の足場の差と、それが修辞的モデルであることが一度に見える
+        placement: {intent: 三分類を紹介した直後, position: middle}
+        information_shape: {kind: comparison, items: 3, attributes: 3}
+        basis: source
+        source_ids: [src-0042]
+  - id: sec-2-2-3
+    parent: sec-2-2
+    heading: 五大文明論をどう読むか
+    purpose: 学校類型論の射程と限界を示す
+    rhetorical_role: contrast
+    intended_reader_effect: 進学実績の背後の層を読む試みとして受け取り、学校史と混同しない
+    expected_density: medium
+    target_chars: 1000
+    summary_points: [学校の出自で読む類型, 確定した教育史ではない]
+    example_needs: [似た進学実績を持つ伝統校・新興校・附属校の出自の違い]
+    devices:
+      - id: wn-2-civilizations
+        type: warning
+        why: 独自の類型を個別校や卒業生の性格の判定に使う誤読が起きやすい
+        placement: {intent: 類型を紹介した直後, position: early}
+        source_ids: [src-0019]
+  - id: sec-2-2-4
+    parent: sec-2-2
+    heading: 東京は「夢の街」か
+    purpose: 上京の便益と費用、動かない選択の正当性を示す
+    rhetorical_role: concession
+    intended_reader_effect: 移動を達成、定住を停滞とみなす単線的な結論を避ける
+    expected_density: light
+    target_chars: 900
+    summary_points: [集積の大きさと暮らしの優劣は別, 動かない選択は失敗ではない]
+  - id: sec-2-3-1
+    parent: sec-2-3
+    heading: 上京と帰省の記録
+    purpose: 初めての東京勤務後の年末年始の記録を事例として読む
+    rhetorical_role: example
+    intended_reader_effect: 脱出の修辞と、帰れば落ち着く生活圏の経験が同居することを見る
+    expected_density: medium
+    target_chars: 1000
+    summary_points: [同窓会と家族の時間, 距離感の点検]
+    devices:
+      - id: cs-2-homecoming
+        type: case_study
+        basis: real
+        why: 抽象的な移動論が続いたところで、著者自身の記録で移動の両義性を具体化する
+        placement: {intent: 節の冒頭, position: section_start}
+        source_ids: [src-0042, src-0044]
+  - id: sec-2-3-2
+    parent: sec-2-3
+    heading: 移動の段階ごとに効く資源
+    purpose: 家庭・学校・大学・仕事の段階ごとに、効く資源と著者の語彙を整理する
+    rhetorical_role: synthesis
+    intended_reader_effect: 評価の仕組みが変わるたびに別の資源が効き直すという見取り図を持つ
+    expected_density: heavy
+    target_chars: 1200
+    summary_points: [入口の通過で差は消えない, 段階ごとに効く資源が変わる]
+    visual_opportunities:
+      - information_shape: {kind: relation, nodes: 5}
+        declined: 資料は段階ごとの資源を述べるが、段階間の関係の向きや強さは述べていない。関係図にすると根拠のない構造を描くことになる（旧図2.1）
+      - {information_shape: {kind: comparison, items: 4, attributes: 3}, note: 段階×資源・語彙・根拠}
+    devices:
+      - id: tbl-2-resources
+        type: table
+        why: 旧図2.1の概念図に代えて、段階ごとの資源を本文の出典つき観察だけで並べる
+        placement: {intent: 段階を順にたどった後, position: middle}
+        information_shape: {kind: comparison, items: 4, attributes: 3}
+        basis: source
+        source_ids: [src-0005, src-0014, src-0018, src-0035, src-0042]
+  - id: sec-2-3-3
+    parent: sec-2-3
+    heading: 回復地点という考え方
+    purpose: 失敗から戻る場所を資源として数え直す
+    rhetorical_role: application
+    intended_reader_effect: 自分の回復地点を具体的に挙げられる
+    expected_density: light
+    target_chars: 900
+    summary_points: [戻れる場所も資源]
+  - id: sec-2-4-1
+    parent: sec-2-4
+    heading: 上昇の孤独
+    purpose: 達成後に出身が意識される逆説を示す
+    rhetorical_role: thesis
+    intended_reader_effect: 成功者の弱音として片づけず、達成が関係と自己像を変える過程として読む
+    expected_density: heavy
+    target_chars: 1100
+    summary_points: [入学後に試験外の経験が価値を持つ, 不適合は能力の欠如ではない]
+    devices:
+      - id: pq-2-kodoku
+        type: pull_quote
+        why: 節の論点は著者自身の言葉から立ち上がる
+        placement: {intent: 節の導入の直後, position: early}
+        source_ids: [src-0055]
+        locator: 上昇の孤独を述べる記事の結びの段落
+  - id: sec-2-4-2
+    parent: sec-2-4
+    heading: 共通語彙と境界
+    purpose: 共通の語彙が安心と選別を同時に作ることを示す
+    rhetorical_role: contrast
+    intended_reader_effect: 境界の快適さを能力や人間の序列に重ねない
+    expected_density: medium
+    target_chars: 900
+    summary_points: [共通語彙は安心と境界を作る]
+    counterarguments: [境界そのものを悪とみなす読み]
+    devices:
+      - id: cp-2-boundary
+        type: counterpoint
+        why: 境界を告発する読みに対し、著者自身の嫉妬や選り好みを含む記述を別の読みとして示す
+        placement: {intent: 境界の働きを述べた後, position: middle}
+        source_ids: [src-0056]
+  - id: sec-2-4-3
+    parent: sec-2-4
+    heading: 章の出口
+    purpose: 家庭・地域・孤独の議論を次章の選択の問いへ渡す
+    rhetorical_role: synthesis
+    intended_reader_effect: 上昇の是非でなく、何が可能になり何が置き去りになるかを問う
+    expected_density: light
+    target_chars: 700
+    summary_points: [上昇が可能にするものと置き去りにするもの]
+chapter_end:
+  - {type: key_points}
+  - {type: open_question}
+  - {type: bridge_to_next}
+  - {type: further_reading, source_ids: [src-0005, src-0019, src-0042, src-0035]}

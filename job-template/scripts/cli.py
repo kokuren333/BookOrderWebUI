@@ -101,7 +101,15 @@ def main():
     resolve = aud.add_parser('resolve'); resolve.add_argument('id'); resolve.add_argument('--note', required=True); resolve.add_argument('--wontfix', action='store_true')
     aud.add_parser('report')
 
+    edi = commands.add_parser('editorial', help='EditorialPlan: check the plans, or fall back a device').add_subparsers(dest='editorial_command', required=True)
+    edi.add_parser('check')
+    fb = edi.add_parser('fallback', help='Replace a device (e.g. a rejected visual) with table, prose, case_study or summary')
+    fb.add_argument('device'); fb.add_argument('--to', required=True, choices=['table', 'prose', 'case_study', 'summary']); fb.add_argument('--reason', required=True)
+
     build = commands.add_parser('build'); build.add_argument('--theme')
+    commands.add_parser('layout', help='Re-measure page layout of the last PDF build (reports/layout-metrics.json)')
+    prof = commands.add_parser('profile', help='Show the resolved PublicationProfile; --apply re-plans with it (user approval)')
+    prof.add_argument('--apply', action='store_true'); prof.add_argument('--user-approval')
     commands.add_parser('fonts')
     theme = commands.add_parser('theme'); sub_theme = theme.add_subparsers(dest='theme_command', required=True)
     sub_theme.add_parser('list'); show = sub_theme.add_parser('preview'); show.add_argument('name')
@@ -146,6 +154,25 @@ def main():
         orchestrator.reopen(state, 'architecture', f'rescaled from {previous["requested_pages"]} to {args.pages} pages')
         orchestrator.save_state(state); print(json.dumps(state['scale'], indent=2)); return 0
 
+    if args.command == 'profile':
+        import orchestrator, publication_profile
+        from design import load_design
+        project, state = orchestrator.load_state()
+        try: design = load_design()
+        except Exception: design = {}
+        profile = publication_profile.resolve(project, design)
+        current = (state.get('scale') or {}).get('profile', {}).get('inputs_fingerprint')
+        print('\n'.join(publication_profile.summary_lines(profile)))
+        print(f"inputs_fingerprint {profile['inputs_fingerprint']} (plan uses {current or 'no profile'})")
+        if not args.apply:
+            if current != profile['inputs_fingerprint']: print('project.json asks for a different profile; run with --apply --user-approval "<quote the user>" to re-plan')
+            return 0
+        if not args.user_approval: raise ValueError('--apply changes the book plan; pass --user-approval "<quote the user>"')
+        from planning import compute_scale
+        state['scale'] = compute_scale(project, design)
+        orchestrator.log_event('goal', 'profile', profile=profile['id'], fingerprint=profile['inputs_fingerprint'], user_approval=args.user_approval)
+        orchestrator.reopen(state, 'architecture', f"publication profile changed to {profile['id']}")
+        orchestrator.save_state(state); return 0
     if args.command == 'source':
         import sources
         c = args.source_command
@@ -191,9 +218,33 @@ def main():
         else: print(json.dumps(audit.render_report(), ensure_ascii=False, indent=2))
         return 0
 
+    if args.command == 'editorial':
+        import editorial_plan
+        from planning import load_outline
+        chapters = load_outline()
+        if args.editorial_command == 'check':
+            result = editorial_plan.run(chapters)
+            for f in editorial_plan.all_findings(result):
+                print(f"[{f['severity']}{' waived' if f.get('waived') else ''}] {f.get('chapter') or 'book'} {f.get('section') or ''} {f.get('device') or ''} {f['rule']}: {f['detail']}")
+            print(json.dumps(result['summary'], ensure_ascii=False))
+            return 0 if result['ok'] else 1
+        chapter = editorial_plan.find_chapter(args.device, chapters)
+        if not chapter: raise ValueError(f'{args.device} is not a device in plan/editorial/*.yaml')
+        codes = []
+        try:
+            import visual_review
+            codes = [r['code'] for c in visual_review.run(chapters, write=False)['candidates'] if (c.get('device') or c['id']) == args.device for r in c.get('rejection_reasons', [])]
+        except Exception: pass
+        new_id = editorial_plan.apply_fallback(chapter, args.device, args.to, args.reason, codes)
+        print(f"{args.device}: fallback to {args.to}" + (f" -> new device {new_id} (fill in its fields, then replace the slot)" if new_id else " (remove its slot and keep it in prose)"))
+        return 0
+
     if args.command == 'build':
         from build import build
         build(args.theme)
+    elif args.command == 'layout':
+        import layout_metrics
+        layout_metrics.main()
     elif args.command == 'fonts':
         from design import available_fonts
         print(json.dumps(available_fonts(), ensure_ascii=False, indent=2))

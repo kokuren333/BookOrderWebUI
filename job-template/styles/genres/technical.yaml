@@ -1,0 +1,19 @@
+tone:
+  overall: "structural, precise, diagram-oriented"
+  ornament: "low"
+diagram:
+  node_style: "outline"
+  edge_style: "labelled-arrow"
+chart:
+  grid_style: "major-only"
+  direct_labeling: true
+table:
+  border_style: "horizontal"
+visual_grammar:
+  components:
+    warning: {semantic_role: implementation-hazard, priority: primary, treatment: side-rule}
+    evidence_note: {priority: supporting, treatment: plain-emphasis}
+  rhythm: {pattern: structured, interruption: diagram-led, section_space: regular}
+  table: {border_density: horizontal, row_spacing: compact, mode: compact}
+  diagram: {node_shape: rectangle, edge_emphasis: directional, hierarchy: levels, label_placement: inside, whitespace: regular, annotation_style: near-edge}
+  chart: {grid_intensity: light, axis_emphasis: strong, direct_labels: true, legend_use: only-if-needed, annotation: outside-data, baseline_emphasis: strong, uncertainty: interval}

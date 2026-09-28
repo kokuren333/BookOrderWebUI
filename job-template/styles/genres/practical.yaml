@@ -1,0 +1,18 @@
+tone:
+  overall: "approachable and actionable"
+  formality: "medium"
+  restraint: "medium"
+callout:
+  fill_style: "surface"
+  border_style: "strong-left-rule"
+  title_style: "clear-bold"
+chart:
+  direct_labeling: true
+  emphasis_strategy: "weight-and-pattern"
+visual_grammar:
+  components:
+    checklist: {priority: primary, treatment: filled-box, fill_policy: surface, use_policy: allowed}
+    warning: {priority: primary, treatment: side-rule}
+    key_point: {priority: secondary, treatment: top-rule}
+  rhythm: {pattern: action-led, interruption: frequent-structured, section_space: regular}
+  chapter_opener: {hierarchy: action-first, lead: concise, number_prominence: medium}

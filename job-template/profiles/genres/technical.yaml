@@ -1,0 +1,15 @@
+# Genre template: technical books (software, engineering). Procedures, architecture and code carry the text;
+# short paragraphs, many small callouts, few case studies, no generated imagery.
+genre: technical
+multiply:
+  devices.visuals_per_10k: 1.0
+  devices.callouts_per_chapter: 1.2
+  devices.case_studies_per_chapter: 0.5
+  devices.pull_quotes_per_chapter: 0.0
+  structure.paragraph_chars_max: 0.85
+set:
+  citations.style: numeric
+  citations.inline_markers_per_page_max: 1.0
+  structure.chapter_end: [key_points, exercises]
+  art_direction.ornament_level: none
+  art_direction.generative_images: {allowed: [], max_total: 0}

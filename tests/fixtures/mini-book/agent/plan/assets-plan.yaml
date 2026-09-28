@@ -7,6 +7,13 @@ assets:
     purpose: "Q・K・Vから出力までの計算の流れを一目で追えるようにする。"
     type: diagram
     source: source/assets/diagrams/attention-flow.yaml
+    geometry: {placement: column, width_mm: 96}
+    information_shape: {kind: process, merging: true, steps: 7}
+    improvement_claim:
+      kinds: [reveal_structure]
+      statement: "Q と K が合流して重みになり、V と合流して出力になるという二つの合流点を一度に見せる。"
+    factual_basis: source
+    source_ids: ["{{src:transformer-architecture}}"]
     caption: "スケール化内積注意の計算の流れ"
     provenance: "authored from {{src:transformer-architecture}}"
     style: technical
@@ -24,4 +31,10 @@ assets:
     purpose: "注意の方式を計算量と特徴で比較する。"
     type: table
     caption: "注意の方式の比較"
+    information_shape: {kind: comparison, items: 4, attributes: 3}
+    improvement_claim:
+      kinds: [reduce_working_memory]
+      statement: "四つの方式を計算量と特徴の二軸で並べ、本文では追いにくい取捨選択を一覧にする。"
+    factual_basis: source
+    source_ids: ["{{src:efficient-attention}}"]
     provenance: "{{src:transformer-architecture}}, {{src:efficient-attention}}"

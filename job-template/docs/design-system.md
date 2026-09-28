@@ -60,7 +60,7 @@ Use Pandoc fenced divs with optional stable ID/title:
 :::
 ```
 
-schemas/components.json lists chapter-opener, section-opener, lead, key-point, note, tip, warning, definition, example, exercise, summary, checklist, quote, pull-quote, sidebar, step-by-step, code-listing, terminal-session, comparison, timeline, figure, full-width-figure, table and glossary-term. HTML/EPUB retains classes, DOCX named paragraph styles, PDF theme components. Ordinary prose remains primary.
+schemas/components.json lists chapter-opener, section-opener, lead, key-point, note, tip, warning, definition, example, exercise, summary, checklist, quote, pull-quote, sidebar, case-study, counterpoint, step-by-step, code-listing, terminal-session, comparison, timeline, figure, full-width-figure, table and glossary-term. HTML/EPUB retains classes, DOCX named paragraph styles, PDF theme components. Ordinary prose remains primary.
 
 ## Diagrams
 

@@ -1,0 +1,30 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "id", "genre", "art_direction_weight", "inputs_fingerprint", "tone", "palette", "typography", "lines", "spacing", "geometry", "diagram", "chart", "table", "callout", "caption", "chapter_opener", "imagery", "accessibility", "print", "grammar", "visual_grammar", "exemplars"],
+  "properties": {
+    "schema": {"type": "string", "enum": ["bookorder/style-bible@1"]},
+    "id": {"type": "string", "pattern": "[a-z][a-z0-9-]*"},
+    "genre": {"type": "string"},
+    "art_direction_weight": {"type": "string", "enum": ["light", "standard", "strong"]},
+    "inputs_fingerprint": {"type": "string", "pattern": "[0-9a-f]{64}"},
+    "tone": {"type": "object"},
+    "palette": {"type": "object"},
+    "typography": {"type": "object"},
+    "lines": {"type": "object"},
+    "spacing": {"type": "object"},
+    "geometry": {"type": "object"},
+    "diagram": {"type": "object"},
+    "chart": {"type": "object"},
+    "table": {"type": "object"},
+    "callout": {"type": "object"},
+    "caption": {"type": "object"},
+    "chapter_opener": {"type": "object"},
+    "imagery": {"type": "object"},
+    "accessibility": {"type": "object"},
+    "print": {"type": "object"},
+    "grammar": {"type": "object"},
+    "visual_grammar": {"type": "object"},
+    "exemplars": {"type": "object"}
+  }
+}

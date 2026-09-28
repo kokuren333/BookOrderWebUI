@@ -1,0 +1,403 @@
+# Resolved StyleBible. Override through project.style_bible; geometry stays in plan/layout-spec.yaml.
+schema: "bookorder/style-bible@1"
+id: "book-style"
+genre: "general"
+art_direction_weight: "standard"
+inputs_fingerprint: "a904556b755571e788d08cd20de891ed543042094df77e9a621008ea85f6e15c"
+tone:
+  overall: "clear and restrained"
+  formality: "standard"
+  density: "balanced"
+  restraint: "high"
+  abstraction: "medium"
+  ornament: "low"
+  whitespace: "balanced"
+palette:
+  ink: "#18181B"
+  muted: "#71717A"
+  accent: "#0891B2"
+  secondary_accent: "#164E63"
+  background: "#FFFFFF"
+  surface: "#F4F7F8"
+  warning: "#9A4D12"
+  success: "#2F6B55"
+typography:
+  body:
+    family: "Noto Sans CJK JP"
+    size_pt: 9.5
+    weight: 400
+    line_height: 1.4
+  heading_1:
+    family: "Noto Sans CJK JP"
+    size_pt: 21.24
+    weight: 400
+    line_height: 1.4
+  heading_2:
+    family: "Noto Sans CJK JP"
+    size_pt: 13.32
+    weight: 400
+    line_height: 1.4
+  heading_3:
+    family: "Noto Sans CJK JP"
+    size_pt: 10.45
+    weight: 400
+    line_height: 1.4
+  chapter_number:
+    family: "Noto Sans CJK JP"
+    size_pt: 61.2
+    weight: 700
+    line_height: 1.4
+  figure_label:
+    family: "Noto Sans CJK JP"
+    size_pt: 8.0
+    weight: 500
+    line_height: 1.4
+  figure_emphasis:
+    family: "Noto Sans CJK JP"
+    size_pt: 8.5
+    weight: 700
+    line_height: 1.4
+  axis_label:
+    family: "Noto Sans CJK JP"
+    size_pt: 7.5
+    weight: 400
+    line_height: 1.4
+  tick_label:
+    family: "Noto Sans CJK JP"
+    size_pt: 7.0
+    weight: 400
+    line_height: 1.4
+  caption:
+    family: "Noto Sans CJK JP"
+    size_pt: 7.8
+    weight: 400
+    line_height: 1.4
+  table:
+    family: "Noto Sans CJK JP"
+    size_pt: 8.74
+    weight: 400
+    line_height: 1.4
+  callout:
+    family: "Noto Sans CJK JP"
+    size_pt: 9.5
+    weight: 400
+    line_height: 1.4
+  code:
+    family: "Noto Sans CJK JP"
+    size_pt: 8.3
+    weight: 400
+    line_height: 1.4
+  minimum_print_pt: 6.5
+lines:
+  hairline_pt: 0.35
+  normal_pt: 0.6
+  strong_pt: 1.0
+  arrow_pt: 0.6
+  arrowhead_mm: 1.4
+spacing:
+  micro_mm: 0.7
+  small_mm: 1.5
+  medium_mm: 3.0
+  large_mm: 6.0
+  section_gap_mm: 5.0
+  figure_gap_mm: 4.0
+  caption_gap_mm: 1.4
+geometry:
+  corner_radius_mm: 1.0
+  node_padding_mm: 2.0
+diagram:
+  node_style: "outline"
+  edge_style: "semantic-arrow"
+  hierarchy_style: "levels"
+  causal_style: "labelled"
+  label_position: "inside"
+  emphasis_strategy: "weight-and-label"
+chart:
+  axis_style: "quiet"
+  grid_style: "major-only"
+  legend_style: "compact"
+  direct_labeling: true
+  max_series: 6
+  emphasis_strategy: "weight-and-pattern"
+  annotation_style: "outside-data"
+table:
+  border_style: "horizontal"
+  header_style: "rule-and-weight"
+  row_spacing: "standard"
+  zebra: false
+  numeric_alignment: "decimal"
+  note_style: "below"
+callout:
+  variants:
+    key-point: "primary-rule"
+    warning: "warning-rule"
+    definition: "quiet-box"
+  border_style: "left-rule"
+  fill_style: "surface"
+  title_style: "small-bold"
+  icon_policy: "none"
+  spacing: "medium"
+caption:
+  prefix_style: "accent-bold"
+  numbering_style: "chapter-sequence"
+  punctuation: "space"
+  source_style: "below-muted"
+  alignment: "left"
+chapter_opener:
+  chapter_number_style: "large-muted"
+  title_style: "editorial"
+  lead_style: "plain"
+  visual_relationship: "below-title"
+imagery:
+  allowed_roles:
+    - "chapter_opener"
+  realism: "low"
+  abstraction: "medium"
+  composition: "spacious"
+  texture: "minimal"
+  lighting: "neutral"
+  people_policy: "avoid"
+  text_in_image: false
+  recurring_motifs: []
+  palette_relationship: "inherit"
+accessibility:
+  grayscale_safe: true
+  minimum_contrast: 4.5
+  color_independent_encoding: true
+  alt_text_required: true
+print:
+  minimum_line_pt: 0.25
+  minimum_text_pt: 6.5
+grammar:
+  accent: "Use accent only for meaningful emphasis and navigation."
+  headings: "Use size and weight to establish hierarchy; avoid a one-character final line."
+  diagram_edges: "Arrow direction and label express a relation, not decoration."
+  chart_categories: "Never encode a category by color alone; label it directly."
+  table_headers: "Distinguish the header with weight and a rule."
+  callouts: "Key point, warning and definition have distinct semantic treatments."
+  captions: "Prefix, chapter number and source note follow one syntax."
+  source_notes: "Keep source notes adjacent to the referenced visual."
+visual_grammar:
+  components:
+    key_point:
+      semantic_role: "synthesis"
+      priority: "secondary"
+      placement: "after-anchor"
+      span_preference: "inherit"
+      break_behavior: "keep-together"
+      title_required: true
+      icon_policy: "none"
+      treatment: "side-rule"
+      border_policy: "semantic"
+      fill_policy: "none"
+      space_before_mm: 3.0
+      space_after_mm: 3.0
+      use_policy: "allowed"
+    warning:
+      semantic_role: "risk"
+      priority: "primary"
+      placement: "after-anchor"
+      span_preference: "inherit"
+      break_behavior: "keep-together"
+      title_required: true
+      icon_policy: "none"
+      treatment: "filled-box"
+      border_policy: "semantic"
+      fill_policy: "surface"
+      space_before_mm: 3.0
+      space_after_mm: 3.0
+      use_policy: "allowed"
+    definition:
+      semantic_role: "term-definition"
+      priority: "tertiary"
+      placement: "after-anchor"
+      span_preference: "inherit"
+      break_behavior: "keep-together"
+      title_required: true
+      icon_policy: "none"
+      treatment: "inset-paragraph"
+      border_policy: "semantic"
+      fill_policy: "none"
+      space_before_mm: 3.0
+      space_after_mm: 3.0
+      use_policy: "allowed"
+    glossary:
+      semantic_role: "terminology"
+      priority: "supporting"
+      placement: "after-anchor"
+      span_preference: "inherit"
+      break_behavior: "keep-together"
+      title_required: false
+      icon_policy: "none"
+      treatment: "margin-label"
+      border_policy: "semantic"
+      fill_policy: "none"
+      space_before_mm: 3.0
+      space_after_mm: 3.0
+      use_policy: "allowed"
+    counterpoint:
+      semantic_role: "alternative-argument"
+      priority: "secondary"
+      placement: "after-anchor"
+      span_preference: "inherit"
+      break_behavior: "keep-together"
+      title_required: true
+      icon_policy: "none"
+      treatment: "top-rule"
+      border_policy: "semantic"
+      fill_policy: "none"
+      space_before_mm: 5.0
+      space_after_mm: 5.0
+      use_policy: "allowed"
+    case_study:
+      semantic_role: "grounded-example"
+      priority: "secondary"
+      placement: "after-anchor"
+      span_preference: "inherit"
+      break_behavior: "keep-together"
+      title_required: true
+      icon_policy: "none"
+      treatment: "side-rule"
+      border_policy: "semantic"
+      fill_policy: "none"
+      space_before_mm: 5.0
+      space_after_mm: 5.0
+      use_policy: "allowed"
+    pull_quote:
+      semantic_role: "editorial-emphasis"
+      priority: "primary"
+      placement: "after-anchor"
+      span_preference: "inherit"
+      break_behavior: "keep-together"
+      title_required: false
+      icon_policy: "none"
+      treatment: "pull-quote"
+      border_policy: "semantic"
+      fill_policy: "none"
+      space_before_mm: 6.0
+      space_after_mm: 6.0
+      use_policy: "allowed"
+    checklist:
+      semantic_role: "action-verification"
+      priority: "secondary"
+      placement: "after-anchor"
+      span_preference: "inherit"
+      break_behavior: "keep-together"
+      title_required: true
+      icon_policy: "none"
+      treatment: "side-rule"
+      border_policy: "semantic"
+      fill_policy: "none"
+      space_before_mm: 3.0
+      space_after_mm: 3.0
+      use_policy: "allowed"
+    chapter_summary:
+      semantic_role: "chapter-synthesis"
+      priority: "secondary"
+      placement: "chapter-end"
+      span_preference: "inherit"
+      break_behavior: "keep-together"
+      title_required: true
+      icon_policy: "none"
+      treatment: "top-rule"
+      border_policy: "semantic"
+      fill_policy: "none"
+      space_before_mm: 3.0
+      space_after_mm: 3.0
+      use_policy: "allowed"
+    further_reading:
+      semantic_role: "reading-navigation"
+      priority: "supporting"
+      placement: "chapter-end"
+      span_preference: "inherit"
+      break_behavior: "keep-together"
+      title_required: true
+      icon_policy: "none"
+      treatment: "plain-emphasis"
+      border_policy: "semantic"
+      fill_policy: "none"
+      space_before_mm: 3.0
+      space_after_mm: 3.0
+      use_policy: "allowed"
+    evidence_note:
+      semantic_role: "evidence-context"
+      priority: "supporting"
+      placement: "after-anchor"
+      span_preference: "inherit"
+      break_behavior: "keep-together"
+      title_required: false
+      icon_policy: "none"
+      treatment: "inset-paragraph"
+      border_policy: "semantic"
+      fill_policy: "none"
+      space_before_mm: 3.0
+      space_after_mm: 3.0
+      use_policy: "allowed"
+    source_note:
+      semantic_role: "attribution"
+      priority: "quiet"
+      placement: "adjacent-to-figure"
+      span_preference: "inherit"
+      break_behavior: "keep-together"
+      title_required: false
+      icon_policy: "none"
+      treatment: "plain-emphasis"
+      border_policy: "semantic"
+      fill_policy: "none"
+      space_before_mm: 1.0
+      space_after_mm: 2.0
+      use_policy: "allowed"
+  hierarchy:
+    heading_2: "secondary"
+    heading_3: "tertiary"
+    caption: "supporting"
+    source_note: "quiet"
+  rhythm:
+    pattern: "balanced"
+    interruption: "occasional"
+    section_space: "regular"
+    box_budget: "avoid-adjacent-filled-boxes"
+  table:
+    border_density: "horizontal"
+    header_emphasis: "rule-and-weight"
+    row_spacing: "regular"
+    numeric_alignment: "decimal"
+    zebra: false
+    source_note: "adjacent"
+    mode: "auto"
+  diagram:
+    node_shape: "rounded-rectangle"
+    edge_emphasis: "directional"
+    hierarchy: "levels"
+    label_placement: "inside"
+    whitespace: "regular"
+    annotation_style: "near-edge"
+  chart:
+    grid_intensity: "light"
+    axis_emphasis: "regular"
+    direct_labels: true
+    legend_use: "only-if-needed"
+    annotation: "outside-data"
+    baseline_emphasis: "regular"
+    uncertainty: "label-or-interval"
+  caption:
+    figure_relationship: "adjacent"
+    weight: "supporting"
+    source_binding: "same-block"
+  chapter_opener:
+    hierarchy: "editorial"
+    lead: "quiet"
+    number_prominence: "large"
+exemplars:
+  chapter_opener: "第2章　仕組みを読む"
+  h1: "自己注意とTransformer"
+  h2: "計算量と効率化"
+  h3: "実験条件の違い"
+  body_paragraph: "結論を先に示し、根拠と適用範囲を続ける。"
+  table: "方式｜条件｜含意"
+  chart: "系列Aと系列Bを直接ラベルで比較"
+  diagram: "入力→処理→出力"
+  key_point: "要点：比較条件を揃える。"
+  warning: "注意：相関を因果と読まない。"
+  definition: "定義：使用する語の意味を固定する。"
+  caption: "図2.1　計算の流れ"

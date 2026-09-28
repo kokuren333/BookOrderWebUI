@@ -1,0 +1,4 @@
+# Book-level waiver for this two-chapter excerpt.
+waivers:
+  - rule: visual_shortage
+    reason: 第2・3章の材料は著者の随筆と観察で、数量データも日付のそろった出来事もない。比較できるものは4つの表にした。残りを図にすると根拠のない構造図（旧図2.1の型）になる

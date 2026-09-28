@@ -1,0 +1,9 @@
+# Mechanical style lint; medium/low findings are revision evidence, not taste gates.
+schema: "bookorder/style-check@1"
+style_id: "book-style"
+layout_id: "book-layout"
+summary:
+  low: 0
+  medium: 0
+  high: 0
+issues: []

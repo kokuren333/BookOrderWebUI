@@ -14,7 +14,7 @@ AUDIT_DIR = ROOT / "plan/audit"
 SEVERITIES = ("high", "medium", "low")
 AGENT_TYPES = ("factual-inconsistency", "unsupported-claim", "source-mismatch", "contradiction", "terminology-drift",
                "inconsistent-definition", "repetition", "duplicated-example", "dependency-error", "missing-transition",
-               "narrative", "chapter-balance", "figure", "table", "equation", "cross-reference", "bibliography", "design", "other")
+               "narrative", "chapter-balance", "figure", "table", "equation", "cross-reference", "bibliography", "design", "layout-pacing", "visual-plan", "other")
 CALLOUTS = {"note", "tip", "warning", "definition", "key-point", "example", "exercise", "summary", "checklist", "sidebar", "pull-quote"}
 HARD_CITATION = re.compile(r"(?<![\w\]])\[(?:\d{1,3})(?:\s*[,–-]\s*\d{1,3})*\](?!\()")
 NUMERIC_FACT = re.compile(r"\d[\d,.]*\s*(?:%|％|percent|倍|億|万|million|billion)|(?:19|20)\d{2}\s*年")
@@ -179,6 +179,7 @@ def asset_issues(records, chapters):
         diagrams.setdefault(hashlib.sha256(normalize(path.read_text(encoding="utf-8").split("title", 1)[-1]).encode()).hexdigest(), []).append(path.name)
     for names in diagrams.values():
         if len(names) > 1: issues.append(issue("figure", "medium", None, "Near-identical diagrams: " + ", ".join(names), action="rewrite"))
+    issues += legibility_issues(records) + visual_plan_issues()
     for record in records.values():
         if not record: continue
         equations = [e for e in record["equations"] if e]
@@ -194,7 +195,41 @@ def asset_issues(records, chapters):
     return issues
 
 
+def visual_plan_issues():
+    """Book-level findings of the visual review (reports/visual-review.yaml): monotony and density health."""
+    import assets as asset_module
+    if asset_module.load_plan() is None: return []
+    try:
+        import visual_review
+        result = visual_review.run()
+    except Exception as exc:
+        return [issue("figure", "low", None, f"Visual review could not run: {exc}", action="verify")]
+    return [issue("visual-plan", f["severity"], None, f["detail"], action="plan", evidence=f["rule"])
+            for f in result["findings"] if f["severity"] in SEVERITIES]
+
+
+def legibility_issues(records):
+    """Figure text measured at its printed size (scripts/figure_check.py, reports/figure-check.json)."""
+    try:
+        from design import load_design
+        import figure_check
+        report = figure_check.check(load_design(), [r for r in records.values() if r])
+    except Exception as exc:
+        return [issue("figure", "low", None, f"Figure legibility could not be checked: {exc}", action="verify")]
+    issues, minimum = [], report["tokens"]["min_label_pt"]
+    for figure in report["figures"]:
+        if figure["status"] == "fail":
+            smallest = ", ".join(f"{b['text']!r} {b['pt']}pt" for b in figure["below_min"][:3])
+            issues.append(issue("figure", "high", figure["chapter"], f"{figure['id']} prints text below {minimum}pt at its placed width "
+                                f"{figure['placed_width_mm']} mm ({smallest}); redraw it at its printed size (skills/figures.md)", action="generate"))
+        elif figure["status"] == "unverified" and figure.get("type") == "chart":
+            issues.append(issue("figure", "medium", figure["chapter"], f"{figure['id']}: printed text size cannot be verified; "
+                                "render the chart with scripts/chartkit.py (SVG, or PNG with its render record)", action="generate"))
+    return issues
+
+
 def pacing_issues(records):
+    """Manuscript-based pacing hints (low). The authority is the page-based check in scripts/pacing.py."""
     issues = []
     for record in records.values():
         if not record: continue
@@ -205,13 +240,13 @@ def pacing_issues(records):
             if kind in ("Para", "Plain", "BlockQuote"):
                 run += len(re.sub(r"\s+", "", plain(block["c"])))
                 if run > 9000:
-                    issues.append(issue("pacing", "low", record["id"], "Very long uninterrupted prose (about 18+ pages in A5); consider a subsection, figure or summary", section, action="layout")); run = 0
+                    issues.append(issue("pacing", "low", record["id"], "Manuscript estimate: very long uninterrupted prose; see reports/pacing-report.json for the measured pages", section, action="layout")); run = 0
             elif kind in ("Figure", "Div", "Table", "CodeBlock", "BulletList", "OrderedList"): run = 0
             tables = tables + 1 if kind == "Table" else 0
-            if tables == 3: issues.append(issue("pacing", "medium", record["id"], "Three consecutive tables; add explanation between them", section, action="layout"))
+            if tables == 3: issues.append(issue("pacing", "low", record["id"], "Three consecutive tables; add explanation between them", section, action="layout"))
             if kind == "Div" and set(block["c"][0][1]) & CALLOUTS: components += 1
         if components >= 3 and record["chars"] / components < 600:
-            issues.append(issue("pacing", "medium", record["id"], f"{components} callouts for {record['chars']} characters; keep ordinary prose dominant", action="layout"))
+            issues.append(issue("pacing", "low", record["id"], f"{components} callouts for {record['chars']} characters; keep ordinary prose dominant", action="layout"))
     return issues
 
 
@@ -238,10 +273,33 @@ def integration_checks(records, chapters, contracts):
             + reference_issues(records, chapters) + balance_issues(contracts) + placeholder_issues(records))
 
 
-def audit_checks(records, chapters, contracts, cov, project=None):
+def paragraph_length_issues(records, chapters, scale):
+    maximum = scale.get("paragraph_chars_max")
+    if not maximum: return []
+    from planning import paragraph_statistics
+    found = []
+    for chapter in chapters:
+        record = records.get(chapter["id"])
+        if not record: continue
+        stats = paragraph_statistics(record, maximum)
+        if stats["high"]:
+            severity = "high"
+        elif stats["medium"]:
+            severity = "medium"
+        else:
+            continue
+        found.append(issue("paragraph-length", severity, chapter["id"],
+            f"paragraphs over {maximum} chars: max {stats['max_paragraph_chars']}, median {stats['median_paragraph_chars']}, "
+            f"p90 {stats['p90_paragraph_chars']}; {stats['violation_count']}/{stats['paragraph_count']} "
+            f"({stats['violation_ratio']:.1%}) exceed the profile limit", evidence=stats))
+    return found
+
+
+def audit_checks(records, chapters, contracts, cov, project=None, scale=None):
     project = project or read_project()
     return (integration_checks(records, chapters, contracts) + citation_issues(records, project) + asset_issues(records, chapters)
-            + coverage_issues(cov) + design_issues() + pacing_issues(records))
+            + coverage_issues(cov) + design_issues() + pacing_issues(records)
+            + paragraph_length_issues(records, chapters, scale or {}))
 
 
 # ---------------------------------------------------------------- agent reviews
@@ -297,7 +355,8 @@ def update_ledger(found, scope, fingerprint):
             entry["status"] = "open"; entry["history"].append({"at": now, "event": "reopened (detected again)"})
         entry["last_seen"] = now
     for key, entry in ledger["issues"].items():
-        covered = scope == "audit" or entry.get("scope") == scope
+        # Layout findings come from the typeset pages; only a layout run can resolve them.
+        covered = entry.get("scope") == scope or (scope == "audit" and entry.get("scope") != "layout")
         if entry["source"] == "deterministic" and entry["status"] == "open" and key not in seen and covered:
             entry["status"] = "resolved"; entry["history"].append({"at": now, "event": "no longer detected"})
     ledger["runs"].append({"at": now, "scope": scope, "fingerprint": fingerprint, "detected": len(found)})

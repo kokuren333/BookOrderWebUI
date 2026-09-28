@@ -14,8 +14,6 @@ import ssl
 import subprocess
 import sys
 import tarfile
-import time
-import urllib.error
 import tomllib
 import urllib.request
 import zipfile
@@ -69,36 +67,15 @@ def supplied_unit(name):
 def fetch(url, expected=None):
     key = hashlib.sha256(url.encode()).hexdigest()
     path = CACHE / key
-    trusted = expected or pins.get(url)
-    if path.exists():
-        cached = path.read_bytes()
-        if not trusted or hashlib.sha256(cached).hexdigest() == trusted:
-            return cached
-        path.unlink()
     if not path.exists():
         request = urllib.request.Request(url, headers={"User-Agent": "PortablePublishingJob/0.1"})
         last = None
-        for attempt in range(5):
+        for _ in range(3):
             try:
-                with urllib.request.urlopen(request, timeout=600) as response:
+                with urllib.request.urlopen(request, timeout=120) as response:
                     data = response.read()
-                digest = hashlib.sha256(data).hexdigest()
-                if trusted and trusted != digest:
-                    raise ValueError(f"Checksum mismatch: {url}")
-                path.write_bytes(data)
-                break
-            except urllib.error.HTTPError as exc:
-                # Candidate package names inferred from abbreviated GHC unit IDs
-                # can include unrelated Hackage names. A 404 is definitive and
-                # must not spend several minutes in the transient-error retry loop.
-                if exc.code == 404:
-                    raise RuntimeError(f"Source archive not found: {url}") from exc
-                last = exc
+                path.write_bytes(data); break
             except Exception as exc: last = exc
-            if attempt < 4:
-                delay = min(15 * (2 ** attempt), 120)
-                print(f"Download failed; retrying in {delay}s ({attempt + 2}/5): {url}: {last}", flush=True)
-                time.sleep(delay)
         else:
             if sys.platform == 'win32' and isinstance(last, urllib.error.URLError) and isinstance(last.reason, ssl.SSLCertVerificationError):
                 # Use Windows' trust store, without disabling certificate checks.
@@ -107,6 +84,7 @@ def fetch(url, expected=None):
             else: raise RuntimeError(f"Download failed: {url}: {last}")
     data = path.read_bytes()
     digest = hashlib.sha256(data).hexdigest()
+    trusted = expected or pins.get(url)
     if trusted and trusted != digest: raise ValueError(f"Checksum mismatch: {url}")
     pins[url] = digest
     return data

@@ -29,6 +29,14 @@ conditions to downstream recipients; do not strip or relicense runtime binaries 
 
 ## Local tools
 
+The book's appearance is resolved in `plan/style-bible.yaml`. See
+[`docs/style-bible.md`](docs/style-bible.md) for overrides, renderer tokens and
+`reports/style-check.yaml`. Page geometry and text flow remain in `plan/layout-spec.yaml`.
+After PDF rendering, `reports/art-direction-check.yaml` audits visual consistency;
+see [`docs/art-direction-qa.md`](docs/art-direction-qa.md). High findings block completion gate 20.
+Accepted pictorial images use the provider-independent request and VisualAsset pipeline; see
+[`docs/image-generation.md`](docs/image-generation.md). Required image QA failures block gate 21.
+
 When project.json has `runtime.bundled: true`, use `bookorder.cmd <command>` on Windows or
 `sh bookorder <command>` on macOS/Linux. The launchers verify and unpack the bundled Python, Pandoc, Typst and
 fonts inside this folder without installing or downloading anything. Low-level actions remain available through
@@ -73,3 +81,7 @@ bookorder rescale --pages N --user-approval "..."   (only with the user's explic
 Read [docs/design-system.md](docs/design-system.md). Five themes (modern-technical, academic-jp, medical-textbook,
 minimal-monochrome, business-reference) share one Design Spec schema; fonts are configured per role in
 book.design.yaml. custom.css loads last for HTML/Web/EPUB; custom.typ overrides PDF styles.
+
+Paper geometry, columns, spans, and writing mode live in `plan/layout-spec.yaml`; see
+[docs/layout-spec.md](docs/layout-spec.md). The file is created before planning begins and can then be edited.
+Run `python tools/layout-specimen.py` for a PDF showing the supported page layouts.

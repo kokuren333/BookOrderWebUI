@@ -17,7 +17,8 @@ import unittest
 REPO = Path(__file__).resolve().parent.parent
 BASE = REPO / ".test-output/unit"
 MODULES = ["common", "crossref", "sources", "research", "planning", "manuscript", "assets", "audit", "citations", "orchestrator",
-           "design", "diagrams", "book_ir", "schema", "validate", "build", "package", "check_env"]
+           "design", "diagrams", "book_ir", "schema", "validate", "build", "package", "check_env",
+           "publication_profile", "pacing", "layout_metrics", "figure_spec", "figure_check", "chartkit", "visual_review", "editorial_plan"]
 
 
 def make_job(name, pages=300, language="ja", urls=(), files=(), web_research=True, coverage=True):
@@ -216,13 +217,100 @@ class CrossReferences(unittest.TestCase):
 
 class Length(unittest.TestCase):
     def test_page_target_to_budget(self):
+        # Compatibility: a 300-page target selects the long profile; the body size is derived from the page model
+        # (780 characters per A5 text page, 25% non-prose area, 6 front pages, 6% back matter).
         root, m = make_job("scale")
         scale = m["planning"].compute_scale(m["common"].read_project(), {"page": {"size": "A5"}, "layout": {"density": "standard"}})
-        self.assertEqual((scale["target_characters"], scale["minimum_characters"]), (150000, 120000))
+        self.assertEqual((scale["target_characters"], scale["minimum_characters"]), (162255, 129804))
+        self.assertEqual(scale["profile"]["id"], "long.general"); self.assertEqual(scale["minimum_chapters"], 7)
+        self.assertLessEqual(abs(scale["requested_pages"] - 300), 1)
+        self.assertTrue((root / "plan/profile.resolved.yaml").is_file())
         b5 = m["planning"].compute_scale(m["common"].read_project(), {"page": {"size": "B5"}, "layout": {"density": "standard"}})
-        self.assertGreater(b5["target_characters"], 150000)
+        self.assertGreater(b5["target_characters"], 162255)
         project = m["common"].read_project(); project["book"]["language"] = "en"
-        self.assertEqual(m["planning"].compute_scale(project, {})["characters_per_page"], 1400)
+        self.assertGreater(m["planning"].compute_scale(project, {})["characters_per_page"], 1400)
+
+    def test_outline_chapter_max_is_a_hard_gate_from_scale(self):
+        root, m = make_job("chapter-max", pages=30)
+        scale = m["planning"].compute_scale(m["common"].read_project(), {})
+        scale.update(minimum_chapters=1, maximum_chapters=2, target_characters=1)
+        chapters = [{"id": f"ch-{i}", "title": f"C{i}", "file": f"source/manuscript/0{i}-c.md", "purpose": "purpose text",
+                     "target_characters": 1000, "required_sections": [f"sec-{i}"], "required_topics": ["topic"]} for i in range(1, 4)]
+        write(root, "source/metadata/outline.yaml", {"chapters": chapters})
+        errors, _ = m["planning"].check_outline(scale)
+        self.assertTrue(any("at most 2 chapters" in e for e in errors), errors)
+
+    def test_editorial_plan_semantic_change_reopens_downstream_only(self):
+        root, m = make_job("editorial-stale", pages=30)
+        orch = m["orchestrator"]
+        (root / "plan/editorial").mkdir(parents=True, exist_ok=True)
+        write(root, "plan/editorial/ch-a.yaml", {"chapter": "ch-a", "chapter_end": ["summary"], "sections": [{"id": "sec-a", "devices": [{"id": "tbl-a", "type": "table"}]}]})
+        project, state = orch.load_state()
+        state["phases"]["editorial_planning"] = "complete"
+        state["phases"]["architecture"] = "complete"
+        for phase in orch.EDITORIAL_PLAN_DOWNSTREAM: state["phases"][phase] = "complete"
+        state.setdefault("artifact_fingerprints", {})["editorial_plan"] = m["common"].editorial_plan_fingerprint()
+        build_before = m["common"].fingerprint()
+        # Formatting and unrelated report changes have no semantic effect.
+        write(root, "plan/editorial/ch-a.yaml", "# comment\nchapter: ch-a\nchapter_end:\n  - summary\nsections:\n  - id: sec-a\n    devices:\n      - id: tbl-a\n        type: table\n")
+        write(root, "reports/unrelated.json", {"changed": True})
+        self.assertFalse(orch.refresh_editorial_plan_dependency(state))
+        self.assertEqual(m["common"].fingerprint(), build_before, "YAML formatting and unrelated reports do not invalidate")
+        # Device addition, slot replacement and chapter-end change independently invalidate consumers.
+        variants = [
+            {"chapter": "ch-a", "chapter_end": ["summary"], "sections": [{"id": "sec-a", "devices": [{"id": "tbl-a", "type": "table"}, {"id": "quote-a", "type": "pull_quote"}]}]},
+            {"chapter": "ch-a", "chapter_end": ["summary"], "sections": [{"id": "sec-a", "devices": [{"id": "tbl-b", "type": "table"}]}]},
+            {"chapter": "ch-a", "chapter_end": ["key_points", "summary"], "sections": [{"id": "sec-a", "devices": [{"id": "tbl-b", "type": "table"}]}]},
+        ]
+        for variant in variants:
+            for phase in orch.EDITORIAL_PLAN_DOWNSTREAM: state["phases"][phase] = "complete"
+            state["artifact_fingerprints"]["editorial_plan"] = m["common"].editorial_plan_fingerprint()
+            write(root, "plan/editorial/ch-a.yaml", variant)
+            self.assertNotEqual(m["common"].fingerprint(), build_before)
+            self.assertTrue(orch.refresh_editorial_plan_dependency(state))
+            self.assertEqual(state["phases"]["editorial_planning"], "complete")
+            self.assertTrue(all(state["phases"][p] == "pending" for p in orch.EDITORIAL_PLAN_DOWNSTREAM))
+            build_before = m["common"].fingerprint()
+
+    def test_paragraph_policy_measures_japanese_reader_text_without_brittle_single_char_gate(self):
+        root, m = make_job("paragraph-policy", pages=30)
+        paragraphs = ["日" * 300 + "。"] * 19 + ["日" * 530 + "。"]
+        write(root, "source/manuscript/01-a.md", "# A {#ch-a}\n\n## S {#sec-a}\n\n" + "\n\n".join(paragraphs) + "\n")
+        record = m["manuscript"].analyze_all()["source/manuscript/01-a.md"]
+        stats = m["planning"].paragraph_statistics(record, 450)
+        self.assertEqual((stats["max_paragraph_chars"], stats["violation_count"], stats["paragraph_count"]), (531, 1, 20))
+        self.assertEqual(stats["violation_ratio"], 0.05)
+        self.assertTrue(stats["medium"])
+        self.assertFalse(stats["high"], "a single 1.18x paragraph is a warning, not a hard failure")
+        severe = m["planning"].paragraph_statistics(m["manuscript"].analyze_all()["source/manuscript/01-a.md"], 350)
+        self.assertTrue(severe["high"])
+
+    def test_rejected_visual_is_skipped_by_asset_generation(self):
+        root, m = make_job("rejected-asset")
+        import importlib
+        diagrams = importlib.import_module("diagrams")
+        visual_review = importlib.import_module("visual_review")
+        assets = importlib.import_module("assets")
+        source = "source/assets/diagrams/rejected.yaml"
+        old_decisions, old_assets, old_specs = visual_review.decisions, assets.assets, diagrams.specs
+        path = root / source; path.parent.mkdir(parents=True, exist_ok=True); path.write_text("{}\n", encoding="utf-8")
+        try:
+            visual_review.decisions = lambda: {"fig-rejected": "rejected"}
+            assets.assets = lambda: [{"id": "fig-rejected", "type": "diagram", "source": source}]
+            diagrams.specs = lambda: [(path, {"type": "flow", "nodes": [], "edges": []})]
+            result = diagrams.generate({})
+            self.assertEqual(result, [])
+            self.assertFalse((root / "source/assets/figures/rejected.svg").exists())
+        finally:
+            visual_review.decisions, assets.assets, diagrams.specs = old_decisions, old_assets, old_specs
+
+    def test_profile_measurement_warnings_do_not_become_required_rewrites(self):
+        _, modules = make_job("paragraph-warning")
+        requires_rewrite = modules["orchestrator"].requires_rewrite
+        self.assertFalse(requires_rewrite({"type": "paragraph-length", "severity": "medium"}))
+        self.assertFalse(requires_rewrite({"type": "layout-pacing", "severity": "medium", "evidence": "book_nonprose_below_target"}))
+        self.assertTrue(requires_rewrite({"type": "paragraph-length", "severity": "high"}))
+        self.assertTrue(requires_rewrite({"type": "contradiction", "severity": "medium"}))
 
     def test_outline_budget_and_dependencies(self):
         root, m = make_job("outline", pages=30)
@@ -324,7 +412,7 @@ class Completion(unittest.TestCase):
         self.assertTrue(orch.build_fresh())
         project, state = orch.load_state()
         gates = {g["id"]: g for g in orch.completion_gates(orch.Context(project, state))}
-        self.assertFalse(gates[8]["passed"]); self.assertIn("of minimum 120,000", gates[8]["detail"])
+        self.assertFalse(gates[8]["passed"]); self.assertIn("of minimum 129,804", gates[8]["detail"])
         self.assertTrue(gates[15]["passed"], "the build itself is fine")
         state, tasks, _ = orch.advance()
         self.assertNotEqual(state["status"], "complete")
@@ -376,13 +464,53 @@ class Persistence(unittest.TestCase):
         orch.save_state(state)
         project, again = orch.load_state()
         self.assertEqual(again["phases"]["reference_assignment"], "complete")
-        self.assertEqual(again["scale"]["target_characters"], 2000)
+        self.assertEqual(again["scale"]["target_characters"], 2100)  # 4-page target, short profile page model
         orch.reopen(again, "architecture", "outline changed")
         self.assertEqual(again["phases"]["research_frozen"], "complete")
         self.assertTrue(all(again["phases"][p] == "pending" for p in orch.PHASES[4:]))
         index = src.init_supplied(); index["sources"][0]["ingest_status"] = "fetching"; src.save_index(index)
         index = src.reset_interrupted(src.load_index())
         self.assertEqual(index["sources"][0]["ingest_status"], "pending")
+
+
+class EditorialPhase(unittest.TestCase):
+    def test_phase_order_and_legacy_states(self):
+        root, m = make_job("editorial-order", pages=4)
+        orch = m["orchestrator"]; order = orch.PHASES.index
+        self.assertTrue(order("reference_assignment") < order("editorial_planning") < order("drafting"))
+        self.assertTrue(order("drafting") < order("asset_planning") < order("asset_generation") < order("integration") < order("layout"))
+        project, state = orch.load_state()
+        del state["phases"]["editorial_planning"]; state["phases"]["drafting"] = "complete"; orch.save_state(state)
+        _, legacy = orch.load_state()
+        self.assertEqual(legacy["phases"]["editorial_planning"], "complete", "a drafted book is not sent back to plan")
+        self.assertIn("legacy", legacy["notes"]["editorial_planning"])
+
+    def test_plans_are_required_before_drafting(self):
+        root, m = make_job("editorial-plan", pages=4)
+        orch = m["orchestrator"]
+        write(root, "source/metadata/outline.yaml", "chapters:\n  - id: ch-one\n    title: One\n    file: source/manuscript/01-one.md\n    purpose: p\n"
+              "    target_characters: 1800\n    required_sections: [{id: sec-one-a, title: A}]\n    required_topics: [a]\n")
+        project, state = orch.load_state()
+        ctx = orch.Context(project, state)
+        result = orch.h_editorial_planning(ctx)
+        self.assertEqual([t["id"] for t in result.tasks], ["editorial:ch-one"])
+        self.assertTrue(any("plan_missing" in c for c in result.tasks[0]["failing_checks"]))
+        self.assertTrue(any("pause" in line.lower() for line in result.tasks[0]["instructions"]))
+        write(root, "plan/editorial/ch-one.yaml", {"chapter_id": "ch-one", "chapter_title": "One", "chapter_role": "introduction", "reader_before": "b",
+              "reader_after": "a", "target_chars": 1800, "sections": [
+                  {"id": "sec-one-a", "heading": "A", "purpose": "p", "rhetorical_role": "thesis", "intended_reader_effect": "e", "expected_density": "light",
+                   "target_chars": 900, "summary_points": ["x"], "devices": [{"id": "wn-one", "type": "warning", "why": "common misreading",
+                                                                               "placement": {"intent": "after x", "position": "section_end"}}]},
+                  {"id": "sec-one-b", "heading": "B", "purpose": "p", "rhetorical_role": "example", "intended_reader_effect": "e", "expected_density": "heavy",
+                   "target_chars": 900, "summary_points": ["y"]}],
+              "chapter_end": [{"type": "key_points"}]})
+        ctx.invalidate()
+        book = orch.h_editorial_planning(ctx)
+        self.assertEqual([t["id"] for t in book.tasks], ["editorial:book"], "a book with no visual material is asked, not filled")
+        self.assertIn("visual_shortage", book.tasks[0]["failing_checks"])
+        write(root, "plan/editorial/book.yaml", {"waivers": [{"rule": "visual_shortage", "reason": "a one-chapter note with nothing to compare or draw"}]})
+        self.assertTrue(orch.h_editorial_planning(ctx).done)
+        self.assertTrue((root / "reports/editorial-plan.yaml").is_file())
 
 
 class Observability(unittest.TestCase):

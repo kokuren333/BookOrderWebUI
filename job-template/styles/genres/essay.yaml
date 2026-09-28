@@ -1,0 +1,24 @@
+tone:
+  overall: "text-first and reflective"
+  density: "light"
+  restraint: "very-high"
+  ornament: "none"
+  whitespace: "generous"
+table:
+  border_style: "minimal"
+chart:
+  grid_style: "none"
+  max_series: 3
+chapter_opener:
+  chapter_number_style: "quiet"
+visual_grammar:
+  components:
+    key_point: {priority: quiet, treatment: plain-emphasis, use_policy: deemphasize}
+    warning: {priority: tertiary, treatment: side-rule, fill_policy: none}
+    definition: {priority: quiet, treatment: plain-emphasis}
+    pull_quote: {priority: tertiary, treatment: inset-paragraph, use_policy: deemphasize}
+    source_note: {priority: quiet, treatment: plain-emphasis}
+  rhythm: {pattern: prose-first, interruption: rare, section_space: generous}
+  table: {border_density: minimal, header_emphasis: typographic, row_spacing: generous, numeric_alignment: right, zebra: false, source_note: adjacent, mode: wide}
+  diagram: {node_shape: pill, edge_emphasis: relational, hierarchy: narrative, label_placement: inside, whitespace: generous, annotation_style: below-node}
+  chart: {grid_intensity: none, axis_emphasis: quiet, direct_labels: true, legend_use: none, annotation: outside-data, baseline_emphasis: quiet, uncertainty: prose-note}

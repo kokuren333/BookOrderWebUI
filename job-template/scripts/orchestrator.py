@@ -11,18 +11,23 @@ import os
 import time
 import traceback
 
-from common import ROOT, read_project, write_json, as_list, fingerprint as build_fingerprint
+from common import ROOT, read_project, write_json, as_list, yaml_data, fingerprint as build_fingerprint, editorial_plan_fingerprint
 
+# outline (architecture) -> EditorialPlan -> section drafting -> VisualPlan / assets -> integration -> layout.
 PHASES = ["source_ingestion", "supplementary_research", "corpus_analysis", "research_frozen", "architecture",
-          "reference_assignment", "drafting", "chapter_review", "integration", "asset_planning", "asset_generation",
-          "audit", "rewrite", "final_audit", "design", "layout", "build", "validation", "package", "complete"]
+          "reference_assignment", "editorial_planning", "drafting", "chapter_review", "asset_planning", "asset_generation",
+          "integration", "audit", "rewrite", "final_audit", "design", "layout", "build", "validation", "package", "complete"]
+# EditorialPlan is an explicit semantic input to each downstream publication artifact.
+EDITORIAL_PLAN_DOWNSTREAM = ["drafting", "chapter_review", "asset_planning", "asset_generation", "integration",
+                            "audit", "rewrite", "final_audit", "design", "layout", "build", "validation", "package", "complete"]
 STATES = ("pending", "running", "complete", "blocked", "failed")
 STATE_FILE = ROOT / "project-state.json"
 EVENTS = ROOT / "run-events.jsonl"
 SUMMARY = ROOT / "execution-summary.json"
 SKILLS = {"source_ingestion": ["skills/source-ingestion.md"], "supplementary_research": ["skills/research.md"],
           "corpus_analysis": ["skills/research.md"], "architecture": ["skills/book-authoring.md"],
-          "drafting": ["skills/book-authoring.md"], "chapter_review": ["skills/book-authoring.md"], "integration": ["skills/editing.md"],
+          "editorial_planning": ["skills/editorial-planning.md"],
+          "drafting": ["skills/book-authoring.md", "skills/editorial-planning.md"], "chapter_review": ["skills/book-authoring.md"], "integration": ["skills/editing.md"],
           "asset_planning": ["skills/figures.md"], "asset_generation": ["skills/figures.md"], "audit": ["skills/audit.md"],
           "rewrite": ["skills/editing.md", "skills/audit.md"], "final_audit": ["skills/audit.md"], "design": ["skills/editorial-design.md"],
           "layout": ["skills/editorial-design.md", "skills/publication-qa.md"], "build": ["skills/publication-qa.md"]}
@@ -63,8 +68,19 @@ def new_state(project):
 
 def load_state():
     project = read_project()
+    # Resolve the planning input before any freshness comparison. A first build must not create
+    # a new semantic fingerprint midway through an otherwise complete orchestration run.
+    from design import load_design
+    from layout_spec import load_or_create
+    design_spec = load_design()
+    load_or_create(project=project, design=design_spec)
+    from style_bible import load_or_resolve
+    load_or_resolve(project=project, design=design_spec)
     if STATE_FILE.is_file():
         state = json.loads(STATE_FILE.read_text(encoding="utf-8"))
+        if "editorial_planning" not in state["phases"] and state["phases"].get("drafting") == "complete":
+            # Drafted before EditorialPlan existed: the manuscript is not re-planned; gates 18/19 check plans only if written.
+            state["phases"]["editorial_planning"] = "complete"; state.setdefault("notes", {})["editorial_planning"] = "legacy: drafted before EditorialPlan"
         for name in PHASES: state["phases"].setdefault(name, "pending")
         return project, state
     state = new_state(project)
@@ -97,6 +113,22 @@ def reopen(state, phase, reason):
     for name in PHASES[start:]:
         if state["phases"][name] != "pending": set_phase(state, name, "pending", reason if name == phase else f"after {phase} reopened")
     state["status"] = "running"
+
+
+def refresh_editorial_plan_dependency(state):
+    """Reopen dependent phases when semantic EditorialPlan source files change."""
+    if state.get("phases", {}).get("editorial_planning") != "complete": return False
+    current = editorial_plan_fingerprint()
+    snapshots = state.setdefault("artifact_fingerprints", {})
+    previous = snapshots.get("editorial_plan")
+    if previous is None:
+        # Adopt pre-existing jobs once; legacy state predates this dependency record.
+        snapshots["editorial_plan"] = current
+        return False
+    if current == previous: return False
+    snapshots["editorial_plan"] = current
+    reopen(state, "drafting", "EditorialPlan semantic inputs changed; dependent manuscript and publication artifacts are stale")
+    return True
 
 
 # ---------------------------------------------------------------- context (lazy computed views)
@@ -285,7 +317,8 @@ def h_architecture(ctx):
     if errors:
         scale = ctx.scale
         return Result(tasks=[task("architecture", "architecture", "Book Bible and whole-book architecture", [
-            f"Scale: {scale['requested_pages']} pages ≈ {scale['target_characters']:,} characters (minimum {scale['minimum_characters']:,}; ~{scale['characters_per_page']}/page). Budgets are binding.",
+            f"Scale: {scale['target_characters']:,} body characters (minimum {scale['minimum_characters']:,}) ≈ {scale['requested_pages']} pages. Budgets are binding.",
+            *profile_lines(),
             "Write plan/book-bible.yaml: title, subtitle, purpose, audience, tone, central_thesis, scope{included, excluded}, terminology{preferred_terms, definitions, aliases}, editorial_rules{voice, formality, tense, punctuation, citation_style, repetition_policy}, global_narrative{opening, development, turning_points, conclusion}, recurring_concepts, recurring_examples, cross_references, chapter_dependencies, design_intent{theme, typography, figure_style, callout_policy}.",
             "Write source/metadata/outline.yaml: chapters: [{id: ch-<slug>, title, file: source/manuscript/NN-<slug>.md, part?, purpose, prerequisites, introduces, develops, assumes, hands_off_to, target_characters, required_sections: [{id: sec-..., title}], required_topics, sources: {primary, supporting}, required_references, expected_assets, must_not_repeat, handoff}].",
             "Design chapters as a dependency graph grounded in plan/topic-synthesis.yaml and plan/source-clusters.yaml; allocate the character budget intentionally; assign every relevant supplied source."],
@@ -293,6 +326,13 @@ def h_architecture(ctx):
     graph = dependency_graph(chapters)
     log_event("architecture", "summary", chapters=len(chapters), waves=len(graph["parallel_waves"]), planned_characters=sum(c["target_characters"] for c in chapters))
     return Result(done=True)
+
+
+def profile_lines():
+    """The resolved PublicationProfile as planning instructions (empty for states that predate profiles)."""
+    import publication_profile
+    profile = publication_profile.load_resolved()
+    return publication_profile.summary_lines(profile) if profile else []
 
 
 def h_reference_assignment(ctx):
@@ -304,6 +344,48 @@ def h_reference_assignment(ctx):
     for chapter in chapters: packet(chapter, chapters, ctx.scale)
     ctx.contracts()
     log_event("reference_assignment", "complete", tool="reference-registry", references=len(entries), packets=len(chapters))
+    return Result(done=True)
+
+
+def h_editorial_planning(ctx):
+    """Before drafting: every chapter's EditorialPlan, checked against the profile (reports/editorial-plan.yaml)."""
+    import editorial_plan as ep
+    from planning import packet
+    chapters = ctx.outline()
+    result = ep.run(chapters, project=ctx.project)
+    stopping = ep.blocking(ep.all_findings(result))
+    if stopping:
+        by_chapter = {}
+        for f in stopping: by_chapter.setdefault(f.get("chapter") or "book", []).append(f)
+        limits = result["limits"]
+        tasks = []
+        for chapter in chapters:
+            problems = by_chapter.get(chapter["id"])
+            if not problems: continue
+            tasks.append(task(f"editorial:{chapter['id']}", "editorial_planning", f"Editorial plan for {chapter['id']} — {chapter['title']}", [
+                f"Plan the chapter before drafting it: read plan/chapter-packets/{chapter['id']}.yaml, plan/book-bible.yaml and the outline entry, then write plan/editorial/{chapter['id']}.yaml (skills/editorial-planning.md).",
+                "Fields: chapter_id, chapter_title, chapter_role (" + "|".join(ep.CHAPTER_ROLES) + "), reader_before, reader_after, target_chars "
+                f"({chapter['target_characters']:,} in the outline), lead, density_profile, sections, chapter_end, waivers.",
+                "Each section: id, heading, purpose, rhetorical_role (" + "|".join(ep.RHETORICAL_ROLES) + "), intended_reader_effect, expected_density (light|medium|heavy), "
+                "target_chars, summary_points, devices, example_needs, case_study_needs, citation_needs, cross_refs, visual_opportunities, new_terms, counterarguments.",
+                "Each device: id (becomes the slot id; fig-/tbl- for figures, charts, timelines and tables so it is also the asset id), type (" + ", ".join(ep.CATALOG) + "), "
+                "why, placement {intent, position: section_start|early|middle|late|section_end}, source_ids (required for pull_quote, real case_study, timeline, "
+                "external counterpoint, chart and factual figure/table); visuals also information_shape and basis. Intents only: rows, nodes and captions are decided in plan/assets-plan.yaml.",
+                f"Pauses: at most {limits['pause_every_chars']['max']:,} characters without a device (target {limits['pause_every_chars']['target']:,}); about "
+                f"{limits['chars_per_text_page']} characters fill a text page and the proof allows {limits['max_text_only_pages']} text-only pages in a row. "
+                "Vary section density; never add a device only to meet a count — split or restructure sections, or waive a medium finding with a reason."] +
+                profile_lines() + ["Problems to fix:"] + [f"- [{f['severity']}] {f['rule']} {f.get('section') or ''} {f.get('device') or ''}: {f['detail']}"
+                                                          + (f" (try: {f['suggestion']})" if f.get("suggestion") else "") for f in problems[:40]],
+                inputs=[f"plan/chapter-packets/{chapter['id']}.yaml"], outputs=[f"plan/editorial/{chapter['id']}.yaml"], group="editorial",
+                checks=[f"{f['rule']}: {f['detail']}" for f in problems[:20]]))
+        if by_chapter.get("book") and not tasks:
+            tasks.append(task("editorial:book", "editorial_planning", "Book-level editorial plan findings", [
+                "Revise the chapter plans, or record a reasoned waiver in plan/editorial/book.yaml (waivers: [{rule, reason}]):"] +
+                [f"- [{f['severity']}] {f['rule']}: {f['detail']}" for f in by_chapter["book"]], outputs=["plan/editorial/book.yaml"],
+                checks=[f["rule"] for f in by_chapter["book"]]))
+        return Result(tasks=tasks)
+    for chapter in chapters: packet(chapter, chapters, ctx.scale)
+    log_event("editorial_planning", "summary", **{k: v for k, v in result["summary"].items() if isinstance(v, (int, float))})
     return Result(done=True)
 
 
@@ -334,11 +416,27 @@ def h_drafting(ctx):
             f"Read plan/chapter-packets/{chapter['id']}.yaml first, then plan/book-bible.yaml, source/metadata/glossary.yaml and the packet's source texts. Do not redefine terminology, tone or thesis.",
             f"Write {chapter['file']} section by section: skeleton → each required section → source enrichment → examples → citations → transitions. Target {chapter['target_characters']:,} characters (minimum {chapter['minimum_characters']:,}); currently {current:,}.",
             "Cite with [cite:src-XXXX] only; cross-reference with @ch:/@sec:/@fig:/@tbl:/@eq:. Never type visible citation numbers.",
+            *editorial_lines(chapter),
             f"Then write plan/summaries/{chapter['id']}.yaml: summary (60+ chars), introduced_concepts, key_terms, examples_used, handoff (what the next chapters can assume)."],
             inputs=[f"plan/chapter-packets/{chapter['id']}.yaml"], outputs=[chapter["file"], f"plan/summaries/{chapter['id']}.yaml"], group=f"wave-{level}", checks=problems))
     if tasks or waiting:
         return Result(tasks=tasks, info=(f"Waiting on prerequisites: {', '.join(waiting)}" if waiting else None))
     return Result(done=True)
+
+
+def editorial_lines(chapter):
+    """Drafting instructions from the chapter's EditorialPlan (none for legacy jobs without plans)."""
+    import editorial_plan
+    plan = editorial_plan.load_plan(chapter["id"])
+    if not plan: return []
+    return editorial_plan.summary_lines(plan) + [
+        "Write the sections in this order with their purpose, role and size. Reserve every device as a slot at its placement, e.g. "
+        + (editorial_plan.slot_markdown(next((d for _, d in editorial_plan.devices(plan) if editorial_plan.live(d)), {"id": "tbl-example", "type": "table", "placement": "…"})).replace("\n", " ")) + ".",
+        "Do not explain in the prose what a slot will show (no paraphrase of the table or quote around it): lead into it and move on. "
+        "Component devices (key_point, definition, warning, counterpoint, case_study, pull_quote, column, checklist) and the chapter-end items may be written "
+        "directly instead of a slot, with the same id: ::: {.key-point #id} ... ::: (case_study -> .case-study, column -> .sidebar, pull_quote -> .pull-quote, "
+        "key_points/summary -> .summary, open_question -> .note, check_questions -> .exercise, further_reading -> .sidebar, bridge_to_next -> ::: {#id} ... :::).",
+        "Figures, charts, timelines and tables stay slots until the asset phase produces them."]
 
 
 def expansion_task(contract, chapter, phase="chapter_review"):
@@ -377,7 +475,7 @@ def h_chapter_review(ctx):
         # Every chapter meets its own minimum but the book is still short: expand the chapters furthest below target.
         short = sorted(results, key=lambda r: r["actual_characters"] / max(r["target_characters"], 1))[:max(1, len(results) // 3)]
         return Result(tasks=[task(f"expand:{r['id']}", "chapter_review", f"Expand {r['id']} (book is {aggregate['book_deficit']:,} characters short)", [
-            f"The manuscript totals {aggregate['total_actual']:,} characters; the {ctx.scale['requested_pages']}-page book needs at least {aggregate['book_minimum']:,}.",
+            f"The manuscript totals {aggregate['total_actual']:,} characters; the book (≈{ctx.scale['requested_pages']} pages) needs at least {aggregate['book_minimum']:,}.",
             f"Grow {r['id']} toward its {r['target_characters']:,}-character target with substantive material from its packet (unused sources, examples, comparisons, limitations)."],
             outputs=[by_id[r["id"]]["file"]], group="chapters") for r in short])
     return Result(done=True)
@@ -388,7 +486,7 @@ def run_integration_checks(ctx, scope):
     results, _ = ctx.contracts()
     records = {cid: rec for cid, rec in ctx.by_chapter().items()}
     if scope == "integration": found = audit.integration_checks(records, ctx.outline(), results)
-    else: found = audit.audit_checks(records, ctx.outline(), results, ctx.coverage(), ctx.project)
+    else: found = audit.audit_checks(records, ctx.outline(), results, ctx.coverage(), ctx.project, ctx.scale)
     log_event(scope, "invoke", tool="deterministic-" + scope, detected=len(found))
     return audit.update_ledger(found, scope, ctx.manuscript_fingerprint())
 
@@ -419,11 +517,43 @@ def h_asset_planning(ctx):
         policy = ctx.project.get("figures", {})
         return Result(tasks=[task("plan-assets", "asset_planning", "Plan figures, tables, equations and images", [
             "Now that substantive text exists, read each chapter and decide where a non-prose representation materially improves understanding. Do not add decorative visuals.",
-            f"Figure policy: {json.dumps(policy)}. Prefer Diagram IR (flow, concept-map, hierarchy, timeline, comparison, cycle, process, network, matrix), tables and equations over generated images.",
+            f"Figure policy: {json.dumps(policy)}. Route comparisons to tables, quantities to charts, structure to diagrams, and formulas to equations. Consider generated images only for accepted abstract/pictorial concepts or chapter openers; never for factual data or density targets.",
             "Write plan/assets-plan.yaml: assets: [{id (fig-/tbl-/eq- prefix), chapter, section, placement, purpose, type (diagram|chart|table|equation|image|screenshot|cover), source (diagram: source/assets/diagrams/<name>.yaml) or data/prompt, path (chart/image), caption, provenance, style}], or none_needed with a reason.",
+            "Each visual is a candidate BookOrder judges (skills/figures.md, reports/visual-review.yaml): give information_shape {kind: comparison|quantity|chronology|hierarchy|process|causal|relation|formula|abstract|sequence|source_image, plus counts}, improvement_claim {kinds: [reduce_working_memory|reveal_structure|show_quantity_shape|anchor_abstraction|orient_reader], statement: what the reader gains over prose, in one sentence}, factual_basis (data|source|derived_from_text|illustrative) and source_ids. For images add role, factuality, provider-neutral subject, PNG path and print geometry; keep all lettering in the renderer.",
+            "Profile visual density is a health check, not a quota: never add a figure to reach it. Keep rejected ideas in the plan with decision: rejected and decision_reason.",
+            "Every figure, chart, timeline and table intent in plan/editorial/*.yaml becomes a candidate here with the same id and device: <device id>; "
+            "decide rows/columns, nodes, renderer, geometry and caption from its information_shape. Do not invent visuals outside the editorial plan without adding them there.",
             "Include every expected_assets entry from outline.yaml."], outputs=["plan/assets-plan.yaml"], checks=errors)])
+    import visual_review
+    review = visual_review.run(ctx.outline())
+    log_event("asset_planning", "visual_review", **review["summary"])
+    fallback = editorial_fallback_task(ctx, review)
+    if fallback: return Result(tasks=[fallback])
     assets.sync_figure_registry()
     return Result(done=True)
+
+
+def editorial_fallback_task(ctx, review):
+    """A rejected visual goes back to the EditorialPlan: table, prose, case study or summary (never a replacement figure by default)."""
+    import editorial_plan as ep
+    rejected = ep.rejected_devices(ctx.outline(), review)
+    if not rejected:
+        if not ep.exists(): return None
+        # A fallback already applied must itself leave a valid plan (pauses, counts, a table's 3×3 shape).
+        stopping = ep.blocking(ep.all_findings(ep.run(ctx.outline(), project=ctx.project)))
+        if not stopping: return None
+        return task("editorial:recheck", "asset_planning", "Repair the editorial plan after the visual fallbacks", [
+            "The editorial plan no longer passes its checks (reports/editorial-plan.yaml). Fix the plans, restructuring sections rather than adding devices to meet counts:"] +
+            [f"- [{f['severity']}] {f.get('chapter') or 'book'} {f.get('section') or ''} {f.get('device') or ''} {f['rule']}: {f['detail']}" for f in stopping[:40]],
+            outputs=sorted({f"plan/editorial/{f['chapter']}.yaml" for f in stopping if f.get("chapter")}), checks=[f["rule"] for f in stopping[:20]])
+    lines = ["The visual review (reports/visual-review.yaml) rejected these planned visuals. Return each to the editorial plan with a fallback:",
+             *[f"- {r['chapter']} {r['device']} ({', '.join(r['codes'])}): bookorder editorial fallback {r['device']} --to {r['options'][0]} --reason \"...\""
+               + (f"   (other options: {', '.join(r['options'][1:])})" if len(r["options"]) > 1 else "") for r in rejected],
+             "prose drops the device (remove its slot and say it in the text); table / case_study / summary add a device in its place that must pass the plan checks "
+             "(a table needs a 3×3 comparison, a real case study needs sources). Then remove the rejected candidate from plan/assets-plan.yaml or mark it decision: rejected.",
+             "If the fallback leaves a text wall or a visual shortage, restructure the sections (split, reorder, move a comparison into a table) — do not add a figure to reach the number."]
+    return task("editorial-fallback", "asset_planning", f"Fall back {len(rejected)} rejected visuals in the editorial plan", lines,
+                outputs=[f"plan/editorial/{r['chapter']}.yaml" for r in rejected], checks=[f"{r['device']}: {', '.join(r['codes'])}" for r in rejected])
 
 
 def h_asset_generation(ctx):
@@ -432,25 +562,65 @@ def h_asset_generation(ctx):
     from diagrams import generate
     assets.sync_figure_registry()
     try:
-        tokens = normalize(load_design(), require_pdf=False)
+        design_spec = load_design()
+        tokens = normalize(design_spec, require_pdf=False)
+        import image_assets, layout_spec, style_bible, visual_review
+        layout = layout_spec.load_or_create(project=ctx.project, design=design_spec)
+        style = style_bible.load_or_resolve(project=ctx.project, design=design_spec)
+        image_decisions = visual_review.decisions() or {}
+        image_assets.prepare(assets.assets(), image_decisions, style, layout, ctx.project)
+        image_check = image_assets.check(assets.assets(), image_decisions)
+    except Exception as exc:
+        return Result(tasks=[task("assets:images", "asset_generation", "Fix image request or provider",
+                                  [f"Image asset preparation failed: {exc}", "Review plan/assets-plan.yaml, resolved StyleBible and project.image_generation.provider."],
+                                  checks=[str(exc)])])
+    try:
         rendered = generate(tokens, raster=False)
         log_event("asset_generation", "complete", tool="diagram-ir-svg", diagrams=len(rendered))
     except Exception as exc:
         return Result(tasks=[task("assets:diagrams", "asset_generation", "Fix Diagram IR", [f"Diagram rendering failed: {exc}", "Fix the Diagram IR files under source/assets/diagrams/."], checks=[str(exc)])])
     ctx.invalidate()
     errors = assets.check_generation(ctx.outline(), ctx.records())
+    errors += [f"{item['asset_id']}: {item['detail']}" for item in image_check['checks'] if item['severity'] == 'high']
     if errors:
         grouped = {}
         for error in errors: grouped.setdefault(error.split(":")[0], []).append(error)
         return Result(tasks=[task(f"asset:{identifier}", "asset_generation", f"Create and place {identifier}", problems + [
             "Diagrams: write Diagram IR YAML (type, title, nodes, edges) and place ![caption](source/assets/figures/<name>.svg){#fig-id} in the planned section — the SVG is rendered by BookOrder.",
             "Tables: pipe table followed by `Table: Caption {#tbl-id}`. Equations: ::: {.equation #eq-id} with $$LaTeX$$ :::. Refer to them with @fig:/@tbl:/@eq:.",
-            "Generated images: save under source/assets/images/ and record source/assets/generated/<id>.json {prompt, generator, created_at, purpose}. If no image tool is available, change the plan to a diagram instead."],
+            "Generated images: only accepted abstract/image candidates enter the ImageGenerationRequest pipeline. Configure project.image_generation.provider: fake for offline fixtures; without a provider, required images remain pending_provider and block completion. Review source/assets/generated/<id>.request.json and <id>.json.",
+            "A rejected or pending visual must not appear in the text: follow its suggestion in reports/visual-review.yaml (prose, list, table or another type)."],
             group="assets", checks=problems) for identifier, problems in grouped.items()])
     results, _ = ctx.contracts()
     if any(r["status"] != "complete" for r in results):
         return Result(tasks=[expansion_task(r, next(c for c in ctx.outline() if c["id"] == r["id"]), "asset_generation") for r in results if r["status"] != "complete"])
+    filling = slot_tasks(ctx)
+    if filling: return Result(tasks=filling)
     return Result(done=True)
+
+
+def open_slots(ctx):
+    """Chapter id -> slot ids still in the text (every device must be produced before integration)."""
+    return {cid: [s["id"] for s in rec.get("slots", [])] for cid, rec in ctx.by_chapter().items() if rec and rec.get("slots")}
+
+
+def slot_tasks(ctx):
+    import editorial_plan as ep
+    tasks = []
+    by_id = {c["id"]: c for c in ctx.outline()}
+    for chapter, slots in open_slots(ctx).items():
+        plan = ep.load_plan(chapter) or ep.normalize({"chapter_id": chapter})
+        planned = {d.get("id"): d for _, d in ep.devices(plan, include_end=True)}
+        lines = [f"Replace each open slot in {by_id[chapter]['file']} with the device it reserves, keeping the id (skills/editorial-planning.md):"]
+        for ident in slots:
+            d = planned.get(ident, {})
+            lines.append(f"- {ident} ({d.get('type', 'unplanned')}): {ep.placement(d)['intent'] if d else 'not in the plan: remove it or add it to plan/editorial/' + chapter + '.yaml'}"
+                         + (f" [sources: {', '.join(d.get('source_ids', []))}]" if d.get("source_ids") else ""))
+        lines.append("Figures/tables come from plan/assets-plan.yaml (same id). Write components as ::: {.key-point #id} ... ::: etc. A device that cannot be produced "
+                     "honestly falls back: bookorder editorial fallback <id> --to prose|table|case_study|summary --reason ...")
+        tasks.append(task(f"slots:{chapter}", "asset_generation", f"Fill {len(slots)} open slots in {chapter}", lines, outputs=[by_id[chapter]["file"]], group="slots",
+                          checks=[f"open slot {i}" for i in slots]))
+    return tasks
 
 
 def chapter_hashes(ctx):
@@ -491,9 +661,16 @@ def h_audit(ctx):
     return Result(done=True)
 
 
+def requires_rewrite(issue):
+    """Warnings remain visible in reports, but only high paragraph/pacing findings block the workflow."""
+    if issue.get("severity") not in ("high", "medium"): return False
+    if issue.get("severity") == "medium" and issue.get("type") in ("paragraph-length", "layout-pacing"): return False
+    return True
+
+
 def rewrite_tasks(ctx, ledger):
     import audit
-    open_items = audit.open_issues(ledger, ("high", "medium"))
+    open_items = [e for e in audit.open_issues(ledger, ("high", "medium")) if requires_rewrite(e)]
     grouped = {}
     for item in open_items: grouped.setdefault(item.get("chapter") or "book", []).append(item)
     tasks = []
@@ -558,7 +735,7 @@ def h_final_audit(ctx):
     new = [f for f in new if audit.issue_key(f) not in known]
     if new: ledger = audit.update_ledger(new, "agent", ctx.manuscript_fingerprint())
     for chapter in changed: ctx.state["reviewed_hashes"][chapter] = current[chapter]
-    problems = audit.open_issues(ledger, ("high", "medium"))
+    problems = [e for e in audit.open_issues(ledger, ("high", "medium")) if requires_rewrite(e)]
     results, _ = ctx.contracts()
     lock_errors = research.check_lock()
     if problems or any(r["status"] != "complete" for r in results) or lock_errors:
@@ -621,6 +798,8 @@ def h_layout(ctx):
         if error:
             return Result(tasks=[task("fix-build", "layout", "Fix the proof build", ["The proof build failed:", error[:3000], "Fix canonical source/design (not generated files) and run bookorder goal."], checks=[error[:300]])])
     built = (ROOT / "reports/build-report.json").stat().st_mtime
+    walls = layout_pacing(ctx)
+    if walls: return walls
     review = ROOT / "reports/layout-review.md"
     pacing = audit.pacing_issues({cid: rec for cid, rec in ctx.by_chapter().items()})
     fresh_review = review.is_file() and review.stat().st_mtime >= built and len(review.read_text(encoding="utf-8").strip()) > 200
@@ -631,6 +810,32 @@ def h_layout(ctx):
         lines += [f"- pacing: {p['chapter']}/{p.get('section') or ''}: {p['detail']}" for p in pacing[:20]]
         return Result(tasks=[task("layout-review", "layout", "Visual layout and pacing review of the proof build", lines, outputs=["reports/layout-review.md"])])
     return Result(done=True)
+
+
+def layout_pacing(ctx):
+    """Text walls measured on the proof pages (scripts/pacing.py) enter the ledger; high ones become revision tasks."""
+    import audit, pacing
+    result = pacing.check(ctx.project)
+    audit.update_ledger(pacing.ledger_issues(result), "layout", ctx.manuscript_fingerprint())
+    log_event("layout", "pacing", verdict=result["verdict"], high=result["summary"].get("high", 0))
+    if result["verdict"] == "pass": return None
+    high = [f for f in result["findings"] if f["severity"] == "high"]
+    if any(f["rule"] == "layout_unmeasured" for f in high):
+        return Result(tasks=[task("fix-layout-metrics", "layout", "Make the layout measurable", [high[0]["detail"]], checks=[high[0]["detail"][:300]])])
+    by_id = {c["id"]: c for c in ctx.outline()}
+    limit = result["limits"]
+    tasks = []
+    for chapter in sorted({f["chapter"] for f in high if f.get("chapter") in by_id}):
+        lines = [f"The typeset proof shows text walls in {chapter}: more than {limit['max_text_only_pages']} consecutive pages with no figure, table, callout, "
+                 f"pull quote, case study or summary ({limit['tier']} limit, from {limit['source']}). Headings, lists and code blocks do not break a wall.",
+                 "Revise the chapter source so that every stretch stays within the limit. Prefer converting existing text (comparison -> table, "
+                 "process -> diagram, digression -> column/counterpoint) over adding material; never add decorative assets. Candidates (reports/pacing-report.json):"]
+        lines += pacing.task_lines(result, chapter)
+        tasks.append(task(f"pacing:{chapter}", "layout", f"Break the text walls in {chapter}", lines, outputs=[by_id[chapter]["file"]], group="pacing"))
+    book = [f for f in high if not f.get("chapter") or f["chapter"] not in by_id]
+    if book and not tasks:
+        tasks.append(task("pacing:book", "layout", "Break the text walls across the book", [f"- {f['detail']}" for f in book]))
+    return Result(tasks=tasks)
 
 
 def h_build(ctx):
@@ -695,12 +900,34 @@ def h_complete(ctx):
 
 HANDLERS = {"source_ingestion": h_source_ingestion, "supplementary_research": h_supplementary_research, "corpus_analysis": h_corpus_analysis,
             "research_frozen": h_research_frozen, "architecture": h_architecture, "reference_assignment": h_reference_assignment,
+            "editorial_planning": h_editorial_planning,
             "drafting": h_drafting, "chapter_review": h_chapter_review, "integration": h_integration, "asset_planning": h_asset_planning,
             "asset_generation": h_asset_generation, "audit": h_audit, "rewrite": h_rewrite, "final_audit": h_final_audit, "design": h_design,
             "layout": h_layout, "build": h_build, "validation": h_validation, "package": h_package, "complete": h_complete}
 
 
 # ---------------------------------------------------------------- completion gates
+
+def art_direction_gate(project, root=None, current_fingerprint=None):
+    root = root or ROOT
+    path = root / "reports/art-direction-check.yaml"
+    report = yaml_data(path) if path.is_file() else {}
+    pdf = root / "publish/book.pdf"
+    pdf_fresh = (not project.get("outputs", {}).get("pdf") or
+                 (pdf.is_file() and report.get("pdf_sha256") == __import__("hashlib").sha256(pdf.read_bytes()).hexdigest()))
+    fresh = report.get("build_fingerprint") == (current_fingerprint or build_fingerprint()) and pdf_fresh
+    summary = report.get("summary") or {}
+    high, medium = int(summary.get("high", 0)), int(summary.get("medium", 0))
+    return {"passed": bool(fresh and high == 0), "fresh": bool(fresh),
+            "high": high, "medium": medium, "report": report}
+
+
+def image_asset_gate(plan_assets=None, decisions=None, root=None):
+    import assets, image_assets, visual_review
+    checked = image_assets.check(plan_assets if plan_assets is not None else assets.assets(),
+                                 decisions if decisions is not None else visual_review.decisions() or {},
+                                 root=root, write=False)
+    return {"passed": checked["summary"]["high"] == 0, "summary": checked["summary"], "checks": checked["checks"]}
 
 def completion_gates(ctx, include_package=True):
     """Publication-level criteria. PDF built != complete; all files exist != complete; exit code 0 != complete."""
@@ -729,7 +956,7 @@ def completion_gates(ctx, include_package=True):
     gate(7, "Chapter contracts satisfied", chapters and not failing, ("failing: " + ", ".join(failing)) if failing else f"{len(results)} chapters", "chapter_review", "chapter length deficit")
     total = aggregate["total_actual"]
     gate(8, "Manuscript length above minimum", total >= ctx.scale["minimum_characters"],
-         f"{total:,} of minimum {ctx.scale['minimum_characters']:,} characters ({ctx.scale['requested_pages']} pages requested)", "chapter_review", "chapter length deficit")
+         f"{total:,} of minimum {ctx.scale['minimum_characters']:,} characters ({(ctx.scale.get('profile') or {}).get('id', 'page target')} profile, ≈{ctx.scale['requested_pages']} pages)", "chapter_review", "chapter length deficit")
     gate(9, "Cross-chapter integration passed", accepted(ctx.state, "integrate") is not None, "accepted" if accepted(ctx.state, "integrate") else "not run", "integration", "editorial inconsistency")
     import assets as asset_module
     asset_errors = (asset_module.check_plan(chapters, ctx.project) if chapters else ["no chapters"]) or asset_module.check_generation(chapters, ctx.records())
@@ -741,11 +968,39 @@ def completion_gates(ctx, include_package=True):
     fresh = final is not None and final.get("fingerprint") == ctx.manuscript_fingerprint()
     gate(12, "Whole-book audit passed on the final manuscript", fresh and accepted(ctx.state, "audit") is not None,
          "fresh" if fresh else ("manuscript changed after the final audit" if final else "not run"), "final_audit", "editorial inconsistency")
-    high = audit.open_issues(ledger, ("high",)); medium = audit.open_issues(ledger, ("medium",))
+    # Layout pacing is judged on the current pages by gate 17, not by what the ledger remembers.
+    high = [e for e in audit.open_issues(ledger, ("high",)) if e["type"] != "layout-pacing"]
+    # Paragraph-length medium findings are warnings; only high-tier paragraph violations gate completion.
+    medium = [e for e in audit.open_issues(ledger, ("medium",)) if e["type"] not in ("layout-pacing", "paragraph-length")]
     gate(13, "High-severity audit issues resolved", not high and not medium, f"{len(high)} high, {len(medium)} medium open", "rewrite", "editorial inconsistency")
     design_problems = audit.design_issues()
     gate(14, "Design validation passed", not design_problems, "; ".join(i["detail"] for i in design_problems) or "ok", "design", "design")
     gate(15, "Build passed and is current", build_fresh(), "fresh" if build_fresh() else "missing, failed or stale", "build", "build")
+    import pacing
+    walls = pacing.check(ctx.project)
+    detail = f"{walls['summary'].get('high', 0)} high, {walls['summary'].get('medium', 0)} medium; max text-only run " \
+             f"{walls['summary'].get('max_text_only_run', '?')} (limit {walls['limits']['max_text_only_pages']}, {walls['limits']['tier']})"
+    if walls["verdict"] == "fail": detail += ": " + "; ".join(f["detail"] for f in walls["findings"] if f["severity"] == "high")[:400]
+    gate(17, "Layout pacing within profile", walls["verdict"] == "pass", detail, "layout", "layout pacing")
+    import editorial_plan as ep
+    legacy = (ctx.state.get("notes") or {}).get("editorial_planning")
+    if chapters and (ep.exists() or not legacy):
+        plan = ep.run(chapters, project=ctx.project)
+        stopping = ep.blocking(ep.all_findings(plan))
+        gate(18, "Editorial plan valid for the profile", not stopping, "; ".join(f"{f['chapter'] or 'book'}: {f['rule']}" for f in stopping[:6])
+             or f"{plan['summary']['planned']} chapters planned, {plan['summary']['waived']} waived", "editorial_planning", "editorial plan")
+    else: gate(18, "Editorial plan valid for the profile", True, legacy or "no chapters", "editorial_planning", "editorial plan")
+    slots = open_slots(ctx) if chapters else {}
+    gate(19, "No unresolved slots", not slots, "; ".join(f"{c}: {', '.join(v[:5])}" for c, v in slots.items())[:400] or "all devices placed",
+         "asset_generation", "asset generation")
+    art = art_direction_gate(ctx.project)
+    gate(20, "Art direction consistency", art["passed"],
+         f"{art['high']} high, {art['medium']} medium; " + ("fresh" if art["fresh"] else "missing or stale"),
+         "validation", "visual consistency")
+    image_check = image_asset_gate()
+    gate(21, "Generated images resolved and print-safe", image_check['passed'],
+         f"{image_check['summary']['high']} high, {image_check['summary']['medium']} medium",
+         "validation", "image asset")
     if include_package:
         from common import output_paths
         target = ROOT / "publish/result.zip"
@@ -759,6 +1014,23 @@ def completion_gates(ctx, include_package=True):
 def handle_failed_gates(ctx, failing):
     earliest = min(failing, key=lambda g: PHASES.index(g["phase"]))
     log_event("goal", "gates_failed", gates=[g["id"] for g in failing])
+    if earliest["id"] == 20:
+        path = ROOT / "reports/art-direction-check.yaml"
+        report = yaml_data(path) if path.is_file() else {}
+        if "missing or stale" in earliest["detail"]:
+            reopen(ctx.state, "build", "art direction report missing or stale")
+            return Result(info="Rebuilding art direction measurements")
+        high = [item for item in report.get("checks", []) if item.get("severity") == "high"]
+        return Result(tasks=[task("fix-art-direction", "validation", "Resolve art direction drift",
+                                  [f"{item['category']} p.{item.get('page') or '?'}: {item['detail']} — {item['suggested_fix']}" for item in high[:20]],
+                                  checks=[item["detail"] for item in high[:10]])])
+    if earliest["id"] == 21:
+        import assets, image_assets, visual_review
+        check = image_assets.check(assets.assets(), visual_review.decisions() or {})
+        problems = [f"{item['asset_id']}: {item['detail']}" for item in check['checks'] if item['severity'] == 'high']
+        return Result(tasks=[task("resolve-image-assets", "validation", "Resolve required generated images",
+                                  problems + ["Configure a provider, repair the requested image, or change the editorial/visual plan and rebuild."],
+                                  checks=problems[:10])])
     reopen(ctx.state, earliest["phase"], f"gate {earliest['id']} failed: {earliest['name']} ({earliest['detail']})")
     return Result(info=f"Reopened {earliest['phase']}: {earliest['name']}")
 
@@ -769,6 +1041,7 @@ def advance(max_steps=80):
     project, state = load_state()
     ctx = Context(project, state)
     tasks = []; info = []
+    refresh_editorial_plan_dependency(state)
     if state["blockers"] and state["status"] == "blocked":
         return state, [], ["BLOCKED — see blockers; after resolving run `bookorder unblock`"]
     for _ in range(max_steps):
@@ -797,6 +1070,8 @@ def advance(max_steps=80):
             set_phase(state, current, "blocked", result.blockers[0]["detail"][:300])
             tasks = result.tasks; break
         if result.done:
+            if current == "editorial_planning":
+                state.setdefault("artifact_fingerprints", {})["editorial_plan"] = editorial_plan_fingerprint()
             set_phase(state, current, "complete")
             if current == "complete": state["status"] = "complete"; break
             continue
@@ -887,7 +1162,7 @@ def write_summary(ctx):
                   "source_index": "research/index.json", "search_log": "research/search-log.jsonl", "research_lock": "research/research-lock.json",
                   "corpus_summary": "research/corpus-summary.yaml", "book_bible": "plan/book-bible.yaml", "outline": "source/metadata/outline.yaml",
                   "chapter_status": "reports/chapter-status.json", "source_coverage": "reports/source-coverage.json",
-                  "assets_plan": "plan/assets-plan.yaml", "audit_report": "reports/audit-report.yaml",
+                  "assets_plan": "plan/assets-plan.yaml", "editorial_plan": "reports/editorial-plan.yaml", "audit_report": "reports/audit-report.yaml",
                   "validation_report": "reports/validation-report.json", "completion_gates": "reports/completion-gates.json"}}
     write_json(SUMMARY, summary)
     return summary

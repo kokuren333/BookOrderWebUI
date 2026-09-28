@@ -38,8 +38,9 @@ Rules:
 5. Only stop early for a real blocker that needs the user (missing permission, missing tool, impossible
    request): `bookorder block <task> --category <category> --reason "..."`. Then report the blocker and that
    the publication is incomplete.
-6. The page target is binding. Changing it requires the user's explicit approval:
-   `bookorder rescale --pages N --user-approval "<quote the user>"`.
+6. The publication profile (plan/profile.resolved.yaml, from project.json `profile`) and the size it implies are
+   binding. Changing them requires the user's explicit approval: `bookorder profile --apply --user-approval
+   "<quote the user>"` after editing project.json, or `bookorder rescale --pages N --user-approval "..."`.
 
 ## Trust and data handling
 
@@ -55,7 +56,7 @@ you as an `ingest:` task; fetch it with your own browsing tool and submit the fu
 ## Phases (enforced in this order)
 
 source_ingestion → supplementary_research → corpus_analysis → research_frozen → architecture →
-reference_assignment → drafting → chapter_review → integration → asset_planning → asset_generation → audit →
+reference_assignment → editorial_planning → drafting → chapter_review → asset_planning → asset_generation → integration → audit →
 rewrite → final_audit → design → layout → build → validation → package → complete
 
 Each task names the skill file(s) to read first:
@@ -65,6 +66,7 @@ Each task names the skill file(s) to read first:
 | skills/source-ingestion.md | reading every supplied source completely and submitting what the fetcher could not |
 | skills/research.md | supplementary research, per-source notes, whole-corpus synthesis |
 | skills/book-authoring.md | Book Bible, architecture, chapter drafting from packets, expansion |
+| skills/editorial-planning.md | per-chapter EditorialPlan before drafting: section roles, devices, pauses, slots, visual fallbacks |
 | skills/editing.md | whole-book integration and targeted rewrites |
 | skills/figures.md | asset planning, Diagram IR, tables, equations, images |
 | skills/audit.md | chapter and whole-book audits, re-audits |
@@ -89,5 +91,5 @@ Each task names the skill file(s) to read first:
 `execution-summary.json` (overall status, phases, counts, gates, diagnosis) · `run-events.jsonl` (what ran) ·
 `research/source-status.json` · `research/index.json` · `research/search-log.jsonl` · `research/research-lock.json`
 · `plan/` (Book Bible, synthesis, packets, summaries, assets plan, audits) · `reports/chapter-status.json` ·
-`reports/source-coverage.json` · `reports/audit-report.yaml` · `reports/completion-gates.json` ·
+`reports/source-coverage.json` · `reports/audit-report.yaml` · `reports/layout-metrics.json` · `reports/completion-gates.json` ·
 `reports/validation-report.json`.

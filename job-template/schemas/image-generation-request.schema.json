@@ -1,0 +1,21 @@
+{
+  "type": "object",
+  "required": ["schema", "request_id", "asset_id", "purpose", "semantic_role", "chapter_id", "slot_id", "source_ids", "factuality", "subject", "context", "must_show", "must_not_show", "composition", "art_direction", "preferred_aspect_ratio", "preferred_span", "placement", "final_width_mm", "final_height_mm", "typography_policy", "provider", "provider_status", "prompt_version", "required", "file_path"],
+  "properties": {
+    "schema": {"type": "string", "enum": ["bookorder/image-generation-request@1"]},
+    "request_id": {"type": "string"}, "asset_id": {"type": "string"},
+    "purpose": {"type": "string"}, "semantic_role": {"type": "string"},
+    "chapter_id": {"type": "string"}, "slot_id": {"type": "string"},
+    "source_ids": {"type": "array", "items": {"type": "string"}},
+    "factuality": {"type": "string", "enum": ["decorative", "illustrative", "conceptual", "factual"]},
+    "subject": {"type": "string"}, "context": {"type": "string"},
+    "must_show": {"type": "array", "items": {"type": "string"}},
+    "must_not_show": {"type": "array", "items": {"type": "string"}},
+    "composition": {"type": "string"}, "art_direction": {"type": "object"},
+    "preferred_aspect_ratio": {"type": "string"}, "preferred_span": {}, "placement": {"type": "string"},
+    "final_width_mm": {"type": "number", "minimum": 1}, "final_height_mm": {"type": "number", "minimum": 1},
+    "typography_policy": {"type": "string", "enum": ["forbidden"]},
+    "provider": {"type": "string"}, "provider_status": {"type": "string", "enum": ["ready", "pending_provider"]},
+    "prompt_version": {"type": "string"}, "required": {"type": "boolean"}, "file_path": {"type": "string"}
+  }
+}

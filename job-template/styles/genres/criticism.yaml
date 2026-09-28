@@ -1,0 +1,44 @@
+tone:
+  overall: "editorial, restrained, argument-led"
+  density: "text-first"
+  restraint: "high"
+  whitespace: "generous"
+  ornament: "low"
+palette:
+  accent: "#8C4E35"
+  secondary_accent: "#493F45"
+  surface: "#F7F3EE"
+spacing:
+  section_gap_mm: 7
+  large_mm: 8
+typography:
+  heading_2: {weight: 600}
+  heading_3: {weight: 500}
+chart:
+  grid_style: "minimal"
+  max_series: 4
+  emphasis_strategy: "direct-label"
+callout:
+  variants:
+    key-point: "quiet-rule"
+    warning: "warning-rule"
+    definition: "plain-rule"
+chapter_opener:
+  chapter_number_style: "quiet-large"
+  title_style: "editorial"
+visual_grammar:
+  components:
+    key_point: {priority: tertiary, treatment: inset-paragraph, border_policy: none, fill_policy: none}
+    warning: {priority: secondary, treatment: side-rule, fill_policy: none}
+    definition: {priority: quiet, treatment: plain-emphasis, border_policy: none, fill_policy: none}
+    counterpoint: {priority: primary, treatment: top-rule, space_before_mm: 8, space_after_mm: 8}
+    case_study: {priority: secondary, treatment: inset-paragraph, space_before_mm: 8, space_after_mm: 8}
+    pull_quote: {priority: primary, treatment: pull-quote, use_policy: allowed, space_before_mm: 10, space_after_mm: 10}
+    source_note: {priority: quiet, treatment: plain-emphasis}
+  hierarchy: {heading_2: secondary, heading_3: supporting, caption: quiet, source_note: quiet}
+  rhythm: {pattern: prose-heavy, interruption: occasional-strong, section_space: generous}
+  table: {border_density: minimal, header_emphasis: typographic, row_spacing: generous, numeric_alignment: right, zebra: false, source_note: adjacent, mode: wide}
+  diagram: {node_shape: pill, edge_emphasis: relational, hierarchy: narrative, label_placement: inside, whitespace: generous, annotation_style: below-node}
+  chart: {grid_intensity: none, axis_emphasis: quiet, direct_labels: true, legend_use: none, annotation: outside-data, baseline_emphasis: quiet, uncertainty: prose-note}
+  caption: {figure_relationship: relaxed, weight: quiet, source_binding: same-block}
+  chapter_opener: {hierarchy: editorial, lead: prose, number_prominence: quiet}

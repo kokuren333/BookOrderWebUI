@@ -1,0 +1,36 @@
+# Length tier: a substantial book, possibly in parts (roughly 200-450 A5 pages). Longer means more kinds of
+# editorial devices and parts, not thinner device density.
+tier: long
+scale:
+  target_body_chars: 150000
+  nonprose_share_target: 0.25
+  minimum_ratio: 0.8
+  front_matter_pages: 6
+  back_matter_share: 0.06
+structure:
+  parts: {min: 0, target: 3, max: 5}
+  chapters: {min: 7, target: 12, max: 20}
+  heading_depth_max: 3
+  section_chars: {min: 600, target: 1100, max: 1800}
+  paragraph_chars_max: 450
+  chapter_lead: required
+  chapter_end: [key_points, open_question, bridge_to_next]
+devices:
+  visuals_per_10k: {min: 1.8, target: 2.5, max: 5.0}
+  tables_per_chapter: {min: 1, target: 2, max: 4}
+  callouts_per_chapter: {min: 1, target: 3, max: 6}
+  case_studies_per_chapter: {min: 0, target: 1, max: 3}
+  columns_per_chapter: {min: 0, target: 0.5, max: 2}
+  pull_quotes_per_chapter: {min: 0, target: 1, max: 3}
+rhythm:
+  max_text_only_pages: 4
+  pause_every_chars: {target: 2400, max: 3600}
+  abstract_run_chars_max: 1500
+citations:
+  style: numeric
+  inline_markers_per_page_max: 1.5
+  further_reading_per_chapter: {min: 0, target: 3, max: 6}
+art_direction:
+  weight: strong
+  ornament_level: medium
+  generative_images: {allowed: [chapter_opener, part_opener], max_total: 18}

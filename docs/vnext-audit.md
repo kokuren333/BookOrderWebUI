@@ -85,7 +85,7 @@ with the manuscript; `package.py` accepted any structurally valid build. A 15,00
 | Design Spec / theme selection / CSS & Typst tokens / custom CSS / components | working | kept; refined; 5 themes; bundled OFL fonts |
 | whole-book audit | missing | deterministic audit + chapter/book agent audits → ledger |
 | targeted rewrite | missing | `rewrite:<ch>` tasks from open issues only |
-| completion gating | insufficient | 16 publication gates, re-verified on every call |
+| completion gating | insufficient | 17 publication gates, re-verified on every call |
 | persistent state / resume | missing | `project-state.json`, file-derived tasks, interrupted-fetch reset |
 | observability | insufficient | `run-events.jsonl`, `execution-summary.json` |
 
@@ -101,18 +101,19 @@ with the manuscript; `package.py` accepted any structurally valid build. A 15,00
         research_frozen         research.py        research-lock.json (IDs stable; post-draft additions tracked)
         architecture            planning.py        Book Bible + outline DAG + budgets (architecture)
         reference_assignment    citations.py       CSL JSON registry, sources.yaml, packets, contracts
-        drafting                planning.py        draft:<ch> in dependency waves (parallel groups)
-        chapter_review          planning.py        contracts → expand:/review:; book-level deficit
+        editorial_planning      editorial_plan.py  editorial:<ch> plans vs profile (roles, devices, pauses) → gate 18
+        drafting                planning.py        draft:<ch> in dependency waves (parallel groups); devices as slots
+        chapter_review          planning.py        contracts (incl. slots) → expand:/review:; book-level deficit
+        asset_planning          assets.py          plan-assets from visual intents; visual review; editorial-fallback
+        asset_generation        assets.py/diagrams asset:<id>; Diagram IR → SVG; slots:<ch> → gate 19
         integration             audit.py           deterministic integration checks + integrate task
-        asset_planning          assets.py          plan-assets
-        asset_generation        assets.py/diagrams asset:<id>; Diagram IR → SVG
         audit                   audit.py           deterministic audit + audit:<ch>, audit:book → ledger
         rewrite                 audit.py           rewrite:<ch> for open high/medium issues only
         final_audit             audit.py           reaudit:<ch> for changed chapters; loops to rewrite
         design                  design.py          design task; Design Spec validation
         layout                  build.py           proof build, pacing report, layout-review task
         build / validation      build.py/validate  final build; structural validation; gates
-        package / complete      package.py         result.zip; all 16 gates re-verified
+        package / complete      package.py         result.zip; all 19 gates re-verified
   └─ bookorder done <task>  → records the report, re-runs advance(); gates decide
 ```
 
