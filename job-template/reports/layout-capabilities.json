@@ -1,7 +1,0 @@
-{
-  "schema": "bookorder/layout-capabilities@1",
-  "layout_id": "book-layout",
-  "renderers": {},
-  "ok": true,
-  "errors": {}
-}

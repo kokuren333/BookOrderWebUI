@@ -41,6 +41,10 @@ Rules:
 6. The publication profile (plan/profile.resolved.yaml, from project.json `profile`) and the size it implies are
    binding. Changing them requires the user's explicit approval: `bookorder profile --apply --user-approval
    "<quote the user>"` after editing project.json, or `bookorder rescale --pages N --user-approval "..."`.
+7. The book format chosen in the WebUI (project.json `layout_preset`, `layout_spec`, `style_preset`,
+   `style_controls`) is resolved into plan/layout-spec.yaml and plan/style-bible.yaml. `bookorder publication`
+   shows the resolved format and any field-level problem; never replace an unsupported choice (for example
+   vertical writing) with a different one yourself — report it with `bookorder block`.
 
 ## Trust and data handling
 

@@ -50,7 +50,7 @@
     return
   }
   pagebreak(weak: true)
-  let style = if sb != none and sb.chapter_opener.title_style == "editorial" { "editorial" } else { comp.chapter_opener }
+  let style = if sb != none and sb.chapter_opener.title_style in ("editorial", "academic", "minimal") { sb.chapter_opener.title_style } else { comp.chapter_opener }
   let opener = context {
     let chapter = book-chapter.get()
     let n = chapter.number

@@ -32,3 +32,37 @@ HTML, EPUB, and DOCX report `degraded` for two-column/span geometry because they
 Run `python tools/layout-specimen.py` in a publishing job with Typst available. It writes `.build/layout-specimen.typ` and `publish/layout-specimen.pdf`, showing one- and two-column body text, span 1 and span 2 figures, a full-width figure/table, a full-width callout, and a chapter opener. The last page states that vertical writing is unsupported.
 
 Typst supports page columns and parent-scoped floats for content across them; see the [Typst columns reference](https://typst.app/docs/reference/layout/columns/) and [page setup guide](https://typst.app/docs/guides/page-setup/). Vertical writing is still tracked in an open [Typst RFC](https://github.com/typst/typst/issues/5908), so this adapter does not simulate it.
+
+## Requests from project.json and the WebUI (P1-UI)
+
+The WebUI's publication panel writes only request fields that this resolver already reads:
+
+| project.json | Meaning |
+|---|---|
+| `layout_preset` | One of `schemas/publication-presets.json` `layout_presets` (standard-book, technical-reference, medical-scientific, magazine-mook, compact-shinsho). A preset is a set of LayoutSpec values, not a renderer mode. |
+| `layout_spec` | A LayoutSpec patch merged over the preset (or over the Design Spec defaults). Custom paper uses `page_size: custom` with `page.width_mm` / `page.height_mm`. |
+
+Resolution order: Design Spec defaults → preset → `layout_spec` patch → derived values (page dimensions from
+`page_size`/`orientation`, spans from `span_policy`, `vertical.enabled` from `writing_mode`) → validation. With neither
+key present the resolution is exactly the pre-P1-UI one.
+
+Paper sizes: A4, A5, B5 (ISO 176 × 250), B6 (ISO 125 × 176), Letter, `custom` (80–600 mm). For JIS B5/B6 use custom.
+
+`span_policy` (optional, two-column bodies) sets how figures and tables without an explicit `geometry.span` are placed:
+
+| Value | Default span | Decision |
+|---|---|---|
+| `column` | 1 | Stays in a column unless the asset asks for a span |
+| `full` | `full` | Full body width unless the asset asks for span 1 (requires 2 columns) |
+| `auto` | 1 | Promoted to `full` at layout time when the declared `width_mm` exceeds the column, or a table has at least `auto_span.table_min_columns` (5) columns |
+
+Validation (`layout_spec.geometry_issues`) reports field-level issues `{code, field, message}` and raises
+`LayoutSpecError`: `page_size_mismatch`, `custom_page_invalid`, `margins_exceed_page`, `body_width_insufficient`,
+`body_height_insufficient`, `gutter_consumes_body`, `gutter_too_small` (< 3 mm), `gutter_too_large` (> 20 mm),
+`column_too_narrow` (< 40 mm per column), `span_exceeds_columns`, `span_policy_single_column`, `span_policy_conflict`,
+`vertical_flag`, `text_direction_conflict`. The limits live in `schemas/publication-presets.json`; the WebUI shows the
+same checks early, but this resolver is the authority. A requested `vertical-rl` layout is refused before the first
+LayoutSpec is written (`vertical_unsupported`) and again by the Typst capability check — it is never rendered horizontally.
+
+`bookorder publication [--json]` resolves profile, LayoutSpec and StyleBible from project.json without writing and
+prints the resolved geometry (column width, body width, gutter) and every issue.

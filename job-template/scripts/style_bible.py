@@ -122,13 +122,51 @@ def visual_defaults(design=None):
     }
 
 
+def _publication_presets():
+    return json.loads((ROOT / "schemas/publication-presets.json").read_text(encoding="utf-8"))
+
+
+def template_genre(project, profile):
+    """Genre template to start from: project.style_preset (WebUI StyleBible preset) or the profile genre."""
+    name = project.get("style_preset")
+    if not name: return (profile or {}).get("genre", "general")
+    presets = _publication_presets()["style_presets"]
+    if name not in presets: raise ValueError(f"project.style_preset {name!r} is not one of {', '.join(presets)}")
+    return presets[name]["template"]
+
+
+def apply_controls(style, controls):
+    """High-level StyleBible controls (schemas/publication-presets.json style_controls) -> StyleBible fields."""
+    if not controls: return style
+    if not isinstance(controls, dict): raise ValueError("project.style_controls must be a mapping")
+    table = _publication_presets()["style_controls"]
+    for name, choice in controls.items():
+        if name not in table: raise ValueError(f"project.style_controls.{name} is not one of {', '.join(table)}")
+        options = table[name]["options"]
+        if choice not in options: raise ValueError(f"project.style_controls.{name}={choice!r} is not one of {', '.join(options)}")
+        option = options[choice]
+        style = merge(style, option.get("patch") or {})
+        for component, fields in (option.get("components") or {}).items():
+            style["visual_grammar"]["components"][component].update(fields)
+        if option.get("spacing_scale", 1) != 1:
+            style["spacing"] = {key: round(float(value) * option["spacing_scale"], 2) for key, value in style["spacing"].items()}
+        if option.get("type_scale", 1) != 1:
+            for role in TYPE_ROLES:
+                size = float(style["typography"][role]["size_pt"]) * option["type_scale"]
+                style["typography"][role]["size_pt"] = round(max(style["print"]["minimum_text_pt"], size), 2)
+    return style
+
+
 def inputs_fingerprint(project, profile, design):
-    genre = (profile or {}).get("genre", "general")
+    genre = template_genre(project, profile)
     template = ROOT / "styles/genres" / f"{genre}.yaml"
     basis = {"resolver_version": "p1-2", "genre_template": template.read_text(encoding="utf-8") if template.is_file() else "",
              "genre": genre, "art_direction": (profile or {}).get("art_direction", {}),
              "design_visual": {key: (design or {}).get(key) for key in ("colors", "typography", "components", "figures", "art_direction")},
              "project_override": project.get("style_bible") or {}}
+    # Only present when requested, so existing jobs keep their fingerprint.
+    if project.get("style_preset"): basis["style_preset"] = project["style_preset"]
+    if project.get("style_controls"): basis["style_controls"] = project["style_controls"]
     return hashlib.sha256(json.dumps(basis, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
 
@@ -141,7 +179,7 @@ def resolve(project=None, profile=None, design=None):
         except Exception: profile = {}
     profile = profile or {}; genre = profile.get("genre", "general")
     style = visual_defaults(design)
-    template = ROOT / "styles/genres" / f"{genre}.yaml"
+    template = ROOT / "styles/genres" / f"{template_genre(project, profile)}.yaml"
     if template.is_file(): style = merge(style, yaml_data(template))
     style["genre"] = genre
     art = profile.get("art_direction") or {}
@@ -151,6 +189,8 @@ def resolve(project=None, profile=None, design=None):
     imagery = art.get("generative_images") or {}
     if isinstance(imagery, dict): style["imagery"]["allowed_roles"] = list(imagery.get("allowed") or [])
     if design.get("art_direction"): style["tone"]["overall"] = str(design["art_direction"])
+    if project.get("style_preset"): style["preset"] = project["style_preset"]
+    style = apply_controls(style, project.get("style_controls"))
     override = project.get("style_bible") or {}
     if not isinstance(override, dict): raise ValueError("project.style_bible must be a mapping")
     style = merge(style, override)
@@ -161,7 +201,7 @@ def resolve(project=None, profile=None, design=None):
 def validate(style):
     schema = json.loads((ROOT / "schemas/style-bible.schema.json").read_text(encoding="utf-8"))
     value = validate_schema(style, schema, coerce=True)
-    allowed_top = {"schema", "id", "genre", "art_direction_weight", "inputs_fingerprint", "grammar", "exemplars", "visual_grammar"} | set(SECTIONS)
+    allowed_top = {"schema", "id", "genre", "preset", "art_direction_weight", "inputs_fingerprint", "grammar", "exemplars", "visual_grammar"} | set(SECTIONS)
     unknown = set(value) - allowed_top
     if unknown: raise ValueError("StyleBible unknown keys: " + ", ".join(sorted(unknown)))
     for section, allowed in SECTIONS.items():

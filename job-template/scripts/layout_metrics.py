@@ -36,7 +36,7 @@ VISUAL = {"figure", "table"}
 ELEMENT_KINDS = ("figure", "table", "equation", "callout", "summary", "case-study", "pull-quote", "quote", "code", "list", "lead")
 TEXT_KINDS = {"prose", "heading", "list"}
 
-PAPER_MM = {"A5": (148, 210), "A4": (210, 297), "B5": (176, 250), "Letter": (215.9, 279.4)}
+PAPER_MM = {"A5": (148, 210), "A4": (210, 297), "B5": (176, 250), "B6": (125, 176), "Letter": (215.9, 279.4)}
 UNIT_PT = {"pt": 1.0, "mm": 72 / 25.4, "cm": 72 / 2.54, "in": 72.0}
 
 
@@ -47,8 +47,12 @@ def length_pt(value, default):
 
 def geometry(tokens):
     page = tokens.get("page", {}); margin = page.get("margin", {})
-    width, height = (x * UNIT_PT["mm"] for x in PAPER_MM.get(page.get("size", "A5"), PAPER_MM["A5"]))
-    if page.get("orientation") == "landscape": width, height = height, width
+    layout_page = (tokens.get("layout_spec") or {}).get("page") or {}
+    if layout_page.get("width_mm") and layout_page.get("height_mm"):  # LayoutSpec is the geometry authority (B6, custom)
+        width, height = (float(layout_page[k]) * UNIT_PT["mm"] for k in ("width_mm", "height_mm"))
+    else:
+        width, height = (x * UNIT_PT["mm"] for x in PAPER_MM.get(page.get("size", "A5"), PAPER_MM["A5"]))
+        if page.get("orientation") == "landscape": width, height = height, width
     body = tokens.get("typography", {}).get("body", {})
     top = length_pt(margin.get("top"), 56.0); bottom = length_pt(margin.get("bottom"), 56.0)
     inner = length_pt(margin.get("inner"), 56.0); outer = length_pt(margin.get("outer"), 48.0)

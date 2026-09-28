@@ -6,6 +6,7 @@
     "schema": {"type": "string", "enum": ["bookorder/style-bible@1"]},
     "id": {"type": "string", "pattern": "[a-z][a-z0-9-]*"},
     "genre": {"type": "string"},
+    "preset": {"type": "string", "enum": ["technical-clean", "medical-evidence", "practical-guide", "critical-editorial", "essay"]},
     "art_direction_weight": {"type": "string", "enum": ["light", "standard", "strong"]},
     "inputs_fingerprint": {"type": "string", "pattern": "[0-9a-f]{64}"},
     "tone": {"type": "object"},

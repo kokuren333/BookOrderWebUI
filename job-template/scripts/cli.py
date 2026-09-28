@@ -110,6 +110,7 @@ def main():
     commands.add_parser('layout', help='Re-measure page layout of the last PDF build (reports/layout-metrics.json)')
     prof = commands.add_parser('profile', help='Show the resolved PublicationProfile; --apply re-plans with it (user approval)')
     prof.add_argument('--apply', action='store_true'); prof.add_argument('--user-approval')
+    pub = commands.add_parser('publication', help='Check the tier/genre, layout and style requested in project.json (read-only)'); pub.add_argument('--json', action='store_true')
     commands.add_parser('fonts')
     theme = commands.add_parser('theme'); sub_theme = theme.add_subparsers(dest='theme_command', required=True)
     sub_theme.add_parser('list'); show = sub_theme.add_parser('preview'); show.add_argument('name')
@@ -154,6 +155,22 @@ def main():
         orchestrator.reopen(state, 'architecture', f'rescaled from {previous["requested_pages"]} to {args.pages} pages')
         orchestrator.save_state(state); print(json.dumps(state['scale'], indent=2)); return 0
 
+    if args.command == 'publication':
+        import publication_request
+        from common import read_project
+        from design import load_design
+        try: design = load_design()
+        except Exception: design = {}
+        report = publication_request.check(read_project(), design)
+        if args.json: print(json.dumps(report, ensure_ascii=False, indent=2))
+        else:
+            layout = report.get('layout') or {}
+            if report.get('profile'): print(f"profile {report['profile']['id']} ≈ {report['profile']['target_pages']} pages")
+            if layout: print(f"layout {layout['page_size']} {layout['width_mm']}×{layout['height_mm']} mm, {layout['columns']} column(s), "
+                             f"column {layout['column_width_mm']} mm, gutter {layout['gutter_mm']} mm, body {layout['body_width_mm']} mm, {layout['writing_mode']}")
+            if report.get('style'): print(f"style template {report['style']['template']} preset {report['style']['preset'] or '(genre default)'}")
+            for issue in report['issues']: print(f"ERROR {issue['field']}: {issue['message']} [{issue['code']}]")
+        return 0 if report['ok'] else 1
     if args.command == 'profile':
         import orchestrator, publication_profile
         from design import load_design

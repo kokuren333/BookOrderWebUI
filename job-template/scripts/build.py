@@ -264,6 +264,12 @@ def build(theme=None):
         # Preserve the selected design in result.zip so a later default build reproduces it.
         (ROOT / 'book.design.yaml').write_text(json.dumps(spec, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     tokens = normalize(spec, require_pdf=bool(outputs.get('pdf')))
+    # Resolve every semantic planning artifact before anything is fingerprinted: a standalone build must not
+    # leave plan/profile.resolved.yaml to be created later (by validation), which would stale the build.
+    import publication_profile
+    if publication_profile.load_resolved() is None and publication_profile.RESOLVED.parent.parent == ROOT:
+        try: publication_profile.write(publication_profile.resolve(project, spec))
+        except ValueError: pass  # workspaces without profiles/ (theme previews) build exactly as before
     import layout_spec
     layout_definition = layout_spec.load_or_create(project=project, design=spec)
     tokens = layout_spec.apply_to_tokens(tokens, layout_definition)

@@ -46,6 +46,12 @@ The integration check uses PANDOC and TYPST environment variables when tools are
 
 This demonstrates the publishing pipeline with a short fixture. An external agent's actual research quality, 50–400-page writing, licensing review and complete editorial work depend on that agent and its available tools. A generated job alone does not guarantee those outcomes.
 
+## Publication format (P1-UI)
+
+Section 05 of the WebUI sets the book format: PublicationProfile tier/genre, a layout preset (Standard Book, Technical / Reference, Medical / Scientific, Magazine / Mook, Compact / Shinsho-like, Custom), page size (A4/A5/B5/B6/Letter/custom), 1 or 2 columns, gutter, inner/outer/top/bottom margins, figure/table span policy, and a StyleBible preset with a few high-level controls (Advanced). The WebUI writes only the request fields the job's existing resolvers read (`profile`, `layout_preset`, `layout_spec`, `style_preset`, `style_controls` in project.json); the job resolves them into plan/profile.resolved.yaml, plan/layout-spec.yaml and plan/style-bible.yaml. Presets, paper sizes and validation limits are shared with the Python resolvers through `job-template/schemas/publication-presets.json`. The live summary and schematic preview are estimates from those shared rules; `bookorder publication` and the LayoutSpec resolver are the authority. Untouched settings produce the same project.json as before. Vertical writing is shown but disabled (the Typst renderer does not support it).
+
+Tests: `python tests/test_publication_ui.py` (resolver + WebUI payload + TypeScript/Python parity) and, after `python tests/mini_e2e.py --keep`, `python tests/publication_e2e.py` (A5 one-column and B5 two-column PDFs from WebUI payloads).
+
 ## Book design
 
 See [the design system guide](job-template/docs/design-system.md). The GUI configures four themes, role fonts, page size, density, components, vector diagrams and custom CSS. Content IR, Design Spec and renderer are separate; CSS/Typst/DOCX share normalized tokens. Theme preview builds an isolated sample. No alternate PDF backend or print PDF/X certification is implemented.

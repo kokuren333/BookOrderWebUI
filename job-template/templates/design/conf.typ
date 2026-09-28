@@ -37,8 +37,10 @@
     let label = if main { str(n) } else { numbering("i", n) }
     align(if calc.even(n) { left } else { right }, label)
   }
-  let papers = (A5: "a5", A4: "a4", B5: "iso-b5", Letter: "us-letter")
-  set page(paper: papers.at(d.page.size), flipped: d.page.orientation == "landscape",
+  let papers = (A5: "a5", A4: "a4", B5: "iso-b5", B6: "iso-b6", Letter: "us-letter")
+  // Named sizes keep Typst's paper path; LayoutSpec custom sizes use their resolved millimetres.
+  let page-dims = if d.page.size in papers { (paper: papers.at(d.page.size), flipped: d.page.orientation == "landscape") } else { (width: d.page.width_mm * 1mm, height: d.page.height_mm * 1mm) }
+  set page(..page-dims,
     margin: (top: eval(d.page.margin.top), bottom: eval(d.page.margin.bottom),
       inside: eval(d.page.margin.inner), outside: eval(d.page.margin.outer)), numbering: none, header: none, footer: none)
   if not preview {

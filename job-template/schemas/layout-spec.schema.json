@@ -5,7 +5,7 @@
   "properties": {
     "schema": {"type": "string", "enum": ["bookorder/layout-spec@1"]},
     "id": {"type": "string", "pattern": "[a-z][a-z0-9-]*"},
-    "page_size": {"type": "string", "enum": ["A5", "B5", "A4", "Letter"]},
+    "page_size": {"type": "string", "enum": ["A5", "B5", "A4", "Letter", "B6", "custom"]},
     "orientation": {"type": "string", "enum": ["portrait", "landscape"]},
     "writing_mode": {"type": "string", "enum": ["horizontal-tb", "vertical-rl"]},
     "text_direction": {"type": "string", "enum": ["ltr", "rtl"]},
@@ -55,6 +55,13 @@
         "quote": {"enum": [1, 2, "full"]},
         "code": {"enum": [1, 2, "full"]},
         "equation": {"enum": [1, 2, "full"]}
+      }
+    },
+    "span_policy": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "figure": {"type": "string", "enum": ["auto", "column", "full"]},
+        "table": {"type": "string", "enum": ["auto", "column", "full"]}
       }
     },
     "writing": {

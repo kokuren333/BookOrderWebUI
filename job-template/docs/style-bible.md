@@ -73,3 +73,18 @@ grid, axis and baseline styles and retains direct label and uncertainty policy
 in its render metadata. The specimen generator writes paired PDFs and a
 `style-grammar-comparison.yaml` with the same LayoutSpec and semantic content.
 Visual rejection remains upstream of asset generation.
+
+## Presets and high-level controls (P1-UI)
+
+`project.style_preset` chooses the genre template (`styles/genres/<template>.yaml`) independently of the profile
+genre: technical-clean → technical, medical-evidence → medical_science, practical-guide → practical,
+critical-editorial → criticism, essay → essay. Without it the profile genre's template is used, as before. The
+resolved file records `preset`.
+
+`project.style_controls` maps a few editorial choices onto existing StyleBible fields (definitions in
+`schemas/publication-presets.json`): `visual_density` (tone, spacing scale, visual_grammar.rhythm.section_space),
+`typography_scale` (all type roles ±6 %, never below the 6.5 pt minimum), `callout_intensity` (key point / warning /
+definition treatments), `table_density` (table and visual_grammar row spacing), `chapter_opener`
+(chapter_opener.title_style: editorial, academic, minimal) and `visual_tone` (tone.restraint, tone.ornament).
+Controls apply after the template and art direction and before `project.style_bible`, which still wins. Preset and
+controls enter `inputs_fingerprint` only when present, so existing jobs keep their fingerprint.

@@ -148,7 +148,8 @@ def pdf_ast(ir, layout=None, grammar=None):
             value = apply_numeric_table_alignment(value, (grammar or {}).get('table'))
             identifier = value['c'][0][0]
             planned = __import__('figure_spec').planned_geometry().get(identifier, {})
-            geometry = __import__('figure_spec').resolve(planned, {'layout_spec': layout}, 'table')
+            geometry = __import__('figure_spec').resolve(planned, {'layout_spec': layout}, 'table',
+                                                         {'table_columns': len(value['c'][2])})
             rendered = {key: transform(item) for key, item in value.items()}
             if columns == 1: return rendered
             table_mark = mark(el='figure-geometry', id=identifier, placement=geometry['placement'],

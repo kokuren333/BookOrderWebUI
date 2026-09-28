@@ -4,6 +4,7 @@ import { loadTemplates } from './templates';
 import { loadRuntime, runtimeCatalog, runtimeTargets, type RuntimeCatalog, type RuntimeTarget } from './runtime';
 import { InfoPages, type InfoPage } from './InfoPages';
 import { DesignPanel } from './DesignPanel';
+import { PublicationPanel } from './PublicationPanel';
 
 export default function App() {
   const currentPage = (): InfoPage => location.hash === '#contents' ? 'contents' : location.hash === '#safety' ? 'safety' : 'job';
@@ -71,8 +72,9 @@ export default function App() {
         </section>
         <section><div className="section-heading"><span>03</span><h2>調査と図表の方針</h2></div><div className="row"><div><h3>Research</h3>{toggles('research', { allow_web_research: '追加Web調査を許可', prefer_primary_sources: '一次資料・信頼できる資料を優先', keep_provenance: '出典と調査履歴を保存', require_supplied_coverage: '関連する提供資料をすべて本文に反映' })}<label>Citation style<select value={form.citationStyle} onChange={e => field('citationStyle', e.target.value as BookForm['citationStyle'])}><option value="numeric">番号式 [1]</option><option value="author-year">著者・年 (Smith 2024)</option><option value="note">脚注式</option></select></label></div><div><h3>Figures</h3>{toggles('figures', { tables: '必要に応じて表を作成', diagrams: '必要に応じて技術図を作成', charts: '必要に応じてグラフを作成', generative_images: '利用可能なら生成画像ツールを使用' })}</div></div><small>科学・技術図は、表・Mermaid・Graphviz・SVG・プログラムによる描画を優先します。</small></section>
         <section><div className="section-heading"><span>04</span><h2>希望する出力</h2></div><div className="outputs"><div><h3>Canonical source</h3>{toggles('outputs', { canonical_markdown: 'Markdown project（必須）' })}<small>章別原稿・メタデータ・文献・図版。<br />再編集するための正本です。</small></div><div><h3>Interchange</h3>{toggles('outputs', { docx: 'DOCX', semantic_html: 'Semantic HTML' })}<small>Word編集やDTPへの受け渡し。</small></div><div><h3>Publication</h3>{toggles('outputs', { pdf: 'PDF', static_site: 'Static website', epub: 'EPUB' })}<small>読者向けの完成出版物。</small></div></div></section>
+        <PublicationPanel value={form.publication} design={form.design} onChange={value => field('publication', value)} onDesignChange={value => field('design', value)} />
         <DesignPanel value={form.design} onChange={value => field('design', value)} />
-        <section><div className="section-heading"><span>06</span><h2>Agentが実行する環境</h2></div>
+        <section><div className="section-heading"><span>07</span><h2>Agentが実行する環境</h2></div>
           <label>OS / CPU<select value={form.runtimeTarget} onChange={e => field('runtimeTarget', e.target.value as RuntimeTarget)}>{runtimeTargets.map(target => <option key={target.id} value={target.id}>{target.label}</option>)}<option value="none">同梱なし · 既存の実行環境を使用</option></select></label>
           {form.runtimeTarget !== 'none' ? <><p>Python・Pandoc・Typst・日本語フォントを同梱します。Agentが実行するマシンのOSとCPUを選んでください。</p><small>インストールや追加ダウンロードは不要です。対応ソース・ライセンス通知もZIPに含めます。Linuxはglibc 2.17以降が対象です。</small>{catalog && <small>同梱データ：約{Math.ceil((catalog.shared.bytes + (catalog.platforms.find(p => p.id === form.runtimeTarget)?.pack.bytes || 0)) / 1024 / 1024)} MB（ダウンロードZIPは圧縮されます）</small>}{!catalog && <p role="status">{catalogError || '実行環境一覧を読み込み中…'}</p>}</> : <small>Agent側にPython・Pandoc・Typstが必要です。</small>}
         </section>

@@ -38,7 +38,7 @@ DEFAULTS = {
 LINE_WEIGHT = {"thin": 0.45, "regular": 0.6, "bold": 0.9}
 DEFAULT_ASPECT = {"diagram": None, "chart": "16:10", "image": "3:2", "screenshot": None}
 
-PAPER_MM = {"A5": (148, 210), "A4": (210, 297), "B5": (176, 250), "Letter": (215.9, 279.4)}
+PAPER_MM = {"A5": (148, 210), "A4": (210, 297), "B5": (176, 250), "B6": (125, 176), "Letter": (215.9, 279.4)}
 UNIT_MM = {"mm": 1.0, "cm": 10.0, "in": 25.4, "pt": 25.4 / 72}
 SAFE_EDGE_MM = 5.0
 CAPTION_RESERVE_MM = 22.0
@@ -101,8 +101,12 @@ def figure_tokens(tokens=None):
 
 def page_frame(tokens=None):
     page = (tokens or {}).get("page", {}); margin = page.get("margin", {})
-    width, height = PAPER_MM.get(page.get("size", "A5"), PAPER_MM["A5"])
-    if page.get("orientation") == "landscape": width, height = height, width
+    layout_page = ((tokens or {}).get("layout_spec") or {}).get("page") or {}
+    if layout_page.get("width_mm") and layout_page.get("height_mm"):  # LayoutSpec is the geometry authority (B6, custom)
+        width, height = float(layout_page["width_mm"]), float(layout_page["height_mm"])
+    else:
+        width, height = PAPER_MM.get(page.get("size", "A5"), PAPER_MM["A5"])
+        if page.get("orientation") == "landscape": width, height = height, width
     m = {k: length_mm(margin.get(k), d) for k, d in (("top", 20), ("bottom", 20), ("inner", 20), ("outer", 17))}
     return {"page_width_mm": width, "page_height_mm": height, "text_width_mm": round(width - m["inner"] - m["outer"], 2),
             "text_height_mm": round(height - m["top"] - m["bottom"], 2), **{f"margin_{k}_mm": v for k, v in m.items()}}
@@ -137,9 +141,31 @@ def _ratio(value):
     return float(match.group(1)) / float(match.group(2)) if match and float(match.group(2)) else None
 
 
-def resolve(geometry=None, tokens=None, kind=None):
+AUTO_TABLE_MIN_COLUMNS = 5  # mirrors schemas/publication-presets.json auto_span.table_min_columns
+try:
+    AUTO_TABLE_MIN_COLUMNS = int(json.loads((ROOT / "schemas/publication-presets.json").read_text(encoding="utf-8"))["auto_span"]["table_min_columns"])
+except Exception: pass
+
+
+def auto_span(geometry, tokens, kind, hints=None):
+    """LayoutSpec span_policy `auto`: an element without an explicit span leaves its column only when it needs the
+    width (declared width wider than a column, or a table with many columns). Returns "full" or None."""
+    layout = (tokens or {}).get("layout_spec") or {}
+    columns = int((layout.get("body") or {}).get("columns", 1))
+    category = "table" if kind == "table" else "figure"
+    if columns < 2 or ((layout.get("span_policy") or {}).get(category)) != "auto": return None
+    if "span" in (geometry or {}) or (geometry or {}).get("placement", "column") != "column": return None
+    declared = length_mm((geometry or {}).get("width_mm"))
+    if declared is not None and declared > frames(tokens)["column"]["width_mm"] + 0.01: return "full"
+    if category == "table" and int((hints or {}).get("table_columns", 0)) >= AUTO_TABLE_MIN_COLUMNS: return "full"
+    return None
+
+
+def resolve(geometry=None, tokens=None, kind=None, hints=None):
     """Normalized print geometry: placement, width_mm, height_mm (None = content decides), aspect_ratio."""
     geometry = dict(geometry or {}); warnings = []
+    promoted = auto_span(geometry, tokens, kind, hints)
+    if promoted: geometry["span"] = promoted
     layout = (tokens or {}).get("layout_spec") or {}
     columns = int((layout.get("body") or {}).get("columns", 1))
     category = "table" if kind == "table" else "figure"
@@ -169,8 +195,10 @@ def resolve(geometry=None, tokens=None, kind=None):
         height = frame["max_height_mm"]
     if frame.get("note"): warnings.append(frame["note"])
     region = "full-width" if span == "full" else frame_name
-    return {"placement": placement, "span": span, "region": region, "width_mm": round(width, 2), "height_mm": round(height, 2) if height else None,
-            "aspect_ratio": aspect, "declared": bool(geometry), "warnings": warnings}
+    result = {"placement": placement, "span": span, "region": region, "width_mm": round(width, 2), "height_mm": round(height, 2) if height else None,
+              "aspect_ratio": aspect, "declared": bool(geometry), "warnings": warnings}
+    if promoted: result["span_source"] = "span_policy.auto"
+    return result
 
 
 def planned_geometry():

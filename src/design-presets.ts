@@ -9,3 +9,9 @@ export function designDefaults(theme = 'modern-technical'): DesignOptions {
     footnoteFont: spec.typography.footnote.japanese, footnoteSize: parseFloat(spec.typography.footnote.size), chapterStyle: spec.components.chapter_opener,
     figureStyle: spec.figures.style, tableStyle: spec.components.table, calloutStyle: spec.components.callout, customCss: '', artDirection: '' };
 }
+
+/** A theme's page settings (size, margins) — the Design Spec defaults LayoutSpec starts from when nothing is requested. */
+export function themePage(theme = 'modern-technical'): { size: string; margin: Record<string, string> } {
+  const spec = JSON.parse(specs[`../job-template/themes/${theme}/theme.yaml`] as string);
+  return { size: spec.page.size, margin: spec.page.margin };
+}

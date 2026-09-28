@@ -32,7 +32,8 @@ PAGE_TIERS = ((80, "short"), (200, "standard"), (450, "long"))
 # Characters of running text on a full text-only page, A5 at standard density (measured: a 10pt Japanese A5
 # page holds about 780 non-space characters). Page size and density scale it.
 TEXT_PAGE_CHARS = {"ja": 780, "zh": 800, "ko": 700, "default": 2200}
-PAGE_AREA = {"A5": 1.0, "B5": 1.42, "A4": 2.0, "Letter": 1.95}
+PAGE_AREA = {"A5": 1.0, "B5": 1.42, "A4": 2.0, "Letter": 1.95, "B6": 0.71}
+A5_AREA_MM2 = 148.0 * 210.0
 DENSITY = {"compact": 1.15, "standard": 1.0, "spacious": 0.85}
 
 CHAPTER_END = ("key_points", "open_question", "bridge_to_next", "further_reading", "check_questions", "exercises", "checklist", "summary")
@@ -144,6 +145,26 @@ def body_for_pages(pages, chars_per_text_page, nonprose, front, back_share):
     return int(round(main * chars_per_text_page * (1 - nonprose))), front
 
 
+def page_basis(project, design):
+    """(page size name, area relative to A5) for the characters-per-page model. A layout requested in project.json
+    (layout_preset / layout_spec, e.g. from the WebUI) wins over the Design Spec page, so B6 and custom sizes count."""
+    size = (design.get("page") or {}).get("size", "A5")
+    chosen = {}
+    if project.get("layout_preset") or project.get("layout_spec"):
+        try:
+            import layout_spec
+            chosen = layout_spec.request(project)
+        except Exception: chosen = {}
+    size = chosen.get("page_size") or size
+    if size in PAGE_AREA and size != "custom": return size, PAGE_AREA[size]
+    page = chosen.get("page") or {}
+    try:
+        import layout_spec
+        width, height = (float(page["width_mm"]), float(page["height_mm"])) if size == "custom" else layout_spec.page_dimensions(size)
+    except Exception: return size, 1.0
+    return size, round(width * height / A5_AREA_MM2, 3)
+
+
 def resolve(project, design=None):
     """The resolved profile (a dict). Deterministic: no clock, no environment beyond the arguments and data files."""
     design = design or {}
@@ -164,11 +185,11 @@ def resolve(project, design=None):
     # override, else from a compatibility page target, else from the tier.
     scale = profile["scale"]
     language = str((project.get("book") or {}).get("language", "en")).split("-")[0].lower()
-    size = (design.get("page") or {}).get("size", "A5"); density = (design.get("layout") or {}).get("density", "standard")
+    size, area = page_basis(project, design); density = (design.get("layout") or {}).get("density", "standard")
     overrides = dict(ask["overrides"])
     for path in [p for p in overrides if p.startswith("scale.")]:
         if path != "scale.target_body_chars": _set(profile, path, overrides.pop(path))
-    per_page = overrides.pop("scale.chars_per_text_page", None) or TEXT_PAGE_CHARS.get(language, TEXT_PAGE_CHARS["default"]) * PAGE_AREA.get(size, 1.0) * DENSITY.get(density, 1.0)
+    per_page = overrides.pop("scale.chars_per_text_page", None) or TEXT_PAGE_CHARS.get(language, TEXT_PAGE_CHARS["default"]) * area * DENSITY.get(density, 1.0)
     if ask["compatibility"]["characters_per_page"]:  # legacy: effective characters per page, devices included
         per_page = float(ask["compatibility"]["characters_per_page"]) / (1 - scale["nonprose_share_target"])
     per_page = round(float(per_page))
@@ -192,6 +213,7 @@ def resolve(project, design=None):
 
     inputs = {"tier": tier, "genre": genre, "request": {k: ask[k] for k in ("tier", "genre", "overrides", "compatibility")},
               "language": language, "page_size": size, "density": density}
+    if size not in PAGE_AREA: inputs["page_area"] = area
     fingerprint = "sha256:" + hashlib.sha256(json.dumps(inputs, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()[:24]
     result = {"schema": SCHEMA, "id": f"{ask['tier']}.{ask['genre'] or 'general'}", "tier": ask["tier"], "genre": ask["genre"] or "general",
               "resolved_from": resolved_from,
