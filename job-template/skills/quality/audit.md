@@ -11,6 +11,13 @@ a choice the user explicitly asked for (no chapter summaries, a one-sided critic
 topic) is not a defect and must not be sent to rewriting. A departure from the user's instructions is an issue with
 `type: user-intent`. Factual, citation and provenance errors are always issues, whatever the instructions say.
 
+Source roles (plan/source-roles.yaml) are part of citation integrity: a citation of a background, structure or
+reference-only source is a `source-role` issue (BookOrder detects it); a factual claim supported only by background
+or experience sources is a high `source-role` issue; a claim below the evidence policy's authority
+(plan/publication-architecture.yaml evidence_policy) is an `evidence-authority` issue. Structural problems — the
+same chapter template everywhere, exercises without answers, exercises or blocks the architecture excludes — are
+`publication-architecture` issues (reports/publication-architecture-qa.yaml).
+
 ## Chapter audit (tasks `audit:<chapter>`, parallel)
 
 Re-read the chapter against its packet, the research notes and source texts, and the Book Bible. Check factual

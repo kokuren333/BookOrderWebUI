@@ -34,7 +34,11 @@ their explanation, overflow, missing glyphs, extreme density differences between
 navigation, search, mobile width and dark mode. Fix causes in canonical source or Design Spec, rebuild with
 `bookorder goal`, then record what you actually inspected in reports/layout-review.md. Never invent checks.
 
-By default use key-point for conclusions, definition for terms, warning/note for cautions and summary at chapter
-ends where the plan has them — unless the user's instructions exclude them. Keep ordinary paragraphs dominant; do
+Use key-point for conclusions, definition for terms, warning/note for cautions and a summary only where the
+editorial plan has one — the publication architecture decides the blocks, not the theme. Design for the book's
+reading mode (plan/publication-architecture.yaml): lookup books need scannable structure, continuous reading calm
+text pages. Uploaded layout references (plan/layout-references.yaml) inform composition only — geometry, margins,
+columns, hierarchy, density, captions, whitespace, rhythm — and are recorded in plan/design-decisions.yaml
+`layout_references_applied`; never copy their content. Keep ordinary paragraphs dominant; do
 not box every paragraph or add decorative assets to fill pages. With user instructions, write `intent_check` in
 plan/design-decisions.yaml.

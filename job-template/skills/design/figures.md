@@ -107,3 +107,13 @@ not generated and must not be referenced in the text yet.
   is revised. `project.image_generation.provider: fake` is for offline integration tests only.
 
 Refer to assets with `@fig:`, `@tbl:`, `@eq:` so numbering stays correct after reordering.
+
+## Visual plan first
+
+Asset planning realises plan/visual-plan.yaml (skills/design/visual-planning.md): the type, purpose, content, reason,
+method and caption intent were decided before drafting. Keep the visual grammar varied where the content varies —
+decision trees, comparison and decision tables, timelines, case flows, algorithm cards, annotated images — and do not
+turn everything into box-and-arrow flows. Uploaded images and diagrams follow the user's per-file instructions
+(plan/uploaded-assets.yaml): record `uploaded_assets` decisions in plan/assets-plan.yaml; a placed upload is a
+`screenshot`-type figure with `path: source/assets/uploaded/<file>` and `uploaded_asset: asset-00N`; redraw only when
+redraw is allowed and credit the source. Layout, style and visual references are never placed.

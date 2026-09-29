@@ -14,7 +14,8 @@ AUDIT_DIR = ROOT / "plan/audit"
 SEVERITIES = ("high", "medium", "low")
 AGENT_TYPES = ("factual-inconsistency", "unsupported-claim", "source-mismatch", "contradiction", "terminology-drift",
                "inconsistent-definition", "repetition", "duplicated-example", "dependency-error", "missing-transition",
-               "narrative", "chapter-balance", "figure", "table", "equation", "cross-reference", "bibliography", "design", "layout-pacing", "visual-plan", "other")
+               "narrative", "chapter-balance", "figure", "table", "equation", "cross-reference", "bibliography", "design", "layout-pacing", "visual-plan",
+               "source-role", "evidence-authority", "publication-architecture", "user-intent", "other")
 CALLOUTS = {"note", "tip", "warning", "definition", "key-point", "example", "exercise", "summary", "checklist", "sidebar", "pull-quote"}
 HARD_CITATION = re.compile(r"(?<![\w\]])\[(?:\d{1,3})(?:\s*[,–-]\s*\d{1,3})*\](?!\()")
 NUMERIC_FACT = re.compile(r"\d[\d,.]*\s*(?:%|％|percent|倍|億|万|million|billion)|(?:19|20)\d{2}\s*年")
@@ -143,6 +144,13 @@ def balance_issues(contracts):
 def citation_issues(records, project):
     issues = []
     index = registry.load_index(); known = registry.by_id(index)
+    import source_roles
+    roles = source_roles.table(index, write=False)
+    try:
+        import publication_architecture as pa
+        minimum = int(pa.load(project).get("evidence_policy", {}).get("minimum_rank_for_factual_claims") or 0)
+    except Exception: minimum = 0
+    rank = lambda sid: source_roles.AUTHORITY.get(roles.get(sid, {}).get("authority"), {}).get("rank")
     try: keys = set(bibliography_keys())
     except Exception as exc: keys = set(); issues.append(issue("bibliography", "high", None, f"Bibliography cannot be read: {exc}"))
     for record in records.values():
@@ -155,12 +163,26 @@ def citation_issues(records, project):
                 issues.append(issue("source-mismatch", "high", record["id"], f"{key} is {known[key]['ingest_status']}; it cannot support a claim", cite["section"], evidence=key))
             elif key in known and key not in keys:
                 issues.append(issue("bibliography", "high", record["id"], f"{key} is missing from the generated bibliography; rerun reference assignment", cite["section"]))
+            elif key in roles and not roles[key]["citation_allowed"]:
+                entry = roles[key]
+                issues.append(issue("source-role", "high", record["id"], f"{key} ({entry.get('title')}) is a {entry['role']} source: it may inform the text but is not a "
+                                    "citation for claims. Cite an evidence source, or drop the citation (it is listed under 参考資料)", cite["section"], evidence=key))
         for section, block in iter_blocks(record):
             if block["t"] in ("Para", "Plain"):
                 text = plain(block["c"])
                 if HARD_CITATION.search(text):
                     issues.append(issue("bibliography", "high", record["id"], "Hard-coded visible citation number; use [cite:src-XXXX]", section, evidence=HARD_CITATION.search(text).group(0)))
                 has_cite = any(n["t"] == "Cite" for n in walk(block["c"]))
+                cited_here = [c["citationId"] for n in walk(block["c"]) if n["t"] == "Cite" for c in n["c"][0]]
+                if cited_here and NUMERIC_FACT.search(text):
+                    if all(roles.get(k, {}).get("role") == "background" and (not roles[k]["citation_allowed"] or roles[k]["role_origin"] == "user") for k in cited_here):
+                        issues.append(issue("source-role", "high", record["id"], "Factual statement supported only by background sources ("
+                                            + ", ".join(cited_here) + "); add evidence", section, evidence=text[:80]))
+                    ranks = [rank(k) for k in cited_here]
+                    if minimum and all(r is not None for r in ranks) and max(ranks) < minimum:
+                        issues.append(issue("evidence-authority", "medium", record["id"], f"Factual statement cites only sources below the evidence policy's authority "
+                                            f"({', '.join(k + ': ' + str(roles.get(k, {}).get('authority')) for k in cited_here)}); "
+                                            "add a guideline / governmental / peer-reviewed source or soften the claim", section, action="verify", evidence=text[:80]))
                 if len(NUMERIC_FACT.findall(text)) >= 2 and not has_cite:
                     issues.append(issue("unsupported-claim", "low", record["id"], "Paragraph states several figures/dates without a citation; verify support", section, action="verify", evidence=text[:80]))
     return issues
@@ -299,7 +321,17 @@ def audit_checks(records, chapters, contracts, cov, project=None, scale=None):
     project = project or read_project()
     return (integration_checks(records, chapters, contracts) + citation_issues(records, project) + asset_issues(records, chapters)
             + coverage_issues(cov) + design_issues() + pacing_issues(records)
-            + paragraph_length_issues(records, chapters, scale or {}))
+            + paragraph_length_issues(records, chapters, scale or {}) + architecture_issues(records, chapters, project))
+
+
+def architecture_issues(records, chapters, project):
+    """High findings of the publication architecture QA that the manuscript must fix (forbidden blocks, exercises
+    without answers, exercises the book should not have) enter the ledger as rewrite targets."""
+    import publication_architecture as pa
+    if pa.request(project)["legacy"]: return []
+    import architecture_qa
+    try: return architecture_qa.ledger_issues(architecture_qa.run(chapters, records, project, write=False))
+    except Exception as exc: return [issue("publication-architecture", "low", None, f"architecture QA could not run: {exc}")]
 
 
 # ---------------------------------------------------------------- agent reviews

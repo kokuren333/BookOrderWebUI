@@ -339,7 +339,7 @@ def assertions(agent, urls):
     assert placed and placed[0]["geometry"]["width_mm"] == 96 and placed[0]["geometry"]["legibility"] == "ok", placed
     assert (WORK / "publish/result.zip").is_file()
     gates = json.loads((WORK / "reports/completion-gates.json").read_text(encoding="utf-8"))
-    assert gates["passed"] and len(gates["gates"]) == 22 and all(g["passed"] for g in gates["gates"] if g["id"] in (17, 18, 19, 20, 21, 22))
+    assert gates["passed"] and len(gates["gates"]) == 23 and all(g["passed"] for g in gates["gates"] if g["id"] in (17, 18, 19, 20, 21, 22, 23))
     intent_gate = next(g for g in gates["gates"] if g["id"] == 22)
     assert "1 conflicts reported" in intent_gate["detail"] and "chapter_end_missing" in intent_gate["detail"], intent_gate
     assert {"architecture", "drafting", "prose_editing", "design", "layout", "audit"} <= agent.intent_tasks, agent.intent_tasks

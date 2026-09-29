@@ -1,0 +1,1393 @@
+{
+  "schema": "bookorder/publication-architecture-vocabulary@1",
+  "note": "Single source of truth for the intent-driven publication architecture. Read by the Python job scripts (scripts/publication_architecture.py, scripts/source_roles.py, scripts/bibliography.py, scripts/editorial_plan.py, scripts/architecture_qa.py) and by the WebUI (src/architecture.ts). Do not duplicate these lists elsewhere.",
+  "structure_modes": {
+    "auto": {
+      "label": "AUTO",
+      "description": "BookOrder infers the publication archetype, block policy, visual policy and chapter architecture from the user's intent and the material. Chapters may differ in structure.",
+      "description_ja": "意図と資料から、出版物タイプ・ブロック方針・図表方針・章構成をBookOrderが設計します。章ごとに異なる構成を許可します。"
+    },
+    "guided": {
+      "label": "GUIDED",
+      "description": "The user fixes the publication type, block preferences, exercise and visual policy; BookOrder designs chapters inside those constraints.",
+      "description_ja": "選んだ出版物タイプ・ブロック方針・問題/図表方針を制約として、その範囲でBookOrderが章を設計します。"
+    },
+    "fixed": {
+      "label": "FIXED",
+      "description": "Legacy template behaviour: the profile's chapter-end apparatus is required in every chapter and devices follow the profile counts. Jobs without publication_architecture in project.json run in this mode.",
+      "description_ja": "従来のテンプレート動作：プロファイルの章末要素を全章に必須とし、要素数もプロファイルに従います（互換用）。"
+    }
+  },
+  "default_mode": "auto",
+  "legacy_mode": "fixed",
+  "archetypes": {
+    "practical_guide": {
+      "label": "実務ガイド",
+      "en": "Practical guide",
+      "reading_mode": "task_lookup",
+      "chapter_strategy": "task_oriented",
+      "preferred_blocks": [
+        "checklist",
+        "workflow_diagram",
+        "case_study",
+        "warning_box",
+        "pitfalls",
+        "decision_table",
+        "next_actions",
+        "template_forms"
+      ],
+      "discouraged_blocks": [
+        "exercises",
+        "check_questions",
+        "answer_key",
+        "pull_quote"
+      ],
+      "forbidden_blocks": [],
+      "requirements": [
+        "every_major_chapter_must_have_actionable_content"
+      ],
+      "exercise_policy": "none",
+      "visual_density": "high",
+      "evidence_priority": "medium",
+      "tone": "direct and approachable",
+      "visual_preferred": [
+        "workflow",
+        "checklist_table",
+        "decision_tree",
+        "dos_and_donts",
+        "comparison_table",
+        "case_flow"
+      ],
+      "profile_genre": "practical"
+    },
+    "handbook": {
+      "label": "ハンドブック",
+      "en": "Handbook",
+      "reading_mode": "reference_lookup",
+      "chapter_strategy": "topic_modules",
+      "preferred_blocks": [
+        "comparison_table",
+        "decision_table",
+        "algorithm_card",
+        "warning_box",
+        "checklist",
+        "callout"
+      ],
+      "discouraged_blocks": [
+        "exercises",
+        "check_questions",
+        "summary",
+        "pull_quote",
+        "column"
+      ],
+      "forbidden_blocks": [],
+      "requirements": [
+        "chapters_are_self_contained"
+      ],
+      "exercise_policy": "none",
+      "visual_density": "high",
+      "evidence_priority": "high",
+      "tone": "concise and precise",
+      "visual_preferred": [
+        "comparison_table",
+        "algorithm_card",
+        "decision_tree",
+        "checklist_table"
+      ],
+      "profile_genre": null
+    },
+    "textbook": {
+      "label": "教科書",
+      "en": "Textbook",
+      "reading_mode": "sequential_study",
+      "chapter_strategy": "progressive_learning",
+      "preferred_blocks": [
+        "definition",
+        "key_point",
+        "figure",
+        "summary",
+        "exercises",
+        "answer_key",
+        "case_study"
+      ],
+      "discouraged_blocks": [
+        "pull_quote"
+      ],
+      "forbidden_blocks": [],
+      "requirements": [
+        "exercises_have_answers_or_explanations"
+      ],
+      "exercise_policy": "where_useful",
+      "visual_density": "medium",
+      "evidence_priority": "high",
+      "tone": "explanatory",
+      "visual_preferred": [
+        "concept_map",
+        "process_diagram",
+        "hierarchy_chart",
+        "comparison_table",
+        "data_chart"
+      ],
+      "profile_genre": null
+    },
+    "reference_book": {
+      "label": "参考書",
+      "en": "Reference book",
+      "reading_mode": "reference_lookup",
+      "chapter_strategy": "topic_modules",
+      "preferred_blocks": [
+        "comparison_table",
+        "definition",
+        "key_point",
+        "callout",
+        "further_reading"
+      ],
+      "discouraged_blocks": [
+        "exercises",
+        "pull_quote",
+        "column"
+      ],
+      "forbidden_blocks": [],
+      "requirements": [],
+      "exercise_policy": "optional",
+      "visual_density": "medium",
+      "evidence_priority": "high",
+      "tone": "precise",
+      "visual_preferred": [
+        "comparison_table",
+        "hierarchy_chart",
+        "summary_infographic"
+      ],
+      "profile_genre": null
+    },
+    "workbook": {
+      "label": "ワークブック",
+      "en": "Workbook",
+      "reading_mode": "active_practice",
+      "chapter_strategy": "practice_units",
+      "preferred_blocks": [
+        "exercises",
+        "answer_key",
+        "template_forms",
+        "checklist",
+        "case_reflection"
+      ],
+      "discouraged_blocks": [
+        "pull_quote",
+        "column"
+      ],
+      "forbidden_blocks": [],
+      "requirements": [
+        "exercises_have_answers_or_explanations"
+      ],
+      "exercise_policy": "every_chapter",
+      "visual_density": "medium",
+      "evidence_priority": "medium",
+      "tone": "encouraging",
+      "visual_preferred": [
+        "checklist_table",
+        "workflow",
+        "dialogue_card"
+      ],
+      "profile_genre": null
+    },
+    "exam_preparation": {
+      "label": "試験対策・問題集",
+      "en": "Exam preparation",
+      "reading_mode": "active_practice",
+      "chapter_strategy": "exam_domains",
+      "preferred_blocks": [
+        "exercises",
+        "answer_key",
+        "key_point",
+        "pitfalls",
+        "comparison_table",
+        "summary"
+      ],
+      "discouraged_blocks": [
+        "pull_quote",
+        "column"
+      ],
+      "forbidden_blocks": [],
+      "requirements": [
+        "exercises_have_answers_or_explanations"
+      ],
+      "exercise_policy": "exam_focused",
+      "visual_density": "medium",
+      "evidence_priority": "high",
+      "tone": "clear and exam-oriented",
+      "visual_preferred": [
+        "comparison_table",
+        "summary_infographic",
+        "decision_tree",
+        "timeline"
+      ],
+      "profile_genre": null
+    },
+    "tutorial": {
+      "label": "チュートリアル",
+      "en": "Tutorial",
+      "reading_mode": "follow_along",
+      "chapter_strategy": "step_by_step",
+      "preferred_blocks": [
+        "algorithm_card",
+        "figure",
+        "warning_box",
+        "next_actions",
+        "pitfalls"
+      ],
+      "discouraged_blocks": [
+        "pull_quote",
+        "column",
+        "check_questions"
+      ],
+      "forbidden_blocks": [],
+      "requirements": [
+        "every_major_chapter_must_have_actionable_content"
+      ],
+      "exercise_policy": "optional",
+      "visual_density": "high",
+      "evidence_priority": "medium",
+      "tone": "direct",
+      "visual_preferred": [
+        "process_diagram",
+        "annotated_image",
+        "workflow",
+        "algorithm_card"
+      ],
+      "profile_genre": "technical"
+    },
+    "essay_like_book": {
+      "label": "エッセイ・読み物",
+      "en": "Essay-like book",
+      "reading_mode": "continuous_reading",
+      "chapter_strategy": "narrative_arc",
+      "preferred_blocks": [
+        "pull_quote"
+      ],
+      "discouraged_blocks": [
+        "exercises",
+        "check_questions",
+        "checklist",
+        "summary",
+        "key_point",
+        "answer_key"
+      ],
+      "forbidden_blocks": [],
+      "requirements": [],
+      "exercise_policy": "none",
+      "visual_density": "minimal",
+      "evidence_priority": "low",
+      "tone": "personal and reflective",
+      "visual_preferred": [
+        "full_page_visual"
+      ],
+      "profile_genre": "essay"
+    },
+    "visual_guide": {
+      "label": "図解ガイド",
+      "en": "Visual guide",
+      "reading_mode": "skim_and_view",
+      "chapter_strategy": "visual_spreads",
+      "preferred_blocks": [
+        "infographic",
+        "figure",
+        "comparison_table",
+        "workflow_diagram",
+        "callout"
+      ],
+      "discouraged_blocks": [
+        "exercises",
+        "column",
+        "pull_quote"
+      ],
+      "forbidden_blocks": [],
+      "requirements": [
+        "visual_led_chapters"
+      ],
+      "exercise_policy": "none",
+      "visual_density": "very_high",
+      "evidence_priority": "medium",
+      "tone": "light and clear",
+      "visual_preferred": [
+        "summary_infographic",
+        "annotated_image",
+        "relationship_map",
+        "dos_and_donts",
+        "full_page_visual",
+        "anatomy_or_domain_schematic"
+      ],
+      "profile_genre": "practical"
+    },
+    "technical_manual": {
+      "label": "技術マニュアル",
+      "en": "Technical manual",
+      "reading_mode": "task_lookup",
+      "chapter_strategy": "procedures",
+      "preferred_blocks": [
+        "algorithm_card",
+        "warning_box",
+        "decision_table",
+        "checklist",
+        "figure"
+      ],
+      "discouraged_blocks": [
+        "pull_quote",
+        "column",
+        "exercises"
+      ],
+      "forbidden_blocks": [],
+      "requirements": [
+        "every_major_chapter_must_have_actionable_content"
+      ],
+      "exercise_policy": "none",
+      "visual_density": "high",
+      "evidence_priority": "high",
+      "tone": "precise and imperative",
+      "visual_preferred": [
+        "process_diagram",
+        "decision_tree",
+        "annotated_image",
+        "checklist_table"
+      ],
+      "profile_genre": "technical"
+    },
+    "academic_monograph": {
+      "label": "学術書・モノグラフ",
+      "en": "Academic monograph",
+      "reading_mode": "continuous_reading",
+      "chapter_strategy": "argument",
+      "preferred_blocks": [
+        "figure",
+        "table",
+        "counterpoint",
+        "further_reading"
+      ],
+      "discouraged_blocks": [
+        "exercises",
+        "checklist",
+        "next_actions",
+        "summary"
+      ],
+      "forbidden_blocks": [],
+      "requirements": [],
+      "exercise_policy": "none",
+      "visual_density": "low",
+      "evidence_priority": "strict",
+      "tone": "scholarly",
+      "visual_preferred": [
+        "data_chart",
+        "comparison_table",
+        "relationship_map"
+      ],
+      "profile_genre": "criticism"
+    }
+  },
+  "blocks": {
+    "summary": {
+      "label": "まとめ",
+      "device": "summary",
+      "component": "summary",
+      "positions": [
+        "chapter_end",
+        "section"
+      ],
+      "apparatus": true
+    },
+    "key_points": {
+      "label": "要点",
+      "device": "summary",
+      "component": "summary",
+      "positions": [
+        "chapter_end"
+      ],
+      "apparatus": true,
+      "alias_of": "summary"
+    },
+    "key_point": {
+      "label": "要点ボックス",
+      "device": "key_point",
+      "component": "key-point",
+      "positions": [
+        "section"
+      ]
+    },
+    "checklist": {
+      "label": "チェックリスト",
+      "device": "checklist",
+      "component": "checklist",
+      "positions": [
+        "section",
+        "chapter_end"
+      ],
+      "apparatus": true
+    },
+    "exercises": {
+      "label": "演習・問題",
+      "device": "exercises",
+      "component": "exercise",
+      "positions": [
+        "section",
+        "chapter_end"
+      ],
+      "apparatus": true,
+      "requires_answers": true,
+      "exercise": true
+    },
+    "check_questions": {
+      "label": "確認問題",
+      "device": "exercises",
+      "component": "exercise",
+      "positions": [
+        "chapter_end",
+        "section"
+      ],
+      "apparatus": true,
+      "requires_answers": true,
+      "exercise": true,
+      "alias_of": "exercises"
+    },
+    "answer_key": {
+      "label": "解答・解説",
+      "device": "answer_key",
+      "component": "exercise",
+      "marker_class": "answer-key",
+      "positions": [
+        "section",
+        "chapter_end",
+        "book_end"
+      ],
+      "answers": true
+    },
+    "pitfalls": {
+      "label": "よくある落とし穴",
+      "device": "pitfalls",
+      "component": "warning",
+      "marker_class": "pitfalls",
+      "positions": [
+        "section",
+        "chapter_end"
+      ]
+    },
+    "next_actions": {
+      "label": "次にやること",
+      "device": "next_actions",
+      "component": "checklist",
+      "marker_class": "next-actions",
+      "positions": [
+        "section",
+        "chapter_end"
+      ]
+    },
+    "case_study": {
+      "label": "ケース",
+      "device": "case_study",
+      "component": "case-study",
+      "positions": [
+        "section"
+      ]
+    },
+    "case_reflection": {
+      "label": "ケースの振り返り",
+      "device": "case_reflection",
+      "component": "note",
+      "marker_class": "case-reflection",
+      "positions": [
+        "section",
+        "chapter_end"
+      ]
+    },
+    "clinical_case": {
+      "label": "臨床事例",
+      "device": "clinical_case",
+      "component": "case-study",
+      "marker_class": "clinical-case",
+      "positions": [
+        "section"
+      ]
+    },
+    "references": {
+      "label": "章の参考資料",
+      "device": "references",
+      "component": "sidebar",
+      "marker_class": "chapter-references",
+      "positions": [
+        "chapter_end"
+      ],
+      "apparatus": true
+    },
+    "further_reading": {
+      "label": "読書案内",
+      "device": "further_reading",
+      "component": "sidebar",
+      "marker_class": "further-reading",
+      "positions": [
+        "chapter_end"
+      ],
+      "apparatus": true
+    },
+    "template_forms": {
+      "label": "書式・テンプレート",
+      "device": "template_forms",
+      "component": "example",
+      "marker_class": "template-form",
+      "positions": [
+        "section",
+        "chapter_end"
+      ]
+    },
+    "dialogue_examples": {
+      "label": "会話例",
+      "device": "dialogue_examples",
+      "component": "example",
+      "marker_class": "dialogue",
+      "positions": [
+        "section"
+      ]
+    },
+    "algorithm_card": {
+      "label": "アルゴリズムカード",
+      "device": "algorithm_card",
+      "component": "step-by-step",
+      "marker_class": "algorithm-card",
+      "positions": [
+        "section"
+      ],
+      "visual_type": "algorithm_card"
+    },
+    "warning_box": {
+      "label": "注意",
+      "device": "warning",
+      "component": "warning",
+      "positions": [
+        "section"
+      ]
+    },
+    "callout": {
+      "label": "補足",
+      "device": "callout",
+      "component": "note",
+      "positions": [
+        "section"
+      ]
+    },
+    "definition": {
+      "label": "定義",
+      "device": "definition",
+      "component": "definition",
+      "positions": [
+        "section"
+      ]
+    },
+    "glossary": {
+      "label": "用語",
+      "device": "glossary",
+      "component": "glossary-term",
+      "positions": [
+        "section"
+      ]
+    },
+    "counterpoint": {
+      "label": "反論・別解釈",
+      "device": "counterpoint",
+      "component": "counterpoint",
+      "positions": [
+        "section"
+      ]
+    },
+    "pull_quote": {
+      "label": "引用",
+      "device": "pull_quote",
+      "component": "pull-quote",
+      "positions": [
+        "section"
+      ]
+    },
+    "column": {
+      "label": "コラム",
+      "device": "column",
+      "component": "sidebar",
+      "positions": [
+        "section"
+      ],
+      "apparatus": true
+    },
+    "open_question": {
+      "label": "問い",
+      "device": "open_question",
+      "component": "note",
+      "positions": [
+        "chapter_end"
+      ],
+      "apparatus": true
+    },
+    "bridge_to_next": {
+      "label": "次章への橋渡し",
+      "device": "bridge_to_next",
+      "component": null,
+      "positions": [
+        "chapter_end"
+      ],
+      "apparatus": true
+    },
+    "figure": {
+      "label": "図",
+      "device": "figure",
+      "visual": true,
+      "positions": [
+        "section"
+      ],
+      "visual_type": "process_diagram"
+    },
+    "workflow_diagram": {
+      "label": "業務フロー図",
+      "device": "figure",
+      "visual": true,
+      "positions": [
+        "section"
+      ],
+      "visual_type": "workflow"
+    },
+    "decision_tree": {
+      "label": "判断フロー",
+      "device": "figure",
+      "visual": true,
+      "positions": [
+        "section"
+      ],
+      "visual_type": "decision_tree"
+    },
+    "infographic": {
+      "label": "インフォグラフィック",
+      "device": "figure",
+      "visual": true,
+      "positions": [
+        "section",
+        "chapter_end"
+      ],
+      "visual_type": "summary_infographic"
+    },
+    "chart": {
+      "label": "グラフ",
+      "device": "chart",
+      "visual": true,
+      "positions": [
+        "section"
+      ],
+      "visual_type": "data_chart"
+    },
+    "table": {
+      "label": "表",
+      "device": "table",
+      "visual": true,
+      "positions": [
+        "section"
+      ],
+      "visual_type": "comparison_table"
+    },
+    "comparison_table": {
+      "label": "比較表",
+      "device": "table",
+      "visual": true,
+      "positions": [
+        "section"
+      ],
+      "visual_type": "comparison_table"
+    },
+    "decision_table": {
+      "label": "判断表",
+      "device": "table",
+      "visual": true,
+      "positions": [
+        "section"
+      ],
+      "visual_type": "decision_table"
+    },
+    "timeline": {
+      "label": "年表・経過",
+      "device": "timeline",
+      "visual": true,
+      "positions": [
+        "section"
+      ],
+      "visual_type": "timeline"
+    }
+  },
+  "exercise_policies": {
+    "none": "No exercises or quizzes.",
+    "optional": "Only where a chapter's purpose is practice; never as routine apparatus.",
+    "where_useful": "Exercises where they consolidate learning, with answers or explanations.",
+    "every_chapter": "Every chapter has practice with answers or explanations.",
+    "exam_focused": "Exam-style questions with answers and explanations are a core content type."
+  },
+  "visual_densities": {
+    "minimal": 0.25,
+    "low": 0.6,
+    "medium": 1.0,
+    "high": 1.4,
+    "very_high": 1.9
+  },
+  "visual_types": {
+    "workflow": {
+      "label": "業務フロー",
+      "device": "figure",
+      "shapes": [
+        "process",
+        "sequence"
+      ],
+      "diagram": [
+        "flow",
+        "process"
+      ]
+    },
+    "decision_tree": {
+      "label": "判断フロー",
+      "device": "figure",
+      "shapes": [
+        "process",
+        "hierarchy"
+      ],
+      "diagram": [
+        "flow",
+        "hierarchy"
+      ]
+    },
+    "timeline": {
+      "label": "時系列",
+      "device": "timeline",
+      "shapes": [
+        "chronology"
+      ],
+      "diagram": [
+        "timeline"
+      ]
+    },
+    "comparison_table": {
+      "label": "比較表",
+      "device": "table",
+      "shapes": [
+        "comparison"
+      ]
+    },
+    "checklist_table": {
+      "label": "チェック表",
+      "device": "table",
+      "shapes": [
+        "comparison",
+        "sequence"
+      ]
+    },
+    "decision_table": {
+      "label": "判断表",
+      "device": "table",
+      "shapes": [
+        "comparison"
+      ]
+    },
+    "hierarchy_chart": {
+      "label": "階層図",
+      "device": "figure",
+      "shapes": [
+        "hierarchy"
+      ],
+      "diagram": [
+        "hierarchy"
+      ]
+    },
+    "concept_map": {
+      "label": "概念マップ",
+      "device": "figure",
+      "shapes": [
+        "relation"
+      ],
+      "diagram": [
+        "concept-map",
+        "network"
+      ]
+    },
+    "algorithm_card": {
+      "label": "アルゴリズムカード",
+      "device": "component",
+      "shapes": [
+        "process"
+      ]
+    },
+    "dialogue_card": {
+      "label": "会話カード",
+      "device": "component",
+      "shapes": [
+        "sequence"
+      ]
+    },
+    "case_flow": {
+      "label": "ケースの経過",
+      "device": "figure",
+      "shapes": [
+        "chronology",
+        "process"
+      ],
+      "diagram": [
+        "timeline",
+        "flow"
+      ]
+    },
+    "dos_and_donts": {
+      "label": "Do / Don't",
+      "device": "table",
+      "shapes": [
+        "comparison"
+      ]
+    },
+    "summary_infographic": {
+      "label": "まとめインフォグラフィック",
+      "device": "figure",
+      "shapes": [
+        "abstract",
+        "comparison",
+        "hierarchy"
+      ],
+      "diagram": [
+        "matrix",
+        "comparison"
+      ]
+    },
+    "process_diagram": {
+      "label": "プロセス図",
+      "device": "figure",
+      "shapes": [
+        "process",
+        "causal"
+      ],
+      "diagram": [
+        "process",
+        "flow",
+        "cycle"
+      ]
+    },
+    "relationship_map": {
+      "label": "関係図",
+      "device": "figure",
+      "shapes": [
+        "relation",
+        "causal"
+      ],
+      "diagram": [
+        "network",
+        "concept-map"
+      ]
+    },
+    "anatomy_or_domain_schematic": {
+      "label": "解剖・領域の模式図",
+      "device": "figure",
+      "shapes": [
+        "source_image",
+        "abstract"
+      ]
+    },
+    "data_chart": {
+      "label": "データグラフ",
+      "device": "chart",
+      "shapes": [
+        "quantity"
+      ]
+    },
+    "annotated_image": {
+      "label": "注釈付き画像",
+      "device": "figure",
+      "shapes": [
+        "source_image"
+      ]
+    },
+    "callout": {
+      "label": "コールアウト",
+      "device": "component",
+      "shapes": [
+        "abstract"
+      ]
+    },
+    "full_page_visual": {
+      "label": "全面ビジュアル",
+      "device": "figure",
+      "shapes": [
+        "abstract",
+        "source_image"
+      ]
+    }
+  },
+  "generation_methods": [
+    "diagram_ir",
+    "native_table",
+    "chart_code",
+    "component",
+    "uploaded_asset",
+    "redraw_from_asset",
+    "generated_image",
+    "screenshot"
+  ],
+  "visual_importance": [
+    "essential",
+    "helpful",
+    "optional"
+  ],
+  "source_roles": {
+    "evidence": {
+      "label": "根拠資料",
+      "content": true,
+      "citation_allowed": true,
+      "group": "cited",
+      "description": "Facts, definitions, numbers, recommendations and claims may cite it.",
+      "description_ja": "事実・定義・数値・推奨の引用根拠にできる資料。"
+    },
+    "background": {
+      "label": "背景資料",
+      "content": true,
+      "citation_allowed": false,
+      "group": "background",
+      "description": "Understanding, viewpoints, field experience and topic discovery; not a citation for factual claims.",
+      "description_ja": "内容理解・観点・現場感の参考。事実の引用根拠にはせず、参考資料として掲載。"
+    },
+    "structure_reference": {
+      "label": "構成の参考",
+      "content": true,
+      "citation_allowed": false,
+      "group": null,
+      "description": "Chapter order and explanation sequence only.",
+      "description_ja": "章構成・説明順序の参考のみ。"
+    },
+    "style_reference": {
+      "label": "文体の参考",
+      "content": false,
+      "citation_allowed": false,
+      "group": "design",
+      "description": "Voice and atmosphere only; never copied.",
+      "description_ja": "文体・雰囲気の参考のみ（コピーしない）。"
+    },
+    "layout_reference": {
+      "label": "レイアウト参考",
+      "content": false,
+      "citation_allowed": false,
+      "group": "design",
+      "description": "Margins, columns, typesetting and figure placement only; never content.",
+      "description_ja": "余白・段組・組版・図表配置の参考のみ。内容ソースとしては読まない。"
+    },
+    "visual_reference": {
+      "label": "図解の参考",
+      "content": false,
+      "citation_allowed": false,
+      "group": "design",
+      "description": "Visual design reference only.",
+      "description_ja": "図解・見た目の参考のみ。"
+    },
+    "asset": {
+      "label": "素材",
+      "content": false,
+      "citation_allowed": false,
+      "group": "visual",
+      "description": "Placed in the publication.",
+      "description_ja": "成果物にそのまま組み込む素材。"
+    },
+    "redraw_source": {
+      "label": "再作図元",
+      "content": true,
+      "citation_allowed": true,
+      "group": "visual",
+      "description": "Understood and redrawn; credited as the figure source.",
+      "description_ja": "内容を理解して再作図する元資料（図表出典として掲載）。"
+    }
+  },
+  "citable_roles": [
+    "evidence",
+    "redraw_source"
+  ],
+  "source_authority": {
+    "primary_authoritative": {
+      "label": "一次・権威資料",
+      "rank": 5
+    },
+    "guideline": {
+      "label": "ガイドライン",
+      "rank": 5
+    },
+    "governmental": {
+      "label": "行政・公的機関",
+      "rank": 5
+    },
+    "peer_reviewed": {
+      "label": "査読論文",
+      "rank": 4
+    },
+    "institutional": {
+      "label": "学会・団体・機関",
+      "rank": 4
+    },
+    "textbook": {
+      "label": "教科書",
+      "rank": 3
+    },
+    "expert_commentary": {
+      "label": "専門家の解説",
+      "rank": 2
+    },
+    "professional_experience": {
+      "label": "実務経験・現場記事",
+      "rank": 1
+    },
+    "anecdotal": {
+      "label": "体験談",
+      "rank": 0
+    },
+    "unknown": {
+      "label": "不明",
+      "rank": null
+    }
+  },
+  "evidence_priorities": {
+    "low": 0,
+    "medium": 2,
+    "high": 3,
+    "strict": 4
+  },
+  "asset_roles": {
+    "cover_candidate": {
+      "label": "表紙候補",
+      "source_role": "asset"
+    },
+    "chapter_opener": {
+      "label": "章扉",
+      "source_role": "asset"
+    },
+    "inline_figure": {
+      "label": "本文図版",
+      "source_role": "asset"
+    },
+    "diagram_source": {
+      "label": "図の元データ",
+      "source_role": "redraw_source"
+    },
+    "table_source": {
+      "label": "表の元データ",
+      "source_role": "redraw_source"
+    },
+    "visual_reference": {
+      "label": "図解の参考",
+      "source_role": "visual_reference"
+    },
+    "style_reference": {
+      "label": "文体・雰囲気の参考",
+      "source_role": "style_reference"
+    },
+    "layout_reference": {
+      "label": "レイアウト参考",
+      "source_role": "layout_reference"
+    },
+    "background_motif": {
+      "label": "背景モチーフ",
+      "source_role": "asset"
+    },
+    "logo": {
+      "label": "ロゴ",
+      "source_role": "asset"
+    },
+    "source_material": {
+      "label": "内容資料",
+      "source_role": "evidence"
+    },
+    "redraw_source": {
+      "label": "再作図元",
+      "source_role": "redraw_source"
+    }
+  },
+  "quick_uses": {
+    "use_as_content": {
+      "label": "内容資料として使う",
+      "role": "evidence"
+    },
+    "use_as_layout_reference": {
+      "label": "レイアウト参考",
+      "role": "layout_reference",
+      "asset_role": "layout_reference"
+    },
+    "use_as_visual_reference": {
+      "label": "図解・見た目の参考",
+      "role": "visual_reference",
+      "asset_role": "visual_reference"
+    },
+    "use_as_asset": {
+      "label": "素材として配置",
+      "role": "asset",
+      "asset_role": "inline_figure"
+    },
+    "redraw": {
+      "label": "情報構造だけ再作図",
+      "role": "redraw_source",
+      "asset_role": "redraw_source"
+    }
+  },
+  "layout_reference_fields": [
+    "page_geometry",
+    "margins",
+    "columns",
+    "heading_hierarchy",
+    "line_length",
+    "body_density",
+    "figure_text_ratio",
+    "caption_style",
+    "callout_placement",
+    "table_style",
+    "chapter_opener_style",
+    "whitespace",
+    "page_rhythm",
+    "header_footer",
+    "folio",
+    "dominant_visual_grammar"
+  ],
+  "intent_fields": [
+    "publication_goal",
+    "audience",
+    "reader_level",
+    "use_context",
+    "reading_mode",
+    "tone",
+    "evidence_priority",
+    "interactivity_need",
+    "visual_need",
+    "visual_density",
+    "page_budget",
+    "expected_reading_time",
+    "publication_archetype",
+    "secondary_archetype",
+    "chapter_strategy",
+    "citation_policy",
+    "source_policy",
+    "layout_strategy"
+  ],
+  "citations": {
+    "in_text_styles": {
+      "numeric": "番号式 [1]",
+      "author-year": "著者・年 (Smith, 2024)",
+      "note": "脚注式"
+    },
+    "footnote_styles": {
+      "full": "脚注に書誌を記載",
+      "short": "脚注は著者・短縮タイトル",
+      "numbered_reference": "脚注に巻末文献番号 [n]"
+    },
+    "bibliography_styles": {
+      "standard": "templates/csl/bibliography-standard.csl",
+      "author_date": "templates/csl/bibliography-author-date.csl"
+    },
+    "bibliography_numbering": {
+      "numbered": "[1], [2] …",
+      "unnumbered": "番号なし"
+    },
+    "numbering_scope": {
+      "per_group": "カテゴリごとに1から",
+      "continuous": "全カテゴリ通し番号"
+    },
+    "bibliography_sort": {
+      "citation_order": "本文での初出順",
+      "author": "著者順",
+      "title": "タイトル順"
+    },
+    "groups": {
+      "cited": {
+        "ja": "引用文献",
+        "en": "Cited references",
+        "default": true
+      },
+      "background": {
+        "ja": "参考資料",
+        "en": "Background sources",
+        "default": true
+      },
+      "visual": {
+        "ja": "図表・画像出典",
+        "en": "Figure and image sources",
+        "default": true
+      },
+      "design": {
+        "ja": "デザイン参考資料",
+        "en": "Design references",
+        "default": false
+      }
+    }
+  },
+  "intent_signals": [
+    {
+      "id": "no_exercises",
+      "patterns": [
+        "(章末|練習|演習|確認|復習|理解度)?問題(は|を|も)?(一切)?(いらない|不要|なし|無し|禁止|付けない|つけない|入れない|載せない|省く)",
+        "(演習|クイズ)(は|を)?(いらない|不要|なし|無し|禁止|付けない|入れない)",
+        "\\b(no|without|skip)\\b[^.]{0,30}\\b(exercises?|quiz(zes)?|review questions)"
+      ],
+      "effect": {
+        "forbid": [
+          "exercises",
+          "check_questions",
+          "answer_key"
+        ],
+        "exercise_policy": "none"
+      }
+    },
+    {
+      "id": "want_exercises",
+      "patterns": [
+        "(問題|演習)(と解説|と解答)?(を|も)?(多め|多く|入れ|付け|たくさん|豊富)",
+        "問題集|試験対策|国家試験|国試|過去問|模擬試験",
+        "exam (prep|preparation)|practice questions"
+      ],
+      "effect": {
+        "prefer": [
+          "exercises",
+          "answer_key"
+        ],
+        "exercise_policy": "where_useful"
+      }
+    },
+    {
+      "id": "exam_book",
+      "patterns": [
+        "問題集|試験対策|国家試験|国試|過去問|exam (prep|preparation)"
+      ],
+      "effect": {
+        "archetype": "exam_preparation",
+        "exercise_policy": "exam_focused"
+      }
+    },
+    {
+      "id": "no_summary",
+      "patterns": [
+        "(章末)?(の)?(まとめ|要約|サマリー)(は|を)?(いらない|不要|なし|無し|付けない|つけない|入れない|省く)",
+        "\\bno (chapter )?summar(y|ies)"
+      ],
+      "effect": {
+        "forbid": [
+          "summary",
+          "key_points"
+        ]
+      }
+    },
+    {
+      "id": "no_columns",
+      "patterns": [
+        "コラム(は|を)?(いらない|不要|なし|無し|入れない|付けない)"
+      ],
+      "effect": {
+        "forbid": [
+          "column"
+        ]
+      }
+    },
+    {
+      "id": "more_cases",
+      "patterns": [
+        "(ケース|事例|症例|ケーススタディ)(を|は)?(多く|多め|豊富|たくさん|中心|重視|増や)",
+        "(many|more) (cases|case studies|examples)"
+      ],
+      "effect": {
+        "prefer": [
+          "case_study",
+          "clinical_case",
+          "case_reflection"
+        ],
+        "case_emphasis": "high"
+      }
+    },
+    {
+      "id": "more_visuals",
+      "patterns": [
+        "(図表|図解|図|イラスト|ビジュアル)(を|は)?(多く|多め|豊富|たくさん|中心|重視|増や)",
+        "visually rich|(many|more) (figures|diagrams|visuals)"
+      ],
+      "effect": {
+        "visual_density": "high"
+      }
+    },
+    {
+      "id": "fewer_visuals",
+      "patterns": [
+        "(図表|図|イラスト)(は)?(少なめ|最小限|控えめ|いらない|不要)"
+      ],
+      "effect": {
+        "visual_density": "low"
+      }
+    },
+    {
+      "id": "not_stiff",
+      "patterns": [
+        "(固|堅|硬)(すぎ|過ぎ)(ない|ず)",
+        "(やわらか|柔らか|親しみやす|カジュアル|くだけ)",
+        "not too (formal|stiff)"
+      ],
+      "effect": {
+        "tone": "approachable, not stiff"
+      }
+    },
+    {
+      "id": "no_textbook",
+      "patterns": [
+        "教科書(的|っぽ)(に|く)?(しない|せず|ない|はしない)"
+      ],
+      "effect": {
+        "discourage": [
+          "summary",
+          "key_points",
+          "exercises",
+          "check_questions"
+        ]
+      }
+    },
+    {
+      "id": "more_checklists",
+      "patterns": [
+        "チェックリスト(を|は)?(多く|多め|入れ|付け|中心|重視)"
+      ],
+      "effect": {
+        "prefer": [
+          "checklist"
+        ]
+      }
+    },
+    {
+      "id": "practical_use",
+      "patterns": [
+        "(現場|実務|臨床|業務|病棟)(で|に|の)(すぐ)?(使える|役立つ|役に立つ)|実務(ガイド|書)|マニュアル"
+      ],
+      "effect": {
+        "archetype": "practical_guide"
+      }
+    },
+    {
+      "id": "textbook_use",
+      "patterns": [
+        "教科書として|テキストとして|講義(で|用)|授業(で|用)"
+      ],
+      "effect": {
+        "archetype": "textbook"
+      }
+    },
+    {
+      "id": "visual_guide",
+      "patterns": [
+        "図解(本|ガイド|で学ぶ)|見てわかる"
+      ],
+      "effect": {
+        "archetype": "visual_guide"
+      }
+    },
+    {
+      "id": "medical_evidence",
+      "patterns": [
+        "医療|看護|臨床|医学|診療|薬剤|患者|ICU|集中治療|病棟"
+      ],
+      "effect": {
+        "evidence_priority": "high",
+        "preferred_authority": [
+          "guideline",
+          "governmental",
+          "peer_reviewed"
+        ]
+      }
+    }
+  ]
+}

@@ -71,7 +71,7 @@ export function PublicationPanel({ publication, design, targetPages, outputs, on
       aria-invalid={issues.length > 0} onChange={event => apply(Number(event.target.value))} />{issues.map(issue => <small className="field-error" key={issue.code + issue.field}>{issueText(issue, preview)}</small>)}</label>;
   const tabs: [Tab, string][] = [['basic', 'Basic'], ['geometry', 'Geometry'], ['typography', 'Typography'], ['grammar', 'Visual grammar'], ['expert', 'Expert']];
 
-  return <section className="publication"><div className="section-heading"><span>05</span><h2>出版形式とデザイン · Publication &amp; design</h2></div>
+  return <section className="publication"><div className="section-heading"><span>06</span><h2>出版形式とデザイン · Publication &amp; design</h2></div>
     <p>ふつうは <b>Basic</b> だけで十分です。おすすめの出版スタイルを選ぶと、ジャンル・レイアウト・テーマがまとめて入ります。細かく調整したいときだけ Advanced の各タブを開いてください。</p>
     <div className="mode-switch" role="tablist" aria-label="設定レベル">{tabs.map(([id, label], i) =>
       <button type="button" role="tab" key={id} aria-selected={tab === id} className={`${tab === id ? 'active' : ''} ${i === 1 ? 'first-advanced' : ''}`} onClick={() => setTab(id)}>{i ? <><small>Advanced</small>{label}</> : label}</button>)}</div>

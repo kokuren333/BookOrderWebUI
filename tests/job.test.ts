@@ -210,7 +210,14 @@ test('generated project.json and book.design.yaml stay compatible with the previ
   };
   for (const [name, form] of Object.entries(cases)) {
     const expected = await golden(name);
-    assert.deepEqual(projectData(form, [], [], modern), expected.project, name);
+    // Every field of the previous WebUI is unchanged. New jobs add the publication architecture (AUTO by default) and
+    // decoupled citation / bibliography settings; the legacy citations.style value stays as it was.
+    const { publication_architecture, citations, ...rest } = projectData(form, [], [], modern) as Record<string, unknown>;
+    const { citations: oldCitations, ...expectedRest } = expected.project;
+    assert.deepEqual(rest, expectedRest, name);
+    assert.equal((citations as { style: string }).style, oldCitations.style, name);
+    assert.deepEqual(publication_architecture, { mode: 'auto' }, name);
+    assert.equal((citations as { in_text_citation_style: string }).in_text_citation_style, oldCitations.style, name);
     assert.deepEqual(jobDesign(form, modern), expected.design, name);
   }
 });
@@ -258,4 +265,56 @@ test('the summary shows the accent the PDF will actually use', async () => {
   assert.equal(pdfAccent(preset, design, medical, lookup), '#116B78');                       // style template beats theme in PDF
   assert.equal(pdfAccent(preset, { accent: '#AA3300' }, medical, lookup), '#AA3300');        // explicit beats template
   assert.equal(pdfAccent(defaultPublication, design, medical, lookup), design.accent);
+});
+
+// ---------------------------------------------------------------- intent-driven publication architecture (WebUI → project.json)
+import { applyQuickUse, architecturePayload, citationPayload, defaultArchitecture, defaultCitation, detectSignals, inferUsage, VOCAB } from '../src/architecture.ts';
+import { execFileSync } from 'node:child_process';
+test('files carry roles: content goes to input/sources, references and figures to input/assets', async () => {
+  const png = new Uint8Array([137, 80, 78, 71]);
+  const files = [
+    { name: 'guideline.md', data: new TextEncoder().encode('# g'), size: 3, usage: { ...inferUsage('guideline.md'), authority: 'guideline', roleOrigin: 'user' as const } },
+    { name: 'nurse-blog.md', data: new TextEncoder().encode('# b'), size: 3 },                                   // estimated: background
+    { name: 'layout-sample.pdf', data: new Uint8Array([37, 80]), size: 2 },                                      // estimated: layout reference
+    { name: 'ward-flow.png', data: png, size: 4, type: 'image/png', usage: { ...inferUsage('ward-flow.png', 'image/png'), intendedChapter: '第2章', notes: '第2章の病棟業務の流れを説明する場所で使用', roleOrigin: 'user' as const } },
+  ];
+  assert.equal(inferUsage('nurse-blog.md').role, 'background');
+  assert.equal(inferUsage('layout-sample.pdf').role, 'layout_reference');
+  assert.equal(inferUsage('ward-flow.png', 'image/png').assetRole, 'inline_figure');
+  assert.equal(applyQuickUse(inferUsage('chart.png'), 'redraw').role, 'redraw_source');
+  const form = { ...baseForm(), instructions: '章末問題はいらない。ケースを多く。' };
+  const zip = await JSZip.loadAsync((await generateJob(form, files, await templateFiles())).data);
+  const project = JSON.parse(await zip.file('publishing-job/project.json')!.async('string'));
+  assert.deepEqual(project.input.sources.map((s: { path: string }) => s.path), ['input/sources/guideline.md', 'input/sources/nurse-blog.md']);
+  assert.deepEqual(project.input.sources.map((s: { usage: { role: string } }) => s.usage.role), ['evidence', 'background']);
+  assert.equal(project.input.sources[1].usage.role_origin, 'inferred');
+  assert.deepEqual(project.input.assets.map((a: { id: string; path: string; usage: { role: string } }) => [a.id, a.path, a.usage.role]),
+    [['asset-001', 'input/assets/layout-sample.pdf', 'layout_reference'], ['asset-002', 'input/assets/ward-flow.png', 'asset']]);
+  assert.equal(project.input.assets[1].usage.intended_chapter, '第2章');
+  assert.ok(zip.file('publishing-job/input/assets/ward-flow.png') && !zip.file('publishing-job/input/sources/ward-flow.png'));
+  const task = await zip.file('publishing-job/TASK.md')!.async('string');
+  assert.ok(task.includes('## Publication architecture') && task.includes('「章末問題はいらない」') && task.includes('## Inputs and their roles'));
+  assert.ok(task.includes('input/assets/layout-sample.pdf: layout_reference'));
+});
+test('structure modes, block policy and decoupled citations are written as chosen', () => {
+  assert.deepEqual(architecturePayload(defaultArchitecture), { mode: 'auto' });
+  const guided = { ...defaultArchitecture, mode: 'guided' as const, archetype: 'exam_preparation', secondaryArchetype: 'textbook', blocks: { exercises: 'preferred' as const, column: 'forbidden' as const },
+    exercisePolicy: 'exam_focused', visualDensity: 'high', visualAvoid: ['workflow'], evidencePriority: 'strict', preferredAuthority: ['guideline'] };
+  assert.deepEqual(architecturePayload(guided), { mode: 'guided', archetype: 'exam_preparation', secondary_archetype: 'textbook',
+    block_policy: { preferred: ['exercises'], forbidden: ['column'] }, exercise_policy: 'exam_focused', visual_policy: { density: 'high', avoid_types: ['workflow'] },
+    evidence_policy: { priority: 'strict', preferred_authority: ['guideline'] } });
+  assert.ok(validateForm({ ...baseForm(), architecture: { ...defaultArchitecture, mode: 'guided' } }).some(e => e.includes('GUIDED')));
+  // Footnotes in the text, numbered lists at the back; author-year in the text, numbered lists at the back.
+  assert.deepEqual(citationPayload('note', defaultCitation), { style: 'note', in_text_citation_style: 'note', footnote_style: 'full', bibliography_style: 'standard',
+    bibliography_numbering: 'numbered', numbering_scope: 'per_group', bibliography_grouping: { cited: true, background: true, visual: true, design: false } });
+  assert.equal(citationPayload('author-year', defaultCitation).bibliography_style, 'author_date');
+  assert.equal(citationPayload('author-year', defaultCitation).bibliography_numbering, 'numbered');
+});
+test('intent signals are read with the same patterns as the job (TypeScript / Python parity)', () => {
+  const text = '章末問題はいらない。ケースを多く、図表を多く。固すぎない文章で。';
+  const ts = detectSignals(text).map(s => [s.id, s.quote]);
+  assert.deepEqual(ts.map(([id]) => id), ['no_exercises', 'more_cases', 'more_visuals', 'not_stiff']);
+  const py = JSON.parse(execFileSync(process.platform === 'win32' ? 'python' : 'python3', ['-c', `import sys, json; sys.path.insert(0, 'job-template/scripts'); import publication_architecture as pa; print(json.dumps([[s['id'], s['quote']] for s in pa.signals(sys.argv[1])], ensure_ascii=False))`, text], { encoding: 'utf8', env: { ...process.env, PYTHONIOENCODING: 'utf-8' } }));
+  assert.deepEqual(ts, py);
+  assert.ok(VOCAB.blocks.answer_key && VOCAB.visual_types.decision_tree && VOCAB.source_roles.layout_reference.content === false);
 });

@@ -50,11 +50,23 @@ waivers:                                   # only for medium/low findings, alway
   - {rule: device_count_under, reason: この章の材料には他者の発言の引用がなく、pull quote を作ると捏造になる}
 ```
 
-## Device catalogue (closed)
+## Device catalogue and the block library
 
 figure, table, chart, timeline (visual intents), key_point, definition, glossary, warning, counterpoint,
-checklist, pull_quote, case_study, column (sidebar), chapter_summary (chapter end only). Every device has `id`,
-`type`, `why` and `placement` (`intent`, `position`: section_start | early | middle | late | section_end).
+checklist, pull_quote, case_study, column (sidebar), chapter_summary (chapter end only) — plus the publication
+block library (schemas/publication-architecture.json): exercises, answer_key, pitfalls, next_actions,
+case_reflection, clinical_case, template_forms, dialogue_examples, algorithm_card, callout, and the visual blocks
+workflow_diagram, decision_tree, decision_table, comparison_table, infographic (figure/table intents with a
+`visual_type`). Every device has `id`, `type`, `why` and `placement` (`intent`, `position`: section_start | early |
+middle | late | section_end). A device that uses an upload carries `asset_ref: asset-00N`; an upload meant for
+this chapter that you do not use goes to `declined_assets: [{asset, reason}]`.
+
+The publication architecture (plan/publication-architecture.yaml, skills/planning/publication-architecture.md)
+decides which blocks this book prefers, discourages or forbids. In AUTO and GUIDED mode a forbidden block is an
+error, a discouraged one needs a waiver with the reason, and the chapter's `blocks` in the outline should appear in
+the plan. Choose blocks per chapter from its content: the same apparatus in every chapter is flagged
+(`chapter_end_uniform`). Exercises always come with answers or explanations (`answer_key`, or
+`answers: {location}`).
 
 Use a device only when its condition holds and the user's instructions do not exclude it:
 
@@ -68,9 +80,11 @@ Use a device only when its condition holds and the user's instructions do not ex
 - table — a comparison of 3+ items on 3+ attributes.
 - figure / chart — only an information shape the visual review can accept (a branching process, a hierarchy,
   5+ values …); never an illustrative arrangement, never a straight A→B→C chain.
-- chapter end — by default what the profile lists (`structure.chapter_end`), in every chapter. If the user's
-  instructions exclude an item (for example no chapter-end summaries), leave it out and switch the default off in
-  plan/user-intent.yaml (`overrides: [chapter_end_missing]`); do not add it back as "good pedagogy".
+- chapter end — AUTO / GUIDED: only what this chapter's content needs (it may be empty), each item with `why`;
+  a summary, quiz or column is not added because "chapters usually have one". FIXED (legacy template): what the
+  profile lists (`structure.chapter_end`), in every chapter. If the user's instructions exclude an item, leave it
+  out (in FIXED mode switch the default off in plan/user-intent.yaml, `overrides: [chapter_end_missing]`); do not
+  add it back as "good pedagogy".
 
 Source ids must exist in the research registry; an unknown id is a planning error. Do not invent quotes, cases,
 dates or data to fill a device.
@@ -98,7 +112,10 @@ Drafting reserves each device where it is planned:
 Do not explain in the prose what the slot will show. Components may be written directly with the same id
 (`::: {.key-point #id}`, `.definition`, `.warning`, `.counterpoint`, `.case-study`, `.pull-quote`, `.sidebar`,
 `.checklist`; chapter end: `.summary` for key_points, `.note` for open_question, `.exercise` for check questions,
-`::: {#id}` for bridge_to_next). Figures and tables replace their slots in the asset phase. Proof builds show open
+`::: {#id}` for bridge_to_next). Library blocks keep their component plus a marker class and title, e.g.
+`::: {.exercise .answer-key #id title="解答・解説"}`, `::: {.warning .pitfalls #id title="よくある落とし穴"}`,
+`::: {.checklist .next-actions #id}`, `::: {.step-by-step .algorithm-card #id}`, `::: {.example .dialogue #id}`,
+`::: {.example .template-form #id}`, `::: {.case-study .clinical-case #id}`, `::: {.note .case-reflection #id}`). Figures and tables replace their slots in the asset phase. Proof builds show open
 slots as placeholders; the final validation fails while any remains.
 
 ## When the visual review rejects a planned visual

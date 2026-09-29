@@ -54,7 +54,7 @@ PACING_RULES = ("run_over_limit", "repeated_walls_in_chapter", "run_crosses_chap
 CONFLICT_CATEGORIES = ("invariant", "structured_setting", "source_evidence", "technical")
 
 # Phases whose tasks change the book (text, structure, visuals, design) and therefore re-check the intent before done.
-CONTENT_PHASES = ("architecture", "editorial_planning", "drafting", "chapter_review", "integration", "asset_planning",
+CONTENT_PHASES = ("publication_planning", "architecture", "editorial_planning", "visual_planning", "drafting", "chapter_review", "integration", "asset_planning",
                   "asset_generation", "rewrite", "prose_editing", "design", "layout", "validation")
 # Phases that judge or research: they read the intent, and never report a requested choice as a defect.
 REVIEW_PHASES = ("supplementary_research", "corpus_analysis", "audit", "prose_audit", "final_audit", "build")
@@ -65,6 +65,11 @@ PHASE_NOTES = {
                               "citation integrity still apply to everything the book does cover.",
     "corpus_analysis": "Judge relevance and synthesise with it in mind (emphasis, exclusions, named cases); do not drop a supplied source "
                        "silently: mark it background/irrelevant with the reason.",
+    "publication_planning": "It is the first input of the publication architecture: every explicit wish (no exercises, more cases, more "
+                            "figures, not too stiff, this image in chapter 3) must appear in plan/publication-intent.yaml and shape the block "
+                            "policy, visual policy and tone in plan/publication-architecture.yaml (intent_trace). Blocks it excludes are forbidden.",
+    "visual_planning": "What the user wants shown (or not shown) as figures and tables, and the uploaded images they assigned, decide the "
+                       "visual plan before the archetype's defaults do.",
     "architecture": "Shape the Book Bible and outline by it. In plan/book-bible.yaml write user_intent: {governs: [each user choice and how "
                     "the book follows it], defaults_used: [BookOrder defaults adopted only where the user said nothing]}. In "
                     "plan/user-intent.yaml write directives: [{id, source_quote (exact words from the text), interpretation, applies_to: "

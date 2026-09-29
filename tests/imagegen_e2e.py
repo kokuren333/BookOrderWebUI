@@ -239,7 +239,7 @@ def main():
         embedded = art["measurement"]["generated_images"]
         assert len(embedded) == 2 and all(item["pdf_image_bbox_pt"] and item["pdf_image_pixels"] for item in embedded), embedded
         gates = json.loads((ROOT / "reports/completion-gates.json").read_text(encoding="utf-8"))
-        assert gates["passed"] and len(gates["gates"]) == 22, [g for g in gates["gates"] if not g["passed"]]
+        assert gates["passed"] and len(gates["gates"]) == 23, [g for g in gates["gates"] if not g["passed"]]
         assert all(g["passed"] for g in gates["gates"] if g["id"] in (10, 15, 20, 21))
         print(json.dumps({"status": "pass", "steps": steps, "pages": metrics["totals"]["pages"],
                           "routed_to_imagegen": report["routed_to_imagegen"],

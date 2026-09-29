@@ -3,7 +3,7 @@ from pathlib import Path
 
 from common import ROOT
 
-CATEGORIES = frozenset({"authoring", "research", "editorial", "design", "quality"})
+CATEGORIES = frozenset({"authoring", "research", "editorial", "design", "quality", "planning"})
 EXCLUDED = frozenset({"node_modules", "build", "dist", "fixtures", "tests", "__pycache__"})
 
 

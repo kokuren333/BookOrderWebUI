@@ -197,7 +197,7 @@ class DeviceConditions(unittest.TestCase):
         bare = {"id": "kp-x", "type": "key_point"}
         found = rules(self.one(bare), "error")
         self.assertTrue({"device_missing_why", "device_missing_placement"} <= found)
-        self.assertIn("device_unknown_type", rules(self.one(device("x", "infographic")), "error"))
+        self.assertIn("device_unknown_type", rules(self.one(device("x", "hologram")), "error"))
 
     def test_definition_at_first_use(self):
         p = plan("ch-g", [section("s1", 900, "light", new_terms=["ギュ"]), section("s2", 900, "heavy", devices=[device("df-g", "definition", terms=["ギュ"])]),

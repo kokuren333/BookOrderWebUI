@@ -68,7 +68,7 @@ def analyze_file(path):
             if "equation" in classes: equations.append(node["c"][0][0])
             elif "slot" in classes:
                 slots.append({"id": node["c"][0][0], "kind": dict(node["c"][0][2]).get("kind", ""), "section": section, "text": plain(node["c"][1])})
-            elif classes: components.append({"type": classes[0], "id": node["c"][0][0]})
+            elif classes: components.append({"type": classes[0], "id": node["c"][0][0], "classes": list(classes), "section": section})
         elif kind == "Image": images.append(node["c"][2][0])
         elif kind == "Link" and node["c"][2][0].startswith("#"):
             refs.append({"key": node["c"][2][0], "target": node["c"][2][0][1:], "section": section})

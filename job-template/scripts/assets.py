@@ -53,11 +53,55 @@ def check_plan(chapters, project=None):
     for chapter in chapters:
         for expected in chapter["expected_assets"]:
             if expected not in ids: errors.append(f"{chapter['id']}: expected asset {expected} from outline.yaml is not planned")
+    errors += uploaded_asset_errors(plan, items, chapters, project)
     import editorial_plan
     linked = {str(a.get("device") or a.get("id")) for a in items}
     for chapter, device in editorial_plan.visual_devices(chapters):
         if device["id"] not in linked:
             errors.append(f"{device['id']}: the editorial plan of {chapter} has a {device['type']} intent here with no candidate (id {device['id']} or device: {device['id']})")
+    return errors
+
+
+UPLOAD_DECISIONS = ("placed", "redrawn", "reference_only", "not_used")
+
+
+def uploaded_asset_errors(plan, items, chapters, project):
+    """Every uploaded asset the user gave a role is considered, and its instruction is respected (plan/uploaded-assets.yaml)."""
+    import source_roles
+    errors = []
+    uploads = {a["id"]: a for a in source_roles.uploaded_assets(project)}
+    decisions = {str(d.get("asset")): d for d in as_list(plan.get("uploaded_assets")) if isinstance(d, dict)}
+    by_id = {str(a.get("id")): a for a in items}
+    for asset in uploads.values():
+        d = decisions.get(asset["id"])
+        placed_as = [a for a in items if str(a.get("uploaded_asset") or "") == asset["id"]]
+        if asset["role"] in ("layout_reference", "style_reference", "visual_reference"):
+            if placed_as: errors.append(f"{asset['id']} is a {asset['role']} (composition/appearance only) and cannot be placed in the book ({', '.join(str(a.get('id')) for a in placed_as)})")
+            continue
+        if not asset["requires_decision"]: continue
+        note = f" — user: \"{asset['instruction']}\"" if asset.get("instruction") else ""
+        if not d:
+            errors.append(f"{asset['id']} ({asset['label']}, {asset['asset_role']}): record uploaded_assets: [{{asset: {asset['id']}, decision: {'|'.join(UPLOAD_DECISIONS)}, "
+                          f"asset_id, chapter, reason}}] in plan/assets-plan.yaml{note}")
+            continue
+        decision = d.get("decision")
+        if decision not in UPLOAD_DECISIONS: errors.append(f"{asset['id']}: decision must be one of {', '.join(UPLOAD_DECISIONS)}"); continue
+        if not research.nonempty(d.get("reason"), 5): errors.append(f"{asset['id']}: reason is required (how the user's instruction was followed){note}")
+        target = by_id.get(str(d.get("asset_id") or ""))
+        if decision in ("placed", "redrawn") and not target: errors.append(f"{asset['id']}: {decision} needs asset_id of the planned figure/table in plan/assets-plan.yaml")
+        if decision == "placed" and target:
+            if str(target.get("uploaded_asset") or "") != asset["id"]: errors.append(f"{target.get('id')}: set uploaded_asset: {asset['id']}")
+            if target.get("type") in ("chart", "image", "screenshot", "cover") and str(target.get("path")) != asset["placeable_path"]:
+                errors.append(f"{target.get('id')}: path must be {asset['placeable_path']} (the uploaded file)")
+            if target.get("type") == "cover" and asset["asset_role"] != "cover_candidate": errors.append(f"{asset['id']} is not a cover candidate; the user did not offer it for the cover")
+        if decision == "redrawn" and not asset.get("redraw_allowed"): errors.append(f"{asset['id']}: the user did not allow redrawing this file")
+        if decision == "placed" and asset["asset_role"] in ("diagram_source", "table_source", "redraw_source") and asset.get("use_verbatim") is False:
+            errors.append(f"{asset['id']}: the user asked to redraw the information, not to paste the file (decision redrawn)")
+        wanted = source_roles.chapter_ref(asset.get("intended_chapter"), chapters)
+        if decision in ("placed", "redrawn") and target and wanted and target.get("chapter") != wanted and not research.nonempty(d.get("deviation_reason"), 10):
+            errors.append(f"{asset['id']}: the user wants it in {wanted} but {target.get('id')} is in {target.get('chapter')}; move it or give deviation_reason")
+        if decision == "not_used" and asset.get("priority") == "high" and not research.nonempty(d.get("reason"), 20):
+            errors.append(f"{asset['id']}: a high-priority upload is not used; explain why in reason (20+ characters)")
     return errors
 
 

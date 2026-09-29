@@ -18,5 +18,11 @@ editorial inspection that programs cannot do.
   figures present, excluded apparatus absent, structured format kept) and add a `## User intent` section to
   reports/layout-review.md with what you checked and any conflict.
 
+- Publication architecture: read reports/publication-architecture-qa.yaml (gate 23) and look for it in the
+  rendered book — chapters shaped by their content rather than one template, no mechanical chapter-end apparatus,
+  exercises only where the architecture wants them and always with answers, varied visual types, uploaded images
+  where the user asked, the citation form and the separate 引用文献 / 参考資料 / 図表・画像出典 lists configured in
+  project.json (reports/bibliography.json).
+
 Record actual evidence and limitations in reports/layout-review.md. A build that succeeds is not a publication
 that is finished: only `bookorder goal` reporting `STATUS: COMPLETE` is.

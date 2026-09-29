@@ -35,10 +35,11 @@ class WebUI(unittest.TestCase):
     def tearDownClass(cls):
         cls.browser.close(); cls.pw.stop(); shutil.rmtree(cls.out, ignore_errors=True)
 
-    def open(self):
+    def open(self, advanced=True):
         page = self.browser.new_page(viewport={"width": 1200, "height": 1600}, accept_downloads=True)
         self.errors = []; page.on("pageerror", lambda e: self.errors.append(str(e)))
-        page.goto((self.out / "index.html").as_uri()); page.wait_for_selector("section.publication")
+        page.goto((self.out / "index.html").as_uri()); page.wait_for_selector("section.architecture")
+        if advanced: page.get_by_role("tab", name="Advanced publishing").click(); page.wait_for_selector("section.publication")
         return page
 
     def summary(self, page):
@@ -155,6 +156,60 @@ class WebUI(unittest.TestCase):
             project = json.loads(z.read("publishing-job/project.json")); task = z.read("publishing-job/TASK.md").decode("utf-8")
         self.assertEqual(project["user_instructions"], "")
         self.assertIn("## Additional user instructions (verbatim)\n\n\n## Precedence of settings", task)
+        self.assertFalse(self.errors, self.errors)
+
+    def test_quick_mode_roles_and_signals(self):
+        """Quick mode: only the essentials are visible; files get estimated, editable roles; explicit wishes are shown."""
+        page = self.open(advanced=False)
+        self.assertFalse(page.locator("section.publication").is_visible(), "format details wait for Advanced publishing")
+        self.instructions(page).locator("textarea").fill("章末問題はいらない。ケースを多く。")
+        signals = page.locator(".signals").inner_text()
+        self.assertIn("章末問題はいらない", signals); self.assertIn("入れない", signals)
+        page.set_input_files("input.file-picker", files=[{"name": "layout-sample.pdf", "mimeType": "application/pdf", "buffer": b"%PDF-1.4"},
+                                                         {"name": "ward-flow.png", "mimeType": "image/png", "buffer": b"\x89PNG"},
+                                                         {"name": "nurse-blog.md", "mimeType": "text/markdown", "buffer": b"# x"}])
+        roles = [page.get_by_label(f"{name}の役割").input_value() for name in ("layout-sample.pdf", "ward-flow.png", "nurse-blog.md")]
+        self.assertEqual(roles, ["layout_reference", "asset", "background"])
+        self.assertEqual(page.locator(".badge", has_text="推定").count(), 3)
+        page.get_by_label("nurse-blog.mdの役割").select_option("evidence")      # the user corrects an estimate
+        self.assertEqual(page.locator(".badge", has_text="推定").count(), 2)
+        page.get_by_label("Book title").fill("Roles"); page.get_by_label("Book description / goal").fill("goal"); page.get_by_label("Target readers").fill("readers")
+        page.locator("label", has_text="OS / CPU").locator("select").select_option("none")
+        with page.expect_download() as info: page.get_by_role("button", name="Generate Publishing Job").click()
+        with zipfile.ZipFile(io.BytesIO(Path(info.value.path()).read_bytes())) as z:
+            project = json.loads(z.read("publishing-job/project.json")); names = z.namelist()
+        self.assertEqual(project["publication_architecture"], {"mode": "auto"})
+        self.assertEqual([(s["path"], s["usage"]["role"], s["usage"]["role_origin"]) for s in project["input"]["sources"]], [("input/sources/nurse-blog.md", "evidence", "user")])
+        self.assertEqual([a["usage"]["role"] for a in project["input"]["assets"]], ["layout_reference", "asset"])
+        self.assertIn("publishing-job/input/assets/layout-sample.pdf", names)
+        self.assertFalse(self.errors, self.errors)
+
+    def test_advanced_architecture_and_bibliography_settings(self):
+        page = self.open()
+        section = page.locator("section.architecture")
+        section.get_by_role("button", name="GUIDED", exact=True).click()
+        section.locator("label", has_text="Publication type").locator("select").select_option("exam_preparation")
+        section.locator("details", has_text="Block policy").locator("summary").click()
+        page.get_by_label("コラムの方針").select_option("forbidden")
+        page.locator("label", has_text="In-text citation").locator("select").select_option("note")
+        page.locator("label", has_text="Footnote style").locator("select").select_option("numbered_reference")
+        page.set_input_files("input.file-picker", files=[{"name": "diagram.png", "mimeType": "image/png", "buffer": b"\x89PNG"}])
+        page.locator("label.chip", has_text="情報構造だけ再作図").locator("input").check()
+        page.locator("details.file-details summary").click()
+        page.locator("details.file-details label", has_text="使う章").locator("input").fill("第3章")
+        page.locator("details.file-details label", has_text="このファイルへの指示").locator("textarea").fill("そのまま貼らず、情報構造だけ再作図する")
+        page.get_by_label("Book title").fill("Advanced"); page.get_by_label("Book description / goal").fill("goal"); page.get_by_label("Target readers").fill("readers")
+        page.locator("label", has_text="OS / CPU").locator("select").select_option("none")
+        with page.expect_download() as info: page.get_by_role("button", name="Generate Publishing Job").click()
+        with zipfile.ZipFile(io.BytesIO(Path(info.value.path()).read_bytes())) as z:
+            project = json.loads(z.read("publishing-job/project.json"))
+        self.assertEqual(project["publication_architecture"], {"mode": "guided", "archetype": "exam_preparation", "block_policy": {"forbidden": ["column"]}})
+        self.assertEqual((project["citations"]["in_text_citation_style"], project["citations"]["footnote_style"], project["citations"]["bibliography_numbering"]),
+                         ("note", "numbered_reference", "numbered"))
+        usage = project["input"]["sources"][0]["usage"]
+        self.assertEqual((usage["role"], usage["asset_role"], usage["intended_chapter"], usage["use_verbatim"], usage["redraw_allowed"]),
+                         ("redraw_source", "redraw_source", "第3章", False, True))
+        self.assertEqual(usage["notes"], "そのまま貼らず、情報構造だけ再作図する")
         self.assertFalse(self.errors, self.errors)
 
 

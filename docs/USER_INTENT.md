@@ -2,7 +2,7 @@
 
 The WebUI field **Additional user instructions — 本全体への優先指示** is the user's instruction for one book. It is
 not a suggestion appended to TASK.md: it is carried verbatim into every phase and outranks BookOrder's own defaults.
-Why this was needed: [USER_INTENT_AUDIT.md](USER_INTENT_AUDIT.md). The agent-facing specification shipped in every
+Why this was needed: [USER_INTENT_AUDIT.md](USER_INTENT_AUDIT.md). How explicit wishes become structure (forbidden blocks, archetype, visual density): [INTENT_DRIVEN_PUBLICATION_ARCHITECTURE.md](INTENT_DRIVEN_PUBLICATION_ARCHITECTURE.md). The agent-facing specification shipped in every
 job is [`job-template/docs/user-intent.md`](../job-template/docs/user-intent.md).
 
 > **Do not improve the book against the user's explicit intent.**

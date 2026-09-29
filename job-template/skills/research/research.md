@@ -50,7 +50,16 @@ key_claims:
 concepts: [term, term]
 limitations: "..."
 bibliographic: {title: "...", authors: ["..."], published: "2024-05-01", container: "...", publisher: "...", type: webpage}
+source_role: evidence      # your estimate unless the user set it: evidence | background | structure_reference | redraw_source
+authority: guideline       # primary_authoritative | guideline | governmental | peer_reviewed | institutional | textbook |
+                           # expert_commentary | professional_experience | anecdotal | unknown
 ```
+
+Source role is separate from relevance: a highly relevant nurse's blog is `relevance: core` and `source_role:
+background` — it shapes the book's field perspective and appears under 参考資料, but facts, numbers and
+recommendations cite evidence (guidelines, official data, peer-reviewed work). A role the user chose in the WebUI
+always wins over your estimate (plan/source-roles.yaml). Files the user marked as layout, style or visual
+references are not sources and never reach this registry.
 
 Relevance decides coverage: every core/supporting supplied source must be reflected in the book (cited where it
 supports the text) unless the job disables that requirement. Do not force irrelevant or duplicate sources into

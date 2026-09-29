@@ -111,6 +111,7 @@ def main():
     prof = commands.add_parser('profile', help='Show the resolved PublicationProfile; --apply re-plans with it (user approval)')
     prof.add_argument('--apply', action='store_true'); prof.add_argument('--user-approval')
     pub = commands.add_parser('publication', help='Check the tier/genre, layout and style requested in project.json (read-only)'); pub.add_argument('--json', action='store_true')
+    arc = commands.add_parser('architecture', help='Show the publication architecture, source roles, uploads and QA (read-only)'); arc.add_argument('--json', action='store_true')
     commands.add_parser('fonts')
     theme = commands.add_parser('theme'); sub_theme = theme.add_subparsers(dest='theme_command', required=True)
     sub_theme.add_parser('list'); show = sub_theme.add_parser('preview'); show.add_argument('name')
@@ -155,6 +156,21 @@ def main():
         orchestrator.reopen(state, 'architecture', f'rescaled from {previous["requested_pages"]} to {args.pages} pages')
         orchestrator.save_state(state); print(json.dumps(state['scale'], indent=2)); return 0
 
+    if args.command == 'architecture':
+        import publication_architecture as pa, source_roles, bibliography, architecture_qa
+        from common import read_project
+        project = read_project(); arch = pa.load(project)
+        data = {"architecture": arch, "check": pa.check(project), "source_roles": source_roles.table(write=False),
+                "uploaded_assets": source_roles.uploaded_assets(project), "citations": bibliography.policy(project)}
+        try: data["qa"] = architecture_qa.run(write=False)["summary"]
+        except Exception as exc: data["qa"] = {"error": str(exc)[:200]}
+        if args.json: print(json.dumps(data, ensure_ascii=False, indent=2)); return 0
+        print('\n'.join(pa.summary_lines(arch)))
+        print('Citations: ' + data["citations"]["summary"])
+        print('\n'.join(source_roles.summary_lines(data["source_roles"])) or 'Source roles: (no sources yet)')
+        for a in data["uploaded_assets"]: print(f"Upload {a['id']} {a['label']}: {a['role']}/{a['asset_role']} chapter {a.get('intended_chapter') or '-'} — {a.get('instruction') or ''}")
+        for e in data["check"]: print('PROBLEM: ' + e)
+        return 1 if data["check"] else 0
     if args.command == 'publication':
         import publication_request
         from common import read_project

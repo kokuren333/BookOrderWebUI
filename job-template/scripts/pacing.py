@@ -249,13 +249,30 @@ def ledger_issues(result):
     return found
 
 
+OP_BLOCK = {"insert_summary": "summary", "add_case_study": "case_study", "add_counterpoint": "counterpoint", "add_pull_quote": "pull_quote",
+            "convert_comparison_to_table": "comparison_table", "add_visual": "figure"}
+
+
+def _blocked_ops(chapter):
+    """Revision candidates the publication architecture excludes for this chapter (forbidden or discouraged)."""
+    try:
+        import publication_architecture as pa, planning
+        arch = pa.load()
+        if arch.get("legacy"): return set()
+        info = next((c for c in planning.load_outline({}) if c["id"] == chapter), None)
+        policy = pa.chapter_policy(arch, info)
+        return {op for op, block in OP_BLOCK.items() if pa.status(policy, block) in ("forbidden", "discouraged")}
+    except Exception: return set()
+
+
 def task_lines(result, chapter):
-    """Instructions for revising one chapter's text walls."""
+    """Instructions for revising one chapter's text walls (never suggesting a block the architecture excludes)."""
     lines = []
+    blocked = _blocked_ops(chapter)
     for finding in result["findings"]:
         if finding["severity"] != "high" or finding.get("chapter") != chapter: continue
         lines.append(f"- {finding['detail']}")
-        for action in finding.get("actions", [])[:5]:
+        for action in [a for a in finding.get("actions", []) if a["op"] not in blocked][:5]:
             target = f" section {action['section']}" if action.get("section") else ""
             lines.append(f"    candidate {action['op']}{target} near page(s) {', '.join(map(str, action['at_pages']))}: {action['why']}")
     return lines

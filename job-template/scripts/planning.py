@@ -98,7 +98,11 @@ def load_outline(scale=None):
             "primary_sources": primary, "supporting_sources": supporting,
             "required_references": as_list(raw.get("required_references")),
             "expected_assets": as_list(raw.get("expected_assets") or raw.get("expected_figures")),
-            "must_not_repeat": as_list(raw.get("must_not_repeat")), "handoff": raw.get("handoff")})
+            "must_not_repeat": as_list(raw.get("must_not_repeat")), "handoff": raw.get("handoff"),
+            # Chapter architecture (publication_architecture.py): what this chapter is for and which blocks/visuals it uses.
+            "content_intent": raw.get("content_intent"), "blocks": [str(b) for b in as_list(raw.get("blocks"))], "blocks_declared": "blocks" in raw,
+            "visuals": [str(v) for v in as_list(raw.get("visuals"))],
+            "block_overrides": raw.get("block_overrides") if isinstance(raw.get("block_overrides"), dict) else {}})
     return chapters
 
 
@@ -296,6 +300,23 @@ def write_contracts(chapters, records, scale):
     return results, aggregate
 
 
+def architecture_entry(chapter, chapters):
+    """The chapter's place in the publication architecture (empty for legacy jobs)."""
+    import publication_architecture as pa
+    import source_roles
+    try: arch = pa.load()
+    except Exception: return {}
+    if arch.get("legacy"): return {}
+    policy = pa.chapter_policy(arch, chapter)
+    uploads = source_roles.for_chapter(chapter["id"], chapters=chapters)
+    return {"publication_architecture": {"file": "plan/publication-architecture.yaml", "mode": arch["mode"], "archetype": arch.get("archetype"),
+                                         "tone": arch.get("tone"), "exercise_policy": arch.get("exercise_policy"),
+                                         "content_intent": chapter.get("content_intent"), "planned_blocks": policy["planned"], "visuals": chapter.get("visuals"),
+                                         "preferred_blocks": policy["preferred"], "discouraged_blocks": policy["discouraged"], "forbidden_blocks": policy["forbidden"],
+                                         "evidence_policy": arch.get("evidence_policy"), "visual_plan": "plan/visual-plan.yaml"},
+            **({"uploaded_assets": uploads} if uploads else {})}
+
+
 def packet(chapter, chapters, scale):
     """Bounded research packet: the chapter job reads this instead of the whole raw corpus."""
     index = registry.load_index(); known = registry.by_id(index); notes = research.load_notes()
@@ -306,11 +327,15 @@ def packet(chapter, chapters, scale):
         if isinstance(concept, dict) and (concept.get("id") in wanted or concept.get("term") in wanted):
             concepts[concept.get("id")] = {"id": concept.get("id"), "term": concept.get("term"), "definition": concept.get("definition"),
                                           "role": "introduce" if concept.get("id") in chapter["introduces"] else "develop" if concept.get("id") in chapter["develops"] else "assume"}
+    import source_roles
+    roles = source_roles.table(index, notes, write=False)
     def describe(identifier):
         source = known.get(identifier, {})
         note = notes.get(identifier, {})
+        role = roles.get(identifier, {})
         return {"id": identifier, "title": source.get("title"), "content": source.get("content_path"), "chars": source.get("chars"),
-                "relevance": note.get("relevance"), "summary": note.get("summary")}
+                "relevance": note.get("relevance"), "summary": note.get("summary"),
+                "source_role": role.get("role"), "authority": role.get("authority"), "citation_allowed": role.get("citation_allowed")}
     claim_list = []
     for identifier in chapter["primary_sources"] + chapter["supporting_sources"]:
         if identifier in notes: claim_list += research.claims(identifier, notes[identifier])
@@ -344,6 +369,7 @@ def packet(chapter, chapters, scale):
         "required_references": chapter["required_references"],
         "claims": claim_list, "concepts": list(concepts.values()), "other_chapters": others,
         "expected_assets": chapter["expected_assets"],
+        **architecture_entry(chapter, chapters),
         "editorial_plan": ({"file": f"plan/editorial/{chapter['id']}.yaml", "reader_before": plan.get("reader_before"), "reader_after": plan.get("reader_after"),
                             "sections": [{"id": s.get("id"), "heading": s.get("heading"), "rhetorical_role": s.get("rhetorical_role"),
                                           "expected_density": s.get("expected_density"), "target_chars": s.get("target_chars"),

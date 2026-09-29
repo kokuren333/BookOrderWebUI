@@ -351,6 +351,18 @@ def combined(project, items, registry_out=None):
         if cites: raise ValueError("Citations exist but no bibliography was generated; run bookorder goal (reference assignment)")
         return doc
     doc["meta"]["bibliography"] = {"t": "MetaList", "c": [{"t": "MetaString", "c": str(path)} for path in files]}
+    import bibliography
+    policy = bibliography.policy(project)
+    if policy["builder"] == "grouped":
+        # In-text form and back matter are separate concerns (scripts/bibliography.py): citeproc renders only the
+        # citations; the grouped, numbered lists are built afterwards.
+        if policy["in_text_csl"]: doc["meta"]["csl"] = {"t": "MetaString", "c": str(ROOT / policy["in_text_csl"])}
+        doc["meta"]["link-citations"] = {"t": "MetaBool", "c": True}
+        doc["meta"]["suppress-bibliography"] = {"t": "MetaBool", "c": True}
+        doc = json.loads(run([tool("pandoc"), "-f", "json", "-t", "json", "--citeproc"], json.dumps(doc)))
+        if policy["footnote_style"] == "numbered_reference": bibliography.wrap_numbered_footnotes(doc)
+        doc["meta"].pop("suppress-bibliography", None)
+        return bibliography.build(doc, project, book["language"])
     style = CSL_STYLES.get(project.get("citations", {}).get("style", "numeric"), CSL_STYLES["numeric"])
     if style: doc["meta"]["csl"] = {"t": "MetaString", "c": str(ROOT / style)}
     doc["meta"]["link-citations"] = {"t": "MetaBool", "c": True}

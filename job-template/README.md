@@ -87,3 +87,9 @@ book.design.yaml. custom.css loads last for HTML/Web/EPUB; custom.typ overrides 
 Paper geometry, columns, spans, and writing mode live in `plan/layout-spec.yaml`; see
 [docs/layout-spec.md](docs/layout-spec.md). The file is created before planning begins and can then be edited.
 Run `python tools/layout-specimen.py` for a PDF showing the supported page layouts.
+
+## Publication architecture
+
+The book is designed from the user's intent, not from a fixed template: see docs/publication-architecture.md
+(structure modes AUTO / GUIDED / FIXED, block library, source roles, uploads, visual plan, citation and bibliography
+settings, gate 23). `bookorder architecture` prints the resolved architecture.

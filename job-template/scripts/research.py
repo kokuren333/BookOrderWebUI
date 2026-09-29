@@ -108,6 +108,8 @@ def check_note(identifier, note, known):
     if relevance == "duplicate" and note.get("duplicate_of") not in known: errors.append(f"{identifier}: duplicate_of must name an existing source")
     if note.get("reliability", "unknown") not in RELIABILITY: errors.append(f"{identifier}: reliability must be one of {', '.join(RELIABILITY)}")
     if not nonempty(note.get("summary"), 60): errors.append(f"{identifier}: summary must describe the whole source (60+ characters)")
+    import source_roles
+    errors += source_roles.check_note_fields(identifier, note)
     claims = as_list(note.get("key_claims"))
     if relevance in ("core", "supporting") and not claims: errors.append(f"{identifier}: core/supporting sources need key_claims")
     for claim in claims:
@@ -280,6 +282,15 @@ def coverage(usage, project=None, index=None):
     """source-coverage.json: how each source is reflected. usage = {src: [{chapter, section}]}"""
     project = project or read_project(); index = index or registry.load_index(); notes = load_notes()
     report = {}; orphans = []
+    import source_roles
+    roles = source_roles.table(index, notes, write=False)
+    outline = ROOT / "source/metadata/outline.yaml"
+    assigned = set()
+    if outline.is_file():
+        for chapter in as_list(yaml_data(outline).get("chapters")):
+            if isinstance(chapter, dict):
+                srcs = chapter.get("sources") or {}
+                assigned |= {str(x) for x in (as_list(srcs.get("primary")) + as_list(srcs.get("supporting")) if isinstance(srcs, dict) else as_list(srcs))}
     for source in index["sources"]:
         identifier = source["id"]; note = notes.get(identifier, {}); relevance = note.get("relevance")
         state = source["ingest_status"]
@@ -289,9 +300,11 @@ def coverage(usage, project=None, index=None):
         elif state in registry.PENDING: status = "pending"
         elif relevance == "irrelevant": status = "irrelevant"
         elif relevance == "background": status = "background_only"
+        elif not roles.get(identifier, {}).get("citation_allowed", True) and identifier in assigned:
+            status = "consulted"  # background / structure reference: informs a chapter, listed in the background bibliography
         elif note: status = "analyzed"
         else: status = "ingested"
-        entry = {"status": status, "origin": source["origin"], "relevance": relevance, "used_in": usage.get(identifier, [])}
+        entry = {"status": status, "origin": source["origin"], "relevance": relevance, "role": roles.get(identifier, {}).get("role"), "used_in": usage.get(identifier, [])}
         if status in ("analyzed", "ingested") and source["origin"] == "supplied": orphans.append(identifier)
         report[identifier] = entry
     required = bool(project["research"].get("require_supplied_coverage", True))

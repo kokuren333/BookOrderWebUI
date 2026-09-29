@@ -60,9 +60,23 @@ CATALOG = {
     "chapter_summary": {"component": "summary", "count": None},
 }
 ALIASES = {"sidebar": "column", "summary": "key_point", "key-point": "key_point", "pull-quote": "pull_quote", "case-study": "case_study"}
+# The publication block library (schemas/publication-architecture.json) extends the catalogue: exercises with answer
+# keys, pitfalls, next actions, templates/forms, dialogue examples, clinical cases, algorithm cards … Visual blocks
+# (workflow_diagram, decision_table, comparison_table, infographic …) are figure/table intents with a visual_type.
+import json as _json
+VOCAB = _json.loads((ROOT / "schemas/publication-architecture.json").read_text(encoding="utf-8"))
+NEW_COUNTS = {"pitfalls": "callouts", "callout": "callouts", "clinical_case": "case_studies"}
+for _block, _spec in VOCAB["blocks"].items():
+    _device = _spec.get("device")
+    if _spec.get("visual") or _device in CATALOG or _device in ("summary", "further_reading", "open_question", "bridge_to_next", "references"): continue
+    CATALOG[_device] = {"component": _spec.get("component"), "marker": _spec.get("marker_class"), "count": NEW_COUNTS.get(_device), "block": _block}
+BLOCK_TO_DEVICE = {b: spec["device"] for b, spec in VOCAB["blocks"].items() if spec.get("visual") or spec["device"] in ("warning",)}
+CHAPTER_END_ANY = tuple(dict.fromkeys(CHAPTER_END + tuple(b for b, spec in VOCAB["blocks"].items() if "chapter_end" in spec.get("positions", []))))
 # Chapter-end items and the component that realises each (bridge_to_next is a plain paragraph block).
 END_COMPONENT = {"key_points": "summary", "summary": "summary", "open_question": "note", "bridge_to_next": None,
                  "further_reading": "sidebar", "check_questions": "exercise", "exercises": "exercise", "checklist": "checklist"}
+for _block, _spec in VOCAB["blocks"].items():
+    if "chapter_end" in _spec.get("positions", []): END_COMPONENT.setdefault(_block, _spec.get("component"))
 # A glossary entry is an inline term, not a pause; everything else interrupts running prose on the page.
 PAUSES = set(CATALOG) - {"glossary"}
 COUNTS = {"tables": "tables_per_chapter", "callouts": "callouts_per_chapter", "case_studies": "case_studies_per_chapter",
@@ -71,7 +85,8 @@ COUNTS = {"tables": "tables_per_chapter", "callouts": "callouts_per_chapter", "c
 QUOTE_ROLES = {"thesis", "evidence", "contrast", "concession"}
 CONCRETE_ROLES = {"example", "application"}
 # Page area of a device as a share of a text page (preventive estimate of the non-prose share).
-AREA = {"figure": 0.4, "chart": 0.4, "table": 0.35, "timeline": 0.35, "key_point": 0.12, "definition": 0.12, "warning": 0.12,
+AREA = {"exercises": 0.2, "answer_key": 0.15, "pitfalls": 0.12, "next_actions": 0.12, "case_reflection": 0.1, "clinical_case": 0.0,
+        "template_forms": 0.2, "dialogue_examples": 0.15, "algorithm_card": 0.2, "callout": 0.1, "figure": 0.4, "chart": 0.4, "table": 0.35, "timeline": 0.35, "key_point": 0.12, "definition": 0.12, "warning": 0.12,
         "counterpoint": 0.15, "checklist": 0.15, "pull_quote": 0.12, "case_study": 0.0, "column": 0.0, "chapter_summary": 0.2}
 SEVERITIES = ("error", "medium", "low")
 DEVICE_ID = re.compile(r"[a-z][a-z0-9-]*")
@@ -134,6 +149,9 @@ def normalize(plan):
         for d in as_list(raw.get("devices")):
             if not isinstance(d, dict): continue
             device = dict(d); device["type"] = device_type(d.get("type")); device["status"] = d.get("status") or "planned"
+            if device["type"] in BLOCK_TO_DEVICE and device["type"] not in CATALOG:
+                block = device["type"]; device["block"] = block; device["type"] = BLOCK_TO_DEVICE[block]
+                if VOCAB["blocks"][block].get("visual_type"): device.setdefault("visual_type", VOCAB["blocks"][block]["visual_type"])
             device["source_ids"] = [str(s) for s in as_list(d.get("source_ids"))]
             section["devices"].append(device)
         for key in ("summary_points", "example_needs", "case_study_needs", "citation_needs", "cross_refs", "visual_opportunities",
@@ -331,8 +349,23 @@ REQUIRED_CHAPTER = ("chapter_title", "chapter_role", "reader_before", "reader_af
 REQUIRED_SECTION = ("id", "heading", "purpose", "rhetorical_role", "intended_reader_effect", "expected_density", "target_chars")
 
 
-def check_chapter(chapter, plan, profile, known_sources=None, first_terms=None, last=False, intent=None):
+DEVICE_BLOCK = {"warning": "warning_box", "chapter_summary": "summary"}
+
+
+def block_of(device):
+    """The block-library id a device realises (policy checks use it)."""
+    import publication_architecture as pa
+    return pa.canonical(device.get("block") or DEVICE_BLOCK.get(device.get("type"), device.get("type")))
+
+
+def adaptive(arch):
+    """AUTO / GUIDED: the block policy decides; FIXED (or no architecture, the legacy default): the profile template."""
+    return bool(arch) and not arch.get("legacy") and arch.get("mode") in ("auto", "guided")
+
+
+def check_chapter(chapter, plan, profile, known_sources=None, first_terms=None, last=False, intent=None, arch=None):
     cid = chapter["id"]; findings = []; intent = intent or {}
+    flexible = adaptive(arch)
     add = lambda rule, severity, detail, section=None, device=None, suggestion=None: findings.append(finding(rule, severity, detail, cid, section, device, suggestion))
     if plan is None:
         add("plan_missing", "error", f"write plan/editorial/{cid}.yaml before drafting"); return {"id": cid, "findings": findings}
@@ -341,7 +374,7 @@ def check_chapter(chapter, plan, profile, known_sources=None, first_terms=None, 
     if plan.get("chapter_id") != cid: add("chapter_id_mismatch", "error", f"chapter_id must be {cid}")
     for key in REQUIRED_CHAPTER:
         value = plan.get(key)
-        optional_end = key == "chapter_end" and (not profile["structure"]["chapter_end"] or "chapter_end_missing" in intent)
+        optional_end = key == "chapter_end" and (flexible or not profile["structure"]["chapter_end"] or "chapter_end_missing" in intent)
         if value in (None, "", []) and not optional_end: add("missing_field", "error", f"{key} is required")
     if plan.get("chapter_role") and plan["chapter_role"] not in CHAPTER_ROLES: add("chapter_role_invalid", "error", f"chapter_role must be one of {', '.join(CHAPTER_ROLES)}")
     target = int(plan.get("target_chars") or 0); outline_target = int(chapter.get("target_characters") or 0)
@@ -390,7 +423,7 @@ def check_chapter(chapter, plan, profile, known_sources=None, first_terms=None, 
         kinds = {d["type"] for d in s["devices"] if live(d)}
         points = [p for p in s["summary_points"] if str(p).strip()]
         if chars > 1500 and len(points) >= 3 and "key_point" not in kinds:
-            add("key_point_needed", "medium", f"{chars:,} characters with {len(points)} points: plan a key_point", sid, suggestion="key_point")
+            add("key_point_needed", "low" if flexible else "medium", f"{chars:,} characters with {len(points)} points: plan a key_point", sid, suggestion="key_point")
         defined = {str(t) for d in s["devices"] if live(d) and d["type"] in ("definition", "glossary") for t in as_list(d.get("terms"))}
         undefined = [str(t) for t in s["new_terms"] if str(t) not in defined and first_terms.get(str(t)) == (cid, sid)]
         if undefined: add("definition_needed", "low", f"new terms without a definition device: {', '.join(undefined)} (a clear definition in prose is fine)", sid)
@@ -426,17 +459,23 @@ def check_chapter(chapter, plan, profile, known_sources=None, first_terms=None, 
         bounds = profile["devices"][setting]
         # Profile ranges are per-chapter averages (0.8 callouts); a chapter holds whole devices.
         low, high = int(bounds["min"] + 0.5), int(bounds["max"] + 0.5)
-        if counts[key] > high: add("device_count_over", "error", f"{counts[key]} {key.replace('_', ' ')}; the profile allows at most {bounds['max']} per chapter")
+        if counts[key] > high: add("device_count_over", "medium" if flexible else "error", f"{counts[key]} {key.replace('_', ' ')}; the profile allows at most {bounds['max']} per chapter")
         elif counts[key] < low:
-            add("device_count_under", "medium", f"{counts[key]} {key.replace('_', ' ')}; the profile expects at least {bounds['min']} per chapter. Look for material the "
+            add("device_count_under", "low" if flexible else "medium", f"{counts[key]} {key.replace('_', ' ')}; the profile expects at least {bounds['min']} per chapter. Look for material the "
                 "sections already contain; do not add devices to reach the number (waive with a reason if the chapter has none)", suggestion=key)
-    # Chapter end.
-    required = [k for k in profile["structure"]["chapter_end"] if not (k == "bridge_to_next" and last)]
+    # Chapter end. FIXED: the profile's apparatus in every chapter (legacy). AUTO/GUIDED: only what the architecture
+    # explicitly requires; every item is chosen for this chapter's content and says why.
+    if flexible: required = [k for k in arch["block_policy"].get("required_chapter_end") or [] if not (k == "bridge_to_next" and last)]
+    else: required = [k for k in profile["structure"]["chapter_end"] if not (k == "bridge_to_next" and last)]
     present = [str(e.get("type")) for e in plan["chapter_end"]]
+    import publication_architecture as pa
     for item in present:
-        if item not in CHAPTER_END: add("chapter_end_unknown", "error", f"chapter_end {item} is not one of {', '.join(CHAPTER_END)}")
+        if item not in CHAPTER_END_ANY: add("chapter_end_unknown", "error", f"chapter_end {item} is not one of {', '.join(CHAPTER_END_ANY)}")
     for item in required:
-        if item not in present: add("chapter_end_missing", "error", f"the profile requires {item} at the end of every chapter")
+        if item not in present and pa.canonical(item) not in {pa.canonical(x) for x in present}:
+            add("chapter_end_missing", "error", f"the {'architecture' if flexible else 'profile'} requires {item} at the end of every chapter")
+    if flexible:
+        findings += block_policy_findings(cid, chapter, plan, arch)
     reading = profile["citations"]["further_reading_per_chapter"]
     for e in plan["chapter_end"]:
         if e.get("type") == "further_reading":
@@ -445,7 +484,7 @@ def check_chapter(chapter, plan, profile, known_sources=None, first_terms=None, 
                 if known_sources is not None and s not in known_sources: add("source_unknown", "error", f"source {s} does not exist in the research registry", device=e["id"])
                 elif known_sources is not None and known_sources[s] not in ("fully_ingested", "partially_ingested"):
                     add("source_unusable", "error", f"source {s} is {known_sources[s]} and cannot support further reading", device=e["id"])
-    if int(reading["min"] + 0.5) > 0 and "further_reading" not in present: add("further_reading_missing", "medium", f"the profile expects {reading['min']}+ further-reading sources per chapter")
+    if int(reading["min"] + 0.5) > 0 and "further_reading" not in present: add("further_reading_missing", "low" if flexible else "medium", f"the profile expects {reading['min']}+ further-reading sources per chapter")
     if profile["structure"]["chapter_lead"] == "required" and not str(plan.get("lead") or "").strip():
         add("chapter_lead_missing", "medium", "the profile requires a chapter lead: state what it tells the reader (lead: ...)")
     gaps, pace = pacing(plan, profile, cid)
@@ -457,14 +496,81 @@ def check_chapter(chapter, plan, profile, known_sources=None, first_terms=None, 
             "max_gap_chars": max([g["chars"] for g in gaps], default=0), "findings": findings}
 
 
+def block_policy_findings(cid, chapter, plan, arch):
+    """AUTO / GUIDED: every device and chapter-end item is a block the chapter's policy allows, exercises come with
+    answers, the chapter's planned blocks (outline) are realised, uploaded assets meant for it are planned."""
+    import publication_architecture as pa
+    import source_roles
+    out = []
+    add = lambda rule, severity, detail, section=None, device=None, suggestion=None: out.append(finding(rule, severity, detail, cid, section, device, suggestion))
+    policy = pa.chapter_policy(arch, chapter)
+    used = []
+    items = [(s, d, block_of(d)) for s, d in devices(plan) if live(d)] + [(None, e, pa.canonical(e.get("type"))) for e in plan["chapter_end"]]
+    for section, d, block in items:
+        used.append(block)
+        where = section.get("id") if section else None
+        state = pa.status(policy, block)
+        why = pa.reason(arch, block)
+        if state == "forbidden":
+            add("block_forbidden", "error", f"{block} is forbidden for this book{(' (' + why + ')') if why else ''}; remove it", where, d.get("id"))
+        elif state == "discouraged":
+            add("block_discouraged", "medium", f"{block} is discouraged for a {arch['archetype']['primary']}{(' (' + why + ')') if why else ''}: drop it, or keep it "
+                "with a waiver that says why this chapter needs it", where, d.get("id"))
+        if section is None and not str(d.get("why") or "").strip():
+            add("chapter_end_missing_why", "error", f"chapter_end {d.get('type')} needs why: what this chapter's reader gains from it here", None, d.get("id"))
+    exercises = [(s, d) for s, d, b in items if b == "exercises"]
+    answers = [d for s, d, b in items if b == "answer_key"]
+    for section, d in exercises:
+        if not answers and not str((d.get("answers") or {}).get("location") if isinstance(d.get("answers"), dict) else d.get("answers") or "").strip():
+            add("exercise_without_answers", "error", "exercises need answers or explanations the reader can recover: plan an answer_key, or answers: {location: <section id | appendix>}",
+                section.get("id") if section else None, d.get("id"), "answer_key")
+    for block in policy["planned"]:
+        if block not in used and pa.status(policy, block) != "forbidden":
+            add("chapter_block_unplanned", "medium", f"the outline plans a {block} for this chapter (source/metadata/outline.yaml blocks) but the editorial plan does not; plan it or update the outline")
+    referenced = {str(d.get("asset_ref")) for _, d in devices(plan) if d.get("asset_ref")}
+    declined = {str(x.get("asset")) for x in as_list(plan.get("declined_assets")) if isinstance(x, dict) and str(x.get("reason") or "").strip()}
+    try: uploads = source_roles.for_chapter(cid)
+    except Exception: uploads = []
+    for asset in uploads:
+        if asset["requires_decision"] and asset["id"] not in referenced | declined:
+            add("uploaded_asset_unplanned", "medium", f"the user uploaded {asset['id']} ({asset['label']}, {asset['asset_role']}) for this chapter"
+                + (f": \"{asset['instruction']}\"" if asset.get("instruction") else "") + "; plan a device with asset_ref: " + asset["id"]
+                + " or list it under declined_assets with the reason")
+    return out
+
+
+def uniformity_findings(chapters, plans, arch):
+    """Book level (AUTO/GUIDED): the same chapter-end apparatus in every chapter is a template, not a decision."""
+    import publication_architecture as pa
+    out = []
+    planned = [plans[c["id"]] for c in chapters if plans.get(c["id"])]
+    if len(planned) < 3: return out
+    ends = [tuple(sorted(pa.canonical(e.get("type")) for e in p["chapter_end"] if e.get("type") != "bridge_to_next")) for p in planned]
+    reason = str((arch.get("chapter_strategy") or {}).get("uniform_structure_reason") or "").strip()
+    practice = arch.get("exercise_policy") in ("every_chapter", "exam_focused")
+    if ends[0] and len(set(ends)) == 1 and not reason and not (practice and set(ends[0]) <= {"exercises", "answer_key"}):
+        out.append(finding("chapter_end_uniform", "medium", f"every chapter ends with the same apparatus ({', '.join(ends[0])}); choose chapter-end blocks per chapter "
+                           "from its content, or state chapter_strategy.uniform_structure_reason in plan/publication-architecture.yaml"))
+    shapes = [tuple(sorted({block_of(d) for _, d in devices(p) if live(d)})) for p in planned]
+    if shapes[0] and len(set(shapes)) == 1 and not reason:
+        out.append(finding("structure_uniform", "low", f"every chapter uses the same set of blocks ({', '.join(shapes[0])})"))
+    return out
+
+
 # ---------------------------------------------------------------- the book
 
-def check(chapters, plans, profile, known_sources=None, book=None, intent=None):
+def check(chapters, plans, profile, known_sources=None, book=None, intent=None, arch=None):
     """The editorial plan of the whole book against the profile (a report dict). `intent`: pipeline-default rule ids
-    switched off by explicit user intent (user_intent.overrides)."""
+    switched off by explicit user intent (user_intent.overrides). `arch`: the publication architecture (None = the
+    legacy FIXED behaviour)."""
     book = book or {}; first_terms = {}; intent = intent or {}
-    results = [check_chapter(c, plans.get(c["id"]), profile, known_sources, first_terms, last=i == len(chapters) - 1, intent=intent) for i, c in enumerate(chapters)]
+    if adaptive(arch):
+        # The architecture's visual density (「図表を多く」, a visual guide …) scales the profile's visual-rate health check.
+        import publication_architecture as pa
+        profile = pa.scaled_profile(profile, arch)
+    results = [check_chapter(c, plans.get(c["id"]), profile, known_sources, first_terms, last=i == len(chapters) - 1, intent=intent, arch=arch) for i, c in enumerate(chapters)]
     findings = []
+    if adaptive(arch): findings += uniformity_findings(chapters, {k: normalize(v) for k, v in plans.items() if v}, arch)
     ids = {}
     for c in chapters:
         plan = plans.get(c["id"])
@@ -499,6 +605,7 @@ def check(chapters, plans, profile, known_sources=None, book=None, intent=None):
                "medium": sum(f["severity"] == "medium" and not f.get("waived") for f in every), "low": sum(f["severity"] == "low" for f in every),
                "waived": sum(bool(f.get("waived")) for f in every), "user_intent_overrides": sorted(intent), "planned_chars": chars, "visual_intents": visuals,
                "visuals_per_10k": round(rate, 2), "nonprose_share_est": round(share, 3)}
+    summary["structure_mode"] = (arch or {}).get("mode", "fixed")
     return {"schema": SCHEMA, "profile": profile.get("id"), "ok": not blocking(every), "summary": summary,
             "limits": {"pause_every_chars": profile["rhythm"]["pause_every_chars"], "max_text_only_pages": profile["rhythm"]["max_text_only_pages"],
                        "chars_per_text_page": profile["scale"]["chars_per_text_page"], "nonprose_share_target": profile["scale"]["nonprose_share_target"],
@@ -531,7 +638,10 @@ def profile_for(project=None):
 
 def run(chapters, write=True, project=None):
     import user_intent
-    result = check(chapters, load_plans(chapters), profile_for(project), known_sources(), load_book(), intent=user_intent.overrides(project))
+    import publication_architecture as pa
+    try: arch = pa.load(project)
+    except Exception: arch = None
+    result = check(chapters, load_plans(chapters), profile_for(project), known_sources(), load_book(), intent=user_intent.overrides(project), arch=arch)
     if write:
         REPORT.parent.mkdir(exist_ok=True)
         write_yaml(REPORT, result, "Generated by BookOrder from plan/editorial/*.yaml and the resolved profile. Change the plans, not this file.")

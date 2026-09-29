@@ -17,6 +17,14 @@ estimate derived from the body size; characters exclude whitespace, code and mat
 chapter-end elements and pacing are defaults: when the user's instructions exclude one (「章末まとめを付けない」),
 list it under that directive's `overrides` instead of planning it.
 
+The publication architecture (plan/publication-architecture.yaml, decided in the publication-planning phase) comes
+before the outline: archetype, block policy, exercise and visual policy, tone. In AUTO / GUIDED mode each outline
+chapter also carries `content_intent`, `blocks` and `visuals` chosen for *that* chapter's content — chapters of one
+book may and usually should differ in structure (skills/planning/publication-architecture.md). When drafting, write
+only the blocks the chapter's editorial plan contains; never add a summary, quiz or column to a chapter because
+other books do. Facts, numbers and recommendations cite sources whose role allows it (evidence); background and
+experience sources shape examples and viewpoint but are never the sole support of a factual claim.
+
 `plan/book-bible.yaml` is shared by every chapter job: title, subtitle, purpose, audience, tone, central_thesis,
 scope (included/excluded), terminology (preferred_terms with `avoid` variants, definitions, aliases),
 editorial_rules (voice, formality, tense, punctuation, citation_style, repetition_policy), global_narrative

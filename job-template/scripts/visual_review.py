@@ -28,6 +28,8 @@ SHAPES = ("comparison", "quantity", "chronology", "hierarchy", "process", "causa
 BASES = ("data", "source", "derived_from_text", "illustrative", "none")
 VISUAL_TYPES = ("diagram", "chart", "table", "image", "screenshot", "equation")
 DECISIONS = ("accepted", "rejected", "pending")
+# Rejections that stand even for a figure the user uploaded and placed (integrity, not usefulness).
+USER_UPLOAD_BLOCKING = ("missing_sources", "causal_without_evidence", "disclaimer_caption", "withdrawn")
 RING = {"cycle", "network", "concept-map"}
 TREE = {"hierarchy"}
 IMAGE_ROLES = ("chapter_opener", "part_opener", "editorial_illustration")
@@ -146,6 +148,7 @@ def candidate(asset, chapter_index=None):
                                                   "conceptual" if shape.get("kind") == "abstract" else "factual"),
             "duplicate_group": asset.get("duplicate_group"), "caption": str(asset.get("caption") or ""), "purpose": str(asset.get("purpose") or ""),
             "role": asset.get("role"), "requested": asset.get("decision"), "request_reason": asset.get("decision_reason"),
+            "uploaded_asset": asset.get("uploaded_asset"),
             "structure": structure}
 
 
@@ -289,6 +292,11 @@ def review(assets, chapters, profile=None, planned_chars=None, genre=None):
         if c["type"] in ("equation", "cover"): c["decision"] = "accepted"
         elif c["requested"] == "rejected":
             c["decision"] = "rejected"; c["rejection_reasons"].insert(0, _reason("withdrawn", str(c["request_reason"] or "withdrawn in the plan")))
+        elif c["rejection_reasons"] and c.get("uploaded_asset") and not any(r["code"] in USER_UPLOAD_BLOCKING for r in c["rejection_reasons"]):
+            # The user uploaded this figure and said where it belongs: usefulness heuristics yield to the user's
+            # explicit choice (docs/user-intent.md); evidence problems still reject it.
+            c["decision"] = "accepted"; c["user_directed"] = True
+            c["waived_reasons"] = c["rejection_reasons"]; c["rejection_reasons"] = []
         elif c["rejection_reasons"]: c["decision"] = "rejected"
         elif c["requested"] == "pending": c["decision"] = "pending"
         else: c["decision"] = "accepted"
@@ -366,6 +374,10 @@ def run(outline=None, write=True):
     import publication_profile
     chapters = outline if outline is not None else load_outline()
     profile = publication_profile.load_resolved()
+    try:
+        import publication_architecture
+        profile = publication_architecture.scaled_profile(profile)
+    except Exception: pass
     result = review(asset_module.assets(), chapters, profile)
     if write:
         REPORT.parent.mkdir(exist_ok=True)

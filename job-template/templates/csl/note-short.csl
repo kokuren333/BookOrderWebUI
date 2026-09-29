@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- BookOrder short note style: footnotes give author, short title and locator; the full record is in the bibliography. -->
+<style xmlns="http://purl.org/net/xbiblio/csl" class="note" version="1.0" demote-non-dropping-particle="sort-only">
+  <info>
+    <title>BookOrder Note (short)</title>
+    <id>https://bookorder.local/styles/note-short</id>
+    <updated>2026-09-27T00:00:00+00:00</updated>
+  </info>
+  <macro name="author">
+    <names variable="author">
+      <name delimiter=", " delimiter-precedes-last="always"/>
+      <substitute>
+        <names variable="editor"/>
+        <text variable="publisher"/>
+      </substitute>
+    </names>
+  </macro>
+  <macro name="issued">
+    <choose>
+      <if variable="issued">
+        <date variable="issued" form="numeric" date-parts="year"/>
+      </if>
+      <else>
+        <text term="no date" form="short"/>
+      </else>
+    </choose>
+  </macro>
+  <citation>
+    <layout suffix="." delimiter="; ">
+      <group delimiter=", ">
+        <text macro="author"/>
+        <text variable="title" form="short" font-style="italic"/>
+        <group delimiter=" ">
+          <label variable="locator" form="short"/>
+          <text variable="locator"/>
+        </group>
+      </group>
+    </layout>
+  </citation>
+  <bibliography entry-spacing="0" hanging-indent="true">
+    <sort>
+      <key macro="author"/>
+      <key variable="title"/>
+    </sort>
+    <layout suffix=".">
+      <group delimiter=". ">
+        <text macro="author"/>
+        <text variable="title" font-style="italic"/>
+        <group delimiter=", ">
+          <text variable="container-title"/>
+          <text variable="publisher"/>
+          <text macro="issued"/>
+        </group>
+        <text variable="URL"/>
+      </group>
+    </layout>
+  </bibliography>
+</style>

@@ -68,7 +68,16 @@ responsibilities and resolvers. Only the user-facing grouping and the WebUI stat
 | 05 出版形式とデザイン | **Publication preset** (bundle), Genre, Theme, Layout, Page size, Columns, theme samples | **Geometry**: custom size, orientation, margins, gutter, figure/table span, writing mode · **Typography**: fonts, sizes, weights · **Visual grammar**: PDF style preset, density, accent, chapter opener, figures, tables (rules + row density), callouts (frame + emphasis) · **Expert**: visual tone, art direction, custom.css |
 | 06 Agentが実行する環境 | Runtime (unchanged) | — |
 
-Right-hand sticky aside in 05: format summary (preset, layout, columns, body, margins, spans, theme + accent,
+### Update: Quick / Advanced publishing and the publication architecture (2026-09-29)
+
+Sections are now 01 本の企画 · 02 資料と指示 (files with roles) · 03 出版物の設計 (structure mode, publication type,
+block / exercise / visual / evidence policy) · 04 調査・引用・参考文献 (research; in-text citation separate from
+bibliography style, numbering and grouping) · 05 希望する出力 · 06 出版形式とデザイン · 07 実行環境. Quick mode shows
+01, 02, a read-only 03 (the explicit wishes BookOrder will enforce, AUTO), 05 and 07; Advanced publishing shows all
+sections with details behind accordions. Both write the same model. See
+[INTENT_DRIVEN_PUBLICATION_ARCHITECTURE.md](INTENT_DRIVEN_PUBLICATION_ARCHITECTURE.md#webui).
+
+Right-hand sticky aside in 06 (formerly 05): format summary (preset, layout, columns, body, margins, spans, theme + accent,
 typography, genre, tier, PDF style, outputs), the schematic page preview and the theme's sample page.
 
 Roles stated in the UI: **Genre** = kind of content (structure, device density) · **Layout** = page size, columns,

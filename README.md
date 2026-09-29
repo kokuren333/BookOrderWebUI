@@ -14,7 +14,7 @@ Open http://127.0.0.1:5173. `npm run build` writes the deployable app to `dist/`
 
 ## User flow
 
-Enter the book plan, source files, URLs, research and figure policies, and requested outputs. Download the job ZIP, extract it and open it with a file/command capable AI agent. Give one instruction — with Codex: `/goal AGENTS.mdを読み、bookorder goal が STATUS: COMPLETE を表示するまで出版ジョブを最後まで実行してください。` The job's root orchestrator (`bookorder goal`) then owns every phase — source ingestion, supplementary research, corpus synthesis, research freeze, Book Bible, architecture, chapter contracts, chapter-by-chapter drafting and expansion, integration, assets, audit, targeted rewrite, re-audit, design, layout, build, validation, packaging — and is the only component that can declare the publication complete (17 publication gates). See [docs/vnext-audit.md](docs/vnext-audit.md) and [docs/production-e2e.md](docs/production-e2e.md). Read publications in publish/ and retain publish/result.zip as the editable completed project.
+Enter the book plan, source files, URLs, research and figure policies, and requested outputs. Download the job ZIP, extract it and open it with a file/command capable AI agent. Give one instruction — with Codex: `/goal AGENTS.mdを読み、bookorder goal が STATUS: COMPLETE を表示するまで出版ジョブを最後まで実行してください。` The job's root orchestrator (`bookorder goal`) then owns every phase — source ingestion, supplementary research, corpus synthesis, research freeze, publication planning, Book Bible, architecture, visual planning, chapter contracts, chapter-by-chapter drafting and expansion, integration, assets, audit, targeted rewrite, re-audit, design, layout, build, validation, packaging — and is the only component that can declare the publication complete (23 publication gates). See [docs/vnext-audit.md](docs/vnext-audit.md) and [docs/production-e2e.md](docs/production-e2e.md). Read publications in publish/ and retain publish/result.zip as the editable completed project.
 
 Files remain in browser memory until included in the download; nothing is uploaded or persisted. Very large source collections require enough browser memory for the source data and compressed ZIP.
 
@@ -38,6 +38,8 @@ npm test
 npm run build
 python tests/test_orchestrator.py   # deterministic orchestration tests (Pandoc required)
 python tests/test_user_intent.py    # user instructions reach every phase; precedence, overrides, conflicts, gate 22
+python tests/test_publication_architecture.py   # archetypes, block policy, exercises, source roles, uploads, citations, visuals, modes
+python tests/architecture_e2e.py    # WebUI-generated AUTO job to STATUS: COMPLETE (layout reference, background source, uploaded figure, footnotes + numbered lists)
 python tests/mini_e2e.py            # real /goal orchestration with a scripted mock agent (Pandoc + Typst)
 python tests/e2e.py                 # legacy build pipeline on the npm-test job ZIP
 python tests/design.py              # themes, tokens, fonts, previews
@@ -47,16 +49,35 @@ The integration check uses PANDOC and TYPST environment variables when tools are
 
 This demonstrates the publishing pipeline with a short fixture. An external agent's actual research quality, 50–400-page writing, licensing review and complete editorial work depend on that agent and its available tools. A generated job alone does not guarantee those outcomes.
 
+## Intent-driven publication architecture
+
+BookOrder designs each publication from the user's intent, the purpose of the book and the role of every input — it
+does not pour text into a fixed template. A new `publication_planning` phase decides the publication archetype
+(practical guide, textbook, exam preparation, handbook …), a block policy over a block library (summary, checklist,
+exercises + answer key, pitfalls, next actions, cases, templates, dialogue examples, algorithm cards, decision tables,
+comparison tables, infographics …), the exercise and visual policy and the evidence policy; chapters then choose
+their own blocks, a `visual_planning` phase plans what must be seen before drafting, the citation form in the text is
+separate from numbered, grouped bibliography lists (引用文献 / 参考資料 / 図表・画像出典), and gate 23 checks the result.
+Modes: AUTO (WebUI default), GUIDED, FIXED (legacy template; every job without `publication_architecture`).
+See [docs/INTENT_DRIVEN_PUBLICATION_ARCHITECTURE.md](docs/INTENT_DRIVEN_PUBLICATION_ARCHITECTURE.md),
+[docs/SOURCE_ROLE_SYSTEM.md](docs/SOURCE_ROLE_SYSTEM.md), [docs/CITATION_AND_BIBLIOGRAPHY.md](docs/CITATION_AND_BIBLIOGRAPHY.md),
+[docs/VISUAL_PLANNING.md](docs/VISUAL_PLANNING.md) and the audit [docs/INTENT_DRIVEN_PUBLICATION_AUDIT.md](docs/INTENT_DRIVEN_PUBLICATION_AUDIT.md).
+
 ## Settings layout (what goes where)
 
-| Section | Basic | Advanced |
+The WebUI has two input modes. **Quick** needs only the book plan, files, the free-text intent, scale, outputs and
+runtime: roles of uploaded files are estimated (marked 「推定」, editable) and the structure mode is AUTO.
+**Advanced publishing** shows every section below (details behind accordions).
+
+| Section | Quick | Advanced publishing |
 |---|---|---|
 | 01 本の企画 | title, goal, readers, language, **Target scale** (the only scale input) | tier override (automatic by default) |
-| 02 資料と指示 | URLs, files, additional instructions — book-wide priority instruction, carried verbatim into every phase; outranks BookOrder defaults, not structured settings or integrity rules ([docs/USER_INTENT.md](docs/USER_INTENT.md)) | — |
-| 03 調査とコンテンツの方針 | research, citation style, whether tables/diagrams/charts/images may be made | — |
-| 04 希望する出力 | output formats | — |
-| 05 出版形式とデザイン | Publication preset, Genre, Theme, Layout, Page size, Columns | Geometry · Typography · Visual grammar · Expert |
-| 06 実行環境 | runtime OS/CPU | — |
+| 02 資料と指示 | URLs, files with a role each (evidence / background / layout reference / asset / redraw …), additional instructions — book-wide priority instruction, carried verbatim into every phase; outranks BookOrder defaults, not structured settings or integrity rules ([docs/USER_INTENT.md](docs/USER_INTENT.md)) | per-file label, asset role, authority, citation, chapter / section, usage, priority, caption, crop / redraw / transform / verbatim, free instruction |
+| 03 出版物の設計 | the explicit wishes read from the instructions; AUTO | structure mode (AUTO / GUIDED / FIXED), publication type (+ secondary, free text), exercise policy, visual density, per-block policy, visual types, chapter architecture, evidence policy, tone, layout strategy |
+| 04 調査・引用・参考文献 | defaults | research, in-text citation, footnote style, bibliography style, numbering, grouping; whether tables/diagrams/charts/images may be made |
+| 05 希望する出力 | output formats | — |
+| 06 出版形式とデザイン | defaults | Publication preset, Genre, Theme, Layout, Page size, Columns · Geometry · Typography · Visual grammar · Expert |
+| 07 実行環境 | runtime OS/CPU | — |
 
 A **Publication preset** (Standard Book, Technical / Reference, Medical / Scientific, Magazine / Mook, Compact) fills genre, layout preset, PDF style preset and theme at once; any later edit wins. **Genre** = kind of content, **Layout** = page size, columns and margins, **Theme** = typefaces, colour and component look. Each concept has exactly one control: page size and orientation belong to the layout; density, chapter opener and accent belong to the Design Spec and, when changed from the theme default, are passed on to the StyleBible automatically. Changing the theme keeps the values you changed and the whole layout; only untouched values follow the new theme. The right-hand summary shows the resolved format, typography, tier, PDF style and outputs next to a schematic page and the theme sample.
 

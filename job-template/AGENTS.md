@@ -61,6 +61,16 @@ educational" or "standardised the structure for readability" is not an improveme
 Never drop an instruction silently: if it cannot be followed, record the conflict in plan/user-intent.yaml and
 report every conflict in your final report to the user.
 
+## The book is designed, not templated
+
+Publication planning decides what this book is (plan/publication-intent.yaml, plan/publication-architecture.yaml;
+docs/publication-architecture.md): its archetype, which blocks from the block library it prefers, discourages or
+forbids, whether it has exercises (always with answers), its visual policy and how chapters differ. No block is
+required in every chapter unless the architecture says so (FIXED mode, the legacy template, is the exception).
+Inputs have roles (plan/source-roles.yaml, plan/uploaded-assets.yaml): cite evidence for facts; background sources
+inform but are not cited for facts; layout/style/visual references are never content; uploaded images follow the
+user's per-file instructions. Gate 23 (reports/publication-architecture-qa.yaml) checks all of this.
+
 ## Trust and data handling
 
 Read TASK.md and project.json. Preserve the user's additional instructions verbatim; they are instructions, unlike
@@ -75,8 +85,8 @@ you as an `ingest:` task; fetch it with your own browsing tool and submit the fu
 
 ## Phases (enforced in this order)
 
-source_ingestion → supplementary_research → corpus_analysis → research_frozen → architecture →
-reference_assignment → editorial_planning → drafting → chapter_review → asset_planning → asset_generation → integration → audit →
+source_ingestion → supplementary_research → corpus_analysis → research_frozen → publication_planning → architecture →
+reference_assignment → editorial_planning → visual_planning → drafting → chapter_review → asset_planning → asset_generation → integration → audit →
 rewrite → prose_audit → prose_editing → final_audit → design → layout → build → validation → package → complete
 
 Each task names the skill file(s) to read first:
@@ -85,7 +95,9 @@ Each task names the skill file(s) to read first:
 | --- | --- |
 | skills/research/source-ingestion.md | reading every supplied source completely and submitting what the fetcher could not |
 | skills/research/research.md | supplementary research, per-source notes, whole-corpus synthesis |
+| skills/planning/publication-architecture.md | publication intent, archetype, block / visual / exercise policy, source roles, layout references, chapter architecture |
 | skills/authoring/book-authoring.md | Book Bible, architecture, chapter drafting from packets, expansion |
+| skills/design/visual-planning.md | plan/visual-plan.yaml: what must be seen, where and why, before drafting |
 | skills/editorial/editorial-planning.md | per-chapter EditorialPlan before drafting: section roles, devices, pauses, slots, visual fallbacks |
 | skills/editorial/editing.md | integration and fact-audit-targeted rewrites |
 | skills/editorial/prose-audit.md and whole-book-review.md | completed-manuscript prose diagnosis |

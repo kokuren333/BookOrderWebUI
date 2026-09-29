@@ -2,6 +2,7 @@ import JSZip from 'jszip';
 import type { RuntimeBundle, RuntimeTarget } from './runtime.ts';
 import { defaultDesign, designSpec, type DesignOptions } from './design.ts';
 import { defaultPublication, designPage, issueText, previewLayout, requestPayload, PUBLICATION_PRESETS, type PublicationOptions, type ThemeSpec } from './publication.ts';
+import { ARCHETYPES, architecturePayload, citationPayload, defaultArchitecture, defaultCitation, detectSignals, inferUsage, isContent, signalText, SOURCE_ROLES, usagePayload, type ArchitectureOptions, type CitationOptions, type FileUsage, type UiMode } from './architecture.ts';
 
 export interface BookForm {
   title: string; description: string; targetReaders: string; language: string;
@@ -10,7 +11,10 @@ export interface BookForm {
   design: DesignOptions;
   publication: PublicationOptions;
   research: { allow_web_research: boolean; prefer_primary_sources: boolean; keep_provenance: boolean; require_supplied_coverage: boolean };
-  citationStyle: 'numeric' | 'author-year' | 'note';
+  citationStyle: 'numeric' | 'author-year' | 'note';   // in-text citation form (project.json citations.style / in_text_citation_style)
+  bibliography: Omit<CitationOptions, 'inText'>;       // back matter: separate from how the text cites
+  uiMode: UiMode;                                      // Quick / Advanced publishing (UI only; both write the same model)
+  architecture: ArchitectureOptions;
   figures: { tables: boolean; diagrams: boolean; charts: boolean; generative_images: boolean };
   outputs: { canonical_markdown: true; docx: boolean; semantic_html: boolean; pdf: boolean; static_site: boolean; epub: boolean };
 }
@@ -19,11 +23,15 @@ export const defaults: BookForm = {
   design: structuredClone(defaultDesign),
   publication: structuredClone(defaultPublication),
   research: { allow_web_research: true, prefer_primary_sources: true, keep_provenance: true, require_supplied_coverage: true },
-  citationStyle: 'numeric',
+  citationStyle: 'numeric', bibliography: structuredClone(defaultCitation), uiMode: 'quick', architecture: structuredClone(defaultArchitecture),
   figures: { tables: true, diagrams: true, charts: true, generative_images: false },
   outputs: { canonical_markdown: true, docx: true, semantic_html: true, pdf: true, static_site: true, epub: false },
 };
-export interface SourceFile { name: string; data: Blob | Uint8Array; size: number }
+export interface SourceFile { name: string; data: Blob | Uint8Array; size: number; type?: string; usage?: FileUsage }
+/** A file's role metadata: the user's choice, else the WebUI estimate (role_origin: inferred). */
+export const fileUsage = (file: SourceFile) => file.usage ?? inferUsage(file.name, file.type);
+/** ZIP path: content files are sources; layout / style / visual references and placed images are assets, never sources. */
+export const filePath = (file: SourceFile, name: string) => `input/${isContent(fileUsage(file)) ? 'sources' : 'assets'}/${name}`;
 
 export function safeName(name: string): string {
   const clean = name.normalize('NFC').replace(/[\\/<>:"|?*\u0000-\u001f]/g, '_').replace(/^\.+|[. ]+$/g, '').trim().slice(0, 150);
@@ -52,6 +60,9 @@ export function validateForm(form: BookForm): string[] {
   if (![design.bodySize, design.codeSize, design.captionSize, design.footnoteSize].every(value => Number.isFinite(value) && value >= 5 && value <= 40)) errors.push('文字サイズは5〜40ptで指定してください。');
   if (!/^#[0-9a-fA-F]{6}$/.test(design.accent)) errors.push('アクセント色は6桁のカラーコードで指定してください。');
   if (![design.bodyJapanese, design.bodyLatin, design.headingJapanese, design.headingLatin, design.codeFont, design.captionFont, design.footnoteFont].every(name => name.trim() && name.length <= 120 && !/[\u0000-\u001f]/.test(name))) errors.push('フォント名を指定してください。');
+  const a = form.architecture;
+  if (a && a.mode === 'guided' && a.archetype === 'auto') errors.push('GUIDEDモードでは出版物タイプを選んでください。');
+  if (a && a.archetype !== 'auto' && a.archetype === a.secondaryArchetype) errors.push('副タイプには主タイプと別のタイプを選んでください。');
   if (form.publication && form.publication.layoutPreset !== 'theme') {
     const preview = previewLayout(form.publication);  // non-theme layouts carry explicit page values
     for (const issue of preview.issues) errors.push(`出版形式：${issueText(issue, preview)}`);
@@ -76,14 +87,49 @@ export function projectData(form: BookForm, names: string[], files: SourceFile[]
   return {
     format: 'portable-publishing-job', format_version: '0.2',
     book: { title: form.title.trim(), description: form.description, target_readers: form.targetReaders, target_pages: form.targetPages, language },
-    user_instructions: form.instructions, research: form.research, figures: form.figures, citations: { style: form.citationStyle },
+    user_instructions: form.instructions, research: form.research, figures: form.figures,
+    citations: form.bibliography ? citationPayload(form.citationStyle, form.bibliography) : { style: form.citationStyle },
     outputs: { ...form.outputs, canonical_markdown: true },
     runtime: { target: form.runtimeTarget, bundled: form.runtimeTarget !== 'none' },
     design: { spec: 'book.design.yaml', theme: form.design.theme, custom_css: 'custom.css' },
-    input: { urls: urlLines(form.urls), sources: names.map((name, i) => ({ original_name: files[i].name, path: `input/sources/${name}`, size_bytes: files[i].size })) },
+    input: inputPayload(form, names, files),
+    // Intent-driven publication architecture (docs/INTENT_DRIVEN_PUBLICATION_ARCHITECTURE.md). Absent = legacy FIXED job.
+    ...(form.architecture ? { publication_architecture: architecturePayload(form.architecture) } : {}),
     // Publication request for the existing resolvers (profile / LayoutSpec / StyleBible). Empty when untouched.
     ...requestPayload(form.publication ?? defaultPublication, form.design, theme),
   };
+}
+/** input.sources (content, with role metadata) and input.assets (not content). A file with an asset role that is also
+ *  content (e.g. a PDF used as evidence and redrawn) is listed in sources with its asset_role. */
+export function inputPayload(form: BookForm, names: string[], files: SourceFile[]) {
+  const sources = []; const assets = [];
+  for (let i = 0; i < files.length; i++) {
+    const usage = fileUsage(files[i]);
+    const entry = { original_name: files[i].name, path: filePath(files[i], names[i]), size_bytes: files[i].size, ...(form.architecture ? { usage: usagePayload(usage) } : {}) };
+    if (isContent(usage) || !form.architecture) sources.push(entry);
+    else assets.push({ id: `asset-${String(assets.length + 1).padStart(3, '0')}`, ...entry });
+  }
+  return { urls: urlLines(form.urls), sources, ...(assets.length ? { assets } : {}) };
+}
+/** TASK.md section: how the book should be designed and what each input is for. */
+export function architectureTask(form: BookForm, names: string[], files: SourceFile[]): string {
+  const a = form.architecture; if (!a) return '';
+  const signals = detectSignals(`${form.instructions}\n${form.description}`);
+  const lines = ['## Publication architecture', `Structure mode: ${a.mode.toUpperCase()} (plan/publication-architecture.yaml is decided in the publication_planning phase; docs/publication-architecture.md).`,
+    `Publication type: ${a.archetype === 'auto' ? 'inferred from the intent' : ARCHETYPES[a.archetype]?.en + (a.secondaryArchetype ? ' + ' + ARCHETYPES[a.secondaryArchetype]?.en : '')}.`,
+    'Blocks (summaries, checklists, exercises, cases, figures …) are a library to combine per chapter, never a template every chapter must repeat. Exercises only where the architecture calls for them, always with answers.'];
+  const chosen = Object.entries(a.blocks);
+  if (chosen.length) lines.push('Block choices from the WebUI: ' + chosen.map(([b, state]) => `${b}=${state}`).join(', ') + '.');
+  if (signals.length) lines.push('Explicit wishes read from the user\'s words (enforced): ' + signals.map(s => `「${s.quote}」→ ${signalText(s.effect)}`).join('; ') + '.');
+  lines.push('', '## Inputs and their roles');
+  if (!files.length) lines.push('(No uploaded files)');
+  files.forEach((file, i) => {
+    const u = fileUsage(file);
+    lines.push(`- ${filePath(file, names[i])}: ${u.role} (${SOURCE_ROLES[u.role]?.label}${u.assetRole ? ', ' + u.assetRole : ''}${u.roleOrigin === 'inferred' ? ', estimated' : ''})`
+      + (u.intendedChapter ? `; chapter ${u.intendedChapter}` : '') + (u.notes ? `; instruction: ${u.notes}` : ''));
+  });
+  lines.push('Only evidence (and redraw sources for figure credits) may be cited for facts. Background sources inform the book and are listed under 参考資料. Layout, style and visual references are never content.');
+  return lines.join('\n') + '\n\n';
 }
 /** Design Spec written to the job. A layout request's named page size is mirrored for the legacy CSS/HTML consumers;
  *  plan/layout-spec.yaml (resolved from project.json) stays the geometry authority for PDF. */
@@ -116,12 +162,12 @@ export async function generateJob(form: BookForm, files: SourceFile[], templates
   root.file('input/urls.txt', urlLines(form.urls).join('\n') + '\n');
   for (let i = 0; i < files.length; i++) {
     const data = files[i].data;
-    root.file(`input/sources/${names[i]}`, data instanceof Blob ? await data.arrayBuffer() : data);
+    root.file(form.architecture ? filePath(files[i], names[i]) : `input/sources/${names[i]}`, data instanceof Blob ? await data.arrayBuffer() : data);
   }
   const requested = ['profile', 'layout_preset', 'layout_spec', 'style_preset', 'style_controls', 'style_bible'].filter(key => key in project);
   const preset = PUBLICATION_PRESETS[(form.publication ?? defaultPublication).publicationPreset];
-  root.file('TASK.md', `# Publishing task\n\n## Title\n${form.title}\n\n## Goal\n${form.description}\n\n## Target readers\n${form.targetReaders}\n\n## Language\n${form.language}\n\n## Expected scale\nApproximately ${form.targetPages} pages. This is a planning guide, not a fixed PDF page count.\n\n## Provided sources\n${names.map(n => '- input/sources/' + n).join('\n') || '(No uploaded files)'}\n\n### URLs\n${urlLines(form.urls).join('\n') || '(No URLs)'}\n\n## Research policy\n${JSON.stringify(form.research, null, 2)}\nIf additional web research is disabled, use only provided files and explicitly supplied URLs. Do not discover additional sources.\n\n## Requested outputs\n${Object.entries(project.outputs).filter(([, v]) => v).map(([key]) => '- ' + key).join('\n')}\n\n## Publication format\n${requested.length ? 'Requested in project.json (' + requested.join(', ') + ')' + (preset ? ', starting from the WebUI publication preset "' + preset.label + '"' : '') + '. BookOrder resolves it into plan/profile.resolved.yaml, plan/layout-spec.yaml and plan/style-bible.yaml; check it with `bookorder publication`.' : 'Theme defaults (no explicit publication request).'} Theme and typography: book.design.yaml.\n\n## Figure policy\n${JSON.stringify(form.figures, null, 2)}\n\n## Additional user instructions (verbatim)\n${form.instructions}\n\n## Precedence of settings\nThe additional user instructions above are the book-specific instruction from the user. BookOrder repeats them verbatim in every task it prints; they are never replaced by a summary. From strongest to weakest:\n\n1. Invariants: factual accuracy, citation integrity, source provenance, safety, build validity and the requested outputs. No instruction waives them.\n2. Explicit user choices, each authoritative for what it states:\n   - the structured settings (project.json, book.design.yaml and the plan files resolved from them) for the fields they represent: scale, outputs, page size, layout and the design values selected in the WebUI;\n   - the additional user instructions for the editorial and semantic choices they state: voice and tone, distance to the reader, difficulty, explanation density, topics to cover or leave out, emphasis, cases, structure, what to show as figures or tables, and chapter apparatus such as summaries, exercises or counterarguments.\n3. Derived decisions: the resolved publication profile, Book Bible, outline and editorial plans, which must follow 1 and 2.\n4. BookOrder defaults and Skill heuristics (genre and tier defaults such as chapter summaries, device counts, balanced framing or teaching scaffolding), which fill only what the user left unspecified.\n\nDo not improve the book against the user's explicit intent. A genre preset does not outrank the instructions: with the Medical preset and \"no routine chapter-end summaries\" in the instructions, the chapters get no routine summary. A structured setting does: if the WebUI selects A5 and the instructions ask for A4, the book stays A5. If an instruction cannot be followed (it conflicts with an invariant or a structured setting, the sources do not support it, or it is technically impossible), do not ignore it silently: record the conflict in plan/user-intent.yaml and tell the user in your final report. See docs/user-intent.md.\n\n## How this job runs\nOne instruction runs the whole publication. With Codex: \`/goal AGENTS.mdを読み、bookorder goal が STATUS: COMPLETE を表示するまで出版ジョブを最後まで実行してください。\` BookOrder's orchestrator (\`bookorder goal\`) owns every phase and alone decides completion; a built PDF is not a finished publication.\n`);
-  for (const path of ['input/sources', 'research', 'plan', 'source/manuscript', 'source/assets/figures', 'source/assets/images', 'source/assets/generated', 'source/metadata/chapters', 'interchange', 'publish', 'reports']) root.file(`${path}/.gitkeep`, '');
+  root.file('TASK.md', `# Publishing task\n\n## Title\n${form.title}\n\n## Goal\n${form.description}\n\n## Target readers\n${form.targetReaders}\n\n## Language\n${form.language}\n\n## Expected scale\nApproximately ${form.targetPages} pages. This is a planning guide, not a fixed PDF page count.\n\n## Provided sources\n${names.map((n, i) => '- ' + (form.architecture ? filePath(files[i], n) : 'input/sources/' + n)).join('\n') || '(No uploaded files)'}\n\n### URLs\n${urlLines(form.urls).join('\n') || '(No URLs)'}\n\n## Research policy\n${JSON.stringify(form.research, null, 2)}\nIf additional web research is disabled, use only provided files and explicitly supplied URLs. Do not discover additional sources.\n\n## Requested outputs\n${Object.entries(project.outputs).filter(([, v]) => v).map(([key]) => '- ' + key).join('\n')}\n\n## Publication format\n${requested.length ? 'Requested in project.json (' + requested.join(', ') + ')' + (preset ? ', starting from the WebUI publication preset "' + preset.label + '"' : '') + '. BookOrder resolves it into plan/profile.resolved.yaml, plan/layout-spec.yaml and plan/style-bible.yaml; check it with `bookorder publication`.' : 'Theme defaults (no explicit publication request).'} Theme and typography: book.design.yaml.\n\n## Figure policy\n${JSON.stringify(form.figures, null, 2)}\n\n## Citations and bibliography\n${JSON.stringify(project.citations, null, 2)}\nHow the text cites and how the back matter lists are separate settings (docs/publication-architecture.md).\n\n${architectureTask(form, names, files)}## Additional user instructions (verbatim)\n${form.instructions}\n\n## Precedence of settings\nThe additional user instructions above are the book-specific instruction from the user. BookOrder repeats them verbatim in every task it prints; they are never replaced by a summary. From strongest to weakest:\n\n1. Invariants: factual accuracy, citation integrity, source provenance, safety, build validity and the requested outputs. No instruction waives them.\n2. Explicit user choices, each authoritative for what it states:\n   - the structured settings (project.json, book.design.yaml and the plan files resolved from them) for the fields they represent: scale, outputs, page size, layout and the design values selected in the WebUI;\n   - the additional user instructions for the editorial and semantic choices they state: voice and tone, distance to the reader, difficulty, explanation density, topics to cover or leave out, emphasis, cases, structure, what to show as figures or tables, and chapter apparatus such as summaries, exercises or counterarguments.\n3. Derived decisions: the resolved publication profile, Book Bible, outline and editorial plans, which must follow 1 and 2.\n4. BookOrder defaults and Skill heuristics (genre and tier defaults such as chapter summaries, device counts, balanced framing or teaching scaffolding), which fill only what the user left unspecified.\n\nDo not improve the book against the user's explicit intent. A genre preset does not outrank the instructions: with the Medical preset and \"no routine chapter-end summaries\" in the instructions, the chapters get no routine summary. A structured setting does: if the WebUI selects A5 and the instructions ask for A4, the book stays A5. If an instruction cannot be followed (it conflicts with an invariant or a structured setting, the sources do not support it, or it is technically impossible), do not ignore it silently: record the conflict in plan/user-intent.yaml and tell the user in your final report. See docs/user-intent.md.\n\n## How this job runs\nOne instruction runs the whole publication. With Codex: \`/goal AGENTS.mdを読み、bookorder goal が STATUS: COMPLETE を表示するまで出版ジョブを最後まで実行してください。\` BookOrder's orchestrator (\`bookorder goal\`) owns every phase and alone decides completion; a built PDF is not a finished publication.\n`);
+  for (const path of ['input/sources', 'input/assets', 'research', 'plan', 'source/manuscript', 'source/assets/figures', 'source/assets/images', 'source/assets/generated', 'source/metadata/chapters', 'interchange', 'publish', 'reports']) root.file(`${path}/.gitkeep`, '');
   root.file('source/references/references.bib', '% Add verified BibTeX records here.\n');
   for (const [file, key] of [['outline', 'chapters'], ['glossary', 'terms'], ['sources', 'sources'], ['figures', 'figures']]) root.file(`source/metadata/${file}.yaml`, `${key}: []\n`);
   return { filename: `${safeName(form.title.trim())}-${form.runtimeTarget === 'none' ? '' : form.runtimeTarget + '-'}publishing-job.zip`, data: await zip.generateAsync({ type: 'uint8array', platform: 'UNIX', streamFiles: true, compression: 'DEFLATE', compressionOptions: { level: 6 } }, meta => progress?.(Math.round(meta.percent))) };

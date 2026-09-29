@@ -14,18 +14,19 @@ import traceback
 from common import ROOT, read_project, write_json, as_list, yaml_data, fingerprint as build_fingerprint, editorial_plan_fingerprint
 
 # outline (architecture) -> EditorialPlan -> section drafting -> VisualPlan / assets -> integration -> layout.
-PHASES = ["source_ingestion", "supplementary_research", "corpus_analysis", "research_frozen", "architecture",
-          "reference_assignment", "editorial_planning", "drafting", "chapter_review", "asset_planning", "asset_generation",
+PHASES = ["source_ingestion", "supplementary_research", "corpus_analysis", "research_frozen", "publication_planning", "architecture",
+          "reference_assignment", "editorial_planning", "visual_planning", "drafting", "chapter_review", "asset_planning", "asset_generation",
           "integration", "audit", "rewrite", "prose_audit", "prose_editing", "final_audit", "design", "layout", "build", "validation", "package", "complete"]
 # EditorialPlan is an explicit semantic input to each downstream publication artifact.
-EDITORIAL_PLAN_DOWNSTREAM = ["drafting", "chapter_review", "asset_planning", "asset_generation", "integration",
+EDITORIAL_PLAN_DOWNSTREAM = ["visual_planning", "drafting", "chapter_review", "asset_planning", "asset_generation", "integration",
                             "audit", "rewrite", "prose_audit", "prose_editing", "final_audit", "design", "layout", "build", "validation", "package", "complete"]
 STATES = ("pending", "running", "complete", "blocked", "failed")
 STATE_FILE = ROOT / "project-state.json"
 EVENTS = ROOT / "run-events.jsonl"
 SUMMARY = ROOT / "execution-summary.json"
 SKILL_IDS = {"source_ingestion": ("source-ingestion",), "supplementary_research": ("research",),
-             "corpus_analysis": ("research",), "architecture": ("book-authoring",),
+             "corpus_analysis": ("research",), "publication_planning": ("publication-architecture",),
+             "architecture": ("book-authoring", "publication-architecture"), "visual_planning": ("visual-planning", "figures"),
              "editorial_planning": ("editorial-planning",), "drafting": ("book-authoring", "editorial-planning"),
              "chapter_review": ("book-authoring",), "integration": ("editing",),
              "asset_planning": ("figures",), "asset_generation": ("figures",), "audit": ("audit",),
@@ -66,6 +67,8 @@ def new_state(project):
             "accepted": {}, "counters": {}, "blockers": [], "reviewed_hashes": {}, "created_at": now(), "updated_at": now(),
             # Jobs started with this flag verify user-intent compliance (docs/user-intent.md); older states are not re-gated.
             "user_intent_protocol": 1,
+            # Jobs started with this flag run publication planning, visual planning and the architecture QA (gate 23).
+            "architecture_protocol": 1,
             "project": {"title": project["book"]["title"], "requested_pages": project["book"].get("target_pages"),
                         "language": project["book"].get("language"), "citation_style": project["citations"]["style"]}}
 
@@ -85,6 +88,11 @@ def load_state():
         if "editorial_planning" not in state["phases"] and state["phases"].get("drafting") == "complete":
             # Drafted before EditorialPlan existed: the manuscript is not re-planned; gates 18/19 check plans only if written.
             state["phases"]["editorial_planning"] = "complete"; state.setdefault("notes", {})["editorial_planning"] = "legacy: drafted before EditorialPlan"
+        # Jobs started before the intent-driven architecture: later phases already done keep their state.
+        if "publication_planning" not in state["phases"] and state["phases"].get("architecture") == "complete":
+            state["phases"]["publication_planning"] = "complete"; state.setdefault("notes", {})["publication_planning"] = "legacy: architected before publication planning"
+        if "visual_planning" not in state["phases"] and state["phases"].get("drafting") == "complete":
+            state["phases"]["visual_planning"] = "complete"; state.setdefault("notes", {})["visual_planning"] = "legacy: drafted before visual planning"
         for name in PHASES: state["phases"].setdefault(name, "pending")
         return project, state
     state = new_state(project)
@@ -131,7 +139,7 @@ def refresh_editorial_plan_dependency(state):
         return False
     if current == previous: return False
     snapshots["editorial_plan"] = current
-    reopen(state, "drafting", "EditorialPlan semantic inputs changed; dependent manuscript and publication artifacts are stale")
+    reopen(state, EDITORIAL_PLAN_DOWNSTREAM[0], "EditorialPlan semantic inputs changed; dependent visual plan, manuscript and publication artifacts are stale")
     return True
 
 
@@ -307,7 +315,9 @@ def h_corpus_analysis(ctx):
     for number, batch in enumerate(batches, 1):
         tasks.append(task(f"analyze:{batch[0]}", "corpus_analysis", f"Analyze sources {batch[0]}…{batch[-1]} ({len(batch)})", [
             "Read each source's COMPLETE persisted text (research/<origin>/<id>/source.md) — not only its opening.",
-            "For each, write research/notes/<id>.yaml: source, relevance (core|supporting|background|irrelevant|duplicate), duplicate_of?, reliability (primary|secondary|tertiary|unknown), summary (whole-source synthesis), key_claims: [{text, locator}], concepts: [terms], limitations, bibliographic: {title, authors, published, container, publisher, type}.",
+            "For each, write research/notes/<id>.yaml: source, relevance (core|supporting|background|irrelevant|duplicate), duplicate_of?, reliability (primary|secondary|tertiary|unknown), summary (whole-source synthesis), key_claims: [{text, locator}], concepts: [terms], limitations, bibliographic: {title, authors, published, container, publisher, type}, "
+            "source_role (your estimate unless the user set it: evidence = may support facts, numbers, definitions, recommendations | background = informs understanding and field experience, not cited for facts | structure_reference | redraw_source) and authority ("
+            + "|".join(__import__("source_roles").AUTHORITY) + "). The user's role/authority from the WebUI wins (plan/source-roles.yaml shows the resolved table).",
             "Sources: " + ", ".join(batch)], outputs=[f"research/notes/{x}.yaml" for x in batch], group="analyze"))
     invalid = [e for e in note_errors if not e.startswith("Missing")]
     if invalid:
@@ -336,11 +346,73 @@ def h_research_frozen(ctx):
     return Result(done=True)
 
 
+def architecture_active(ctx):
+    """Publication-architecture checks apply to jobs started under this protocol (older states are not re-gated)."""
+    return bool(ctx.state.get("architecture_protocol"))
+
+
+def h_publication_planning(ctx):
+    """Intent Interpreter + Source Classifier + Publication Architect, before the outline exists."""
+    import publication_architecture as pa
+    import source_roles
+    source_roles.table(); source_roles.write_asset_registry(ctx.project)
+    pa.seed(ctx.project)
+    errors = pa.check(ctx.project)
+    if pa.request(ctx.project)["mode"] == "fixed":
+        if errors: return Result(tasks=[task("publication-plan", "publication_planning", "Fix the publication architecture request", errors, checks=errors)])
+        log_event("publication_planning", "summary", mode="fixed")
+        return Result(done=True)
+    if errors:
+        req = pa.request(ctx.project)
+        layout_refs = [a for a in source_roles.uploaded_assets(ctx.project) if a["role"] == "layout_reference"]
+        lines = [
+            f"Structure mode: {req['mode'].upper()} — " + pa.VOCAB["structure_modes"][req["mode"]]["description"],
+            "Intent Interpreter: read the user's verbatim instructions, book.description, target readers, the WebUI publication settings "
+            "(project.json publication_architecture, citations) and plan/book-context.yaml. Complete plan/publication-intent.yaml: every field in "
+            "fields (" + ", ".join(pa.VOCAB["intent_fields"]) + ") has {value, origin: user_setting|user_text|inferred|default, evidence}. "
+            "Keep explicit_signals (BookOrder found them in the user's words). Set reviewed_by_agent: true.",
+            "Publication Architect: complete plan/publication-architecture.yaml from the intent: archetype {primary, secondary} ("
+            + ", ".join(pa.ARCHETYPES) + "), block_policy {preferred, discouraged, forbidden, requirements} from the block library ("
+            + ", ".join(b for b in pa.BLOCKS if not pa.BLOCKS[b].get("alias_of")) + "), exercise_policy (" + "|".join(pa.EXERCISE_POLICIES)
+            + "), visual_policy {density, preferred_types, avoid_types, min_distinct_types, max_share_per_type} (taxonomy: " + ", ".join(pa.VISUAL_TYPES)
+            + "), chapter_strategy {strategy, vary_structure, uniform_structure_reason}, evidence_policy, citation_policy, layout_strategy, intent_trace.",
+            "Decide what THIS book needs: a practical guide usually needs checklists, cases and decision aids instead of quizzes; a textbook or exam book "
+            "needs exercises WITH answers/explanations. Never add a block to every chapter by habit. Blocks the user excluded stay forbidden "
+            "(BookOrder re-applies them); record in intent_trace how each explicit user phrase shaped the architecture.",
+            "Source Classifier: check plan/source-roles.yaml. Where the user did not set a role, estimate source_role and authority in "
+            "research/notes/<id>.yaml; evidence supports factual claims, background (experience articles, blogs) informs but is not cited for facts."]
+        if layout_refs:
+            lines.append("Layout references (" + ", ".join(f"{a['id']} {a['label']}: {a['path']}" for a in layout_refs) + ") are COMPOSITION ONLY — never content, "
+                         "never cited, never copied. Look at them and write plan/layout-references.yaml: references: [{asset, features: {"
+                         + ", ".join(pa.VOCAB["layout_reference_fields"]) + "}, apply: [what the design adopts], do_not_copy: [...], content_used: false}].")
+        uploads = [a for a in source_roles.uploaded_assets(ctx.project) if a["role"] not in ("layout_reference",)]
+        if uploads:
+            lines.append("Uploaded assets with the user's instructions (plan/uploaded-assets.yaml) must be considered by the architecture: "
+                         + "; ".join(f"{a['id']} {a['label']} [{a['asset_role']}] chapter {a.get('intended_chapter') or '-'}: {a.get('instruction') or a.get('intended_usage') or '-'}" for a in uploads[:12]))
+        outputs = ["plan/publication-intent.yaml", "plan/publication-architecture.yaml"] + (["plan/layout-references.yaml"] if layout_refs else [])
+        return Result(tasks=[task("publication-plan", "publication_planning", "Publication planning: intent, archetype, block and visual policy", lines,
+                                  outputs=outputs, checks=errors)])
+    arch = pa.load(ctx.project)
+    log_event("publication_planning", "summary", mode=arch["mode"], archetype=arch["archetype"]["primary"], forbidden=len(arch["block_policy"]["forbidden"]))
+    return Result(done=True)
+
+
+def architecture_lines(chapter=None, ctx=None):
+    """Publication architecture as task instructions (empty for jobs that predate it)."""
+    if ctx is not None and not architecture_active(ctx): return []
+    import publication_architecture as pa
+    try: return pa.summary_lines(pa.load(), chapter)
+    except Exception: return []
+
+
 def h_architecture(ctx):
     from planning import check_bible, check_outline, dependency_graph
     errors = check_bible()
     outline_errors, chapters = check_outline(ctx.scale, ctx.project)
     errors += outline_errors
+    if architecture_active(ctx) and not outline_errors:
+        import publication_architecture as pa
+        errors += pa.check_outline(chapters, project=ctx.project)
     intent_outputs = []
     if intent_active(ctx):
         errors += architecture_intent_errors(ctx)
@@ -352,7 +424,12 @@ def h_architecture(ctx):
             *profile_lines(),
             "Write plan/book-bible.yaml: title, subtitle, purpose, audience, tone, central_thesis, scope{included, excluded}, terminology{preferred_terms, definitions, aliases}, editorial_rules{voice, formality, tense, punctuation, citation_style, repetition_policy}, global_narrative{opening, development, turning_points, conclusion}, recurring_concepts, recurring_examples, cross_references, chapter_dependencies, design_intent{theme, typography, figure_style, callout_policy}.",
             "Write source/metadata/outline.yaml: chapters: [{id: ch-<slug>, title, file: source/manuscript/NN-<slug>.md, part?, purpose, prerequisites, introduces, develops, assumes, hands_off_to, target_characters, required_sections: [{id: sec-..., title}], required_topics, sources: {primary, supporting}, required_references, expected_assets, must_not_repeat, handoff}].",
-            "Design chapters as a dependency graph grounded in plan/topic-synthesis.yaml and plan/source-clusters.yaml; allocate the character budget intentionally; assign every relevant supplied source."],
+            "Design chapters as a dependency graph grounded in plan/topic-synthesis.yaml and plan/source-clusters.yaml; allocate the character budget intentionally; assign every relevant supplied source.",
+            *architecture_lines(ctx=ctx),
+            *(["Chapter architecture (Chapter Planner): each outline chapter also has content_intent (what the chapter must do for its reader), "
+               "blocks (the block-library items its content needs — chapters may and usually should differ), visuals (visual types it needs) and "
+               "optional block_overrides {preferred, discouraged, forbidden}. Do not give every chapter the same blocks or the same chapter end."]
+              if architecture_active(ctx) and __import__("publication_architecture").request(ctx.project)["mode"] != "fixed" else [])],
             outputs=["plan/book-bible.yaml", "source/metadata/outline.yaml"] + intent_outputs, checks=errors)])
     graph = dependency_graph(chapters)
     log_event("architecture", "summary", chapters=len(chapters), waves=len(graph["parallel_waves"]), planned_characters=sum(c["target_characters"] for c in chapters))
@@ -417,6 +494,7 @@ def h_editorial_planning(ctx):
                 "Each device: id (becomes the slot id; fig-/tbl- for figures, charts, timelines and tables so it is also the asset id), type (" + ", ".join(ep.CATALOG) + "), "
                 "why, placement {intent, position: section_start|early|middle|late|section_end}, source_ids (required for pull_quote, real case_study, timeline, "
                 "external counterpoint, chart and factual figure/table); visuals also information_shape and basis. Intents only: rows, nodes and captions are decided in plan/assets-plan.yaml.",
+                *editorial_architecture_lines(ctx, chapter),
                 f"Pauses: at most {limits['pause_every_chars']['max']:,} characters without a device (target {limits['pause_every_chars']['target']:,}); about "
                 f"{limits['chars_per_text_page']} characters fill a text page and the proof allows {limits['max_text_only_pages']} text-only pages in a row. "
                 "Vary section density; never add a device only to meet a count — split or restructure sections, or waive a medium finding with a reason."] +
@@ -433,6 +511,52 @@ def h_editorial_planning(ctx):
     for chapter in chapters: packet(chapter, chapters, ctx.scale)
     log_event("editorial_planning", "summary", **{k: v for k, v in result["summary"].items() if isinstance(v, (int, float))})
     return Result(done=True)
+
+
+def editorial_architecture_lines(ctx, chapter):
+    """Block policy, chapter-end rule and uploaded assets for one chapter's EditorialPlan task."""
+    if not architecture_active(ctx): return []
+    import publication_architecture as pa
+    import source_roles
+    arch = pa.load(ctx.project)
+    lines = architecture_lines(chapter, ctx)
+    if arch["mode"] != "fixed":
+        lines.append("Devices may also be block-library ids: " + ", ".join(b for b in pa.BLOCKS if not pa.BLOCKS[b].get("alias_of") and b not in ("summary", "key_points"))
+                     + " (visual blocks such as workflow_diagram, decision_tree, decision_table, comparison_table, infographic are figure/table intents: give information_shape "
+                     "and basis; set visual_type from the taxonomy). chapter_end lists only what THIS chapter needs, each item with why — it may be empty. "
+                     "Exercises always come with an answer_key (or answers: {location}).")
+    uploads = source_roles.for_chapter(chapter["id"], ctx.project, ctx.outline())
+    if uploads:
+        lines.append("Uploaded for this chapter (the user's instructions are binding): " + "; ".join(
+            f"{a['id']} {a['label']} [{a['asset_role']}, {a['placeable_path'] or a['path']}] {a.get('intended_section') or ''} — {a.get('instruction') or a.get('intended_usage') or ''}"
+            f" (crop {'ok' if a['crop_allowed'] else 'no'}, redraw {'ok' if a['redraw_allowed'] else 'no'}, verbatim {'yes' if a['use_verbatim'] else 'no'})" for a in uploads)
+            + ". Plan each as a device with asset_ref: <asset id>, or list it under declined_assets: [{asset, reason}].")
+    return lines
+
+
+def h_visual_planning(ctx):
+    """Visual Planner: every visual intent gets purpose, type, content, reason, sources, method, importance and caption intent."""
+    import publication_architecture as pa
+    import visual_plan
+    chapters = ctx.outline()
+    if not architecture_active(ctx): return Result(done=True)
+    arch = pa.load(ctx.project)
+    visual_plan.seed(chapters, arch)
+    result = visual_plan.check(chapters, arch)
+    log_event("visual_planning", "summary", **{k: v for k, v in result["summary"].items() if isinstance(v, (int, float))})
+    if result["ok"]: return Result(done=True)
+    stopping = [f for f in result["findings"] if f["severity"] == "error" or (f["severity"] == "medium" and not f.get("waived"))]
+    lines = ["Complete plan/visual-plan.yaml (BookOrder seeded one entry per visual intent from plan/editorial/*.yaml). For each: type (" + ", ".join(visual_plan.TYPES)
+             + "), purpose, content (what exactly is shown: nodes, rows, axes, steps), reason (why seeing it beats reading it here), source_requirements "
+             "(source ids or derived_from_text), generation_method (" + ", ".join(visual_plan.METHODS) + "), importance (" + "|".join(visual_plan.IMPORTANCE)
+             + "), caption_intent, duplication_check (how it adds to the prose instead of repeating it), uploaded_asset when an upload is used.",
+             "Plan what the reader must see, not a number of figures. Do not default to box-and-arrow flows: a decision is a decision_tree or decision_table, "
+             "a comparison a comparison_table or dos_and_donts, a course over time a timeline or case_flow, a procedure an algorithm_card, a dialogue a dialogue_card.",
+             "If a visual type changes, change the device in plan/editorial/<chapter>.yaml too. Medium findings: change the plan, or add waivers: [{rule, reason}] "
+             "(text_only_chapters: [{chapter, reason}] for chapters that truly need no visual).",
+             *architecture_lines(ctx=ctx), "Findings:"] + [f"- [{f['severity']}] {f['rule']} {f.get('chapter') or ''} {f.get('visual') or ''}: {f['detail']}" for f in stopping[:40]]
+    return Result(tasks=[task("visual-plan", "visual_planning", "Visual planning: what must be seen, and why", lines,
+                              outputs=["plan/visual-plan.yaml"], checks=[f"{f['rule']}: {f['detail']}" for f in stopping[:20]])])
 
 
 def drafted(chapter, record, ctx=None):
@@ -466,6 +590,10 @@ def h_drafting(ctx):
             f"Write {chapter['file']} section by section: skeleton → each required section → source enrichment → examples → citations → transitions. Target {chapter['target_characters']:,} characters (minimum {chapter['minimum_characters']:,}); currently {current:,}.",
             "Cite with [cite:src-XXXX] only; cross-reference with @ch:/@sec:/@fig:/@tbl:/@eq:. Never type visible citation numbers.",
             *editorial_lines(chapter),
+            *architecture_lines(chapter, ctx),
+            *(["Cite only sources whose role allows it (plan/source-roles.yaml, packet source_role): facts, numbers, definitions and recommendations "
+               "cite evidence; background and experience sources may shape examples and viewpoint but are never the only support of a factual claim."]
+              if architecture_active(ctx) else []),
             f"Then write plan/summaries/{chapter['id']}.yaml: summary (60+ chars), introduced_concepts, key_terms, examples_used, handoff (what the next chapters can assume)"
             + (", intent_check (one or two sentences: how this chapter follows the user's instructions, or the conflict you recorded)." if intent_active(ctx) else ".")],
             inputs=[f"plan/chapter-packets/{chapter['id']}.yaml"], outputs=[chapter["file"], f"plan/summaries/{chapter['id']}.yaml"], group=f"wave-{level}", checks=problems))
@@ -485,8 +613,18 @@ def editorial_lines(chapter):
         "Do not explain in the prose what a slot will show (no paraphrase of the table or quote around it): lead into it and move on. "
         "Component devices (key_point, definition, warning, counterpoint, case_study, pull_quote, column, checklist) and the chapter-end items may be written "
         "directly instead of a slot, with the same id: ::: {.key-point #id} ... ::: (case_study -> .case-study, column -> .sidebar, pull_quote -> .pull-quote, "
-        "key_points/summary -> .summary, open_question -> .note, check_questions -> .exercise, further_reading -> .sidebar, bridge_to_next -> ::: {#id} ... :::).",
+        "key_points/summary -> .summary, open_question -> .note, check_questions -> .exercise, further_reading -> .sidebar, bridge_to_next -> ::: {#id} ... :::). "
+        "Block-library components carry their marker class and title: " + block_markup_hint() + ".",
         "Figures, charts, timelines and tables stay slots until the asset phase produces them."]
+
+
+def block_markup_hint():
+    import editorial_plan as ep
+    parts = []
+    for block, spec in ep.VOCAB["blocks"].items():
+        if spec.get("marker_class") and spec.get("component"):
+            parts.append(f"{block} -> ::: {{.{spec['component']} .{spec['marker_class']} #id title=\"{spec['label']}\"}}")
+    return "; ".join(parts)
 
 
 def expansion_task(contract, chapter, phase="chapter_review"):
@@ -495,7 +633,7 @@ def expansion_task(contract, chapter, phase="chapter_review"):
     lines = [f"Contract status: {contract['actual_characters']:,}/{contract['target_characters']:,} characters (minimum {contract['minimum_characters']:,})."]
     lines += ["Problem: " + r["detail"] for r in contract["reasons"]]
     if "length" in kinds:
-        lines.append(f"Expand by about {contract['deficit']:,} characters with substance: unused assigned sources {', '.join(contract.get('unused_assigned_sources', [])) or '(none)'}, missing concepts, worked examples, historical context, technical explanation, comparisons, counterexamples, limitations. No padding or repetition.")
+        lines.append(f"Expand by about {contract['deficit']:,} characters with substance: unused assigned sources {', '.join(contract.get('unused_assigned_sources', [])) or '(none)'}, missing concepts, worked examples, historical context, technical explanation, comparisons, counterexamples, limitations. No padding or repetition. Never add a block the publication architecture forbids or discourages (no routine summaries or quizzes to gain length).")
     lines.append(f"Use plan/chapter-packets/{contract['id']}.yaml (regenerated). Keep the Book Bible, glossary and must_not_repeat. Update plan/summaries/{contract['id']}.yaml if the content changed (keep any intent_check current).")
     return task(("expand:" if kinds == ["length"] else "review:") + contract["id"], phase,
                 ("Expand " if kinds == ["length"] else "Complete contract for ") + contract["id"], lines,
@@ -573,7 +711,12 @@ def h_asset_planning(ctx):
             "Profile visual density is a health check, not a quota: never add a figure to reach it. Keep rejected ideas in the plan with decision: rejected and decision_reason.",
             "Every figure, chart, timeline and table intent in plan/editorial/*.yaml becomes a candidate here with the same id and device: <device id>; "
             "decide rows/columns, nodes, renderer, geometry and caption from its information_shape. Do not invent visuals outside the editorial plan without adding them there.",
-            "Include every expected_assets entry from outline.yaml."], outputs=["plan/assets-plan.yaml"], checks=errors)])
+            "Include every expected_assets entry from outline.yaml.",
+            *(["Follow plan/visual-plan.yaml (type, purpose, content, reason, generation_method, caption_intent) for every visual; it was decided before drafting.",
+               "Uploaded assets (plan/uploaded-assets.yaml): record uploaded_assets: [{asset, decision: placed|redrawn|reference_only|not_used, asset_id, chapter, reason, credit?}]. "
+               "A placed upload is a figure of type screenshot with path source/assets/uploaded/<file> and uploaded_asset: <asset id>; a redrawn one is a Diagram IR or table "
+               "with uploaded_asset and source credit. Respect crop/redraw/transform/verbatim flags and each asset's instruction. Layout, style and visual references are never placed."]
+              if architecture_active(ctx) else [])], outputs=["plan/assets-plan.yaml"], checks=errors)])
     import visual_review
     review = visual_review.run(ctx.outline())
     log_event("asset_planning", "visual_review", **review["summary"])
@@ -858,6 +1001,7 @@ def h_design(ctx):
     except Exception as exc: errors.append(f"Design Spec: {exc}")
     decisions = ROOT / "plan/design-decisions.yaml"
     errors += intent_check_errors(ctx, decisions)
+    errors += layout_reference_design_errors(ctx, decisions)
     if errors or not decisions.is_file() or not agent_reported(ctx.state, "design"):
         art = ""
         try: art = load_design().get("art_direction", "")
@@ -866,9 +1010,32 @@ def h_design(ctx):
             "Read docs/design-system.md, book.design.yaml and plan/book-bible.yaml design_intent. Art direction from the user: " + (art or "(none)"),
             "Translate the direction into book.design.yaml (theme, page, typography roles, colors, layout density, component variants, figure style). Use custom.css / custom.typ only for what the Design Spec cannot express.",
             "Run `bookorder fonts` if you change fonts; unavailable fonts fall back (reports/design-report.json).",
-            "Write plan/design-decisions.yaml: theme, decisions: [{direction, spec_change}], overrides: [...], notes."],
+            "Write plan/design-decisions.yaml: theme, decisions: [{direction, spec_change}], overrides: [...], notes.",
+            *design_architecture_lines(ctx)],
             outputs=["book.design.yaml", "plan/design-decisions.yaml"], checks=errors)])
     return Result(done=True)
+
+
+def design_architecture_lines(ctx):
+    """Layout Designer inputs: layout strategy, visual grammar of the archetype, layout references (composition only)."""
+    if not architecture_active(ctx): return []
+    import publication_architecture as pa
+    arch = pa.load(ctx.project)
+    lines = [f"Layout strategy: {arch.get('layout_strategy')}. Archetype {arch['archetype']['primary']} (reading mode {arch.get('reading_mode')}): "
+             "design for how the book is used — lookup books need scannable headings, tables and boxes; continuous reading needs calm text pages."]
+    if pa.LAYOUT_REFERENCES.is_file():
+        lines.append("Apply plan/layout-references.yaml (composition only: geometry, margins, columns, hierarchy, density, captions, whitespace, rhythm). "
+                     "Record layout_references_applied: [{asset, adopted, not_adopted, reason}] in plan/design-decisions.yaml. Never copy content or text from them.")
+    return lines
+
+
+def layout_reference_design_errors(ctx, path):
+    if not architecture_active(ctx) or not path.is_file(): return []
+    import publication_architecture as pa
+    if not pa.LAYOUT_REFERENCES.is_file(): return []
+    try: data = yaml_data(path)
+    except ValueError: return []
+    return [] if as_list(data.get("layout_references_applied")) else ["plan/design-decisions.yaml: layout_references_applied is required (how the uploaded layout references shaped the design)"]
 
 
 def build_fresh():
@@ -909,6 +1076,10 @@ def h_layout(ctx):
         lines = ["Open the proof outputs: publish/book.pdf (several representative pages at real size incl. chapter openers, dense tables, figures, equations, bibliography), publish/site/ (navigation, search, mobile width), interchange/book.docx styles, EPUB if requested.",
                  "Check awkward page breaks, orphan headings, figures separated from their explanation, overflowing tables/code, missing glyphs, long uninterrupted prose runs, callout density and chapter density differences.",
                  "Fix problems in canonical source or Design Spec, rebuild with `bookorder goal`, then record ACTUAL checks and findings in reports/layout-review.md (never invent checks)."]
+        if architecture_active(ctx):
+            lines.append("Publication QA also reads reports/publication-architecture-qa.yaml and reports/bibliography.json: check in the rendered outputs that chapters "
+                         "are not built from one template, visuals vary with the content, uploaded assets appear as instructed, and the back matter shows the "
+                         "configured citation form and separate 引用文献 / 参考資料 / 図表出典 lists.")
         lines += [f"- pacing: {p['chapter']}/{p.get('section') or ''}: {p['detail']}" for p in pacing[:20]]
         return Result(tasks=[task("layout-review", "layout", "Visual layout and pacing review of the proof build", lines, outputs=["reports/layout-review.md"],
                                   checks=(["reports/layout-review.md: add a '## User intent' section (what you checked against the user's instructions)"] if intent_missing else None))])
@@ -1013,8 +1184,8 @@ def h_complete(ctx):
 
 
 HANDLERS = {"source_ingestion": h_source_ingestion, "supplementary_research": h_supplementary_research, "corpus_analysis": h_corpus_analysis,
-            "research_frozen": h_research_frozen, "architecture": h_architecture, "reference_assignment": h_reference_assignment,
-            "editorial_planning": h_editorial_planning,
+            "research_frozen": h_research_frozen, "publication_planning": h_publication_planning, "architecture": h_architecture, "reference_assignment": h_reference_assignment,
+            "editorial_planning": h_editorial_planning, "visual_planning": h_visual_planning,
             "drafting": h_drafting, "chapter_review": h_chapter_review, "integration": h_integration, "asset_planning": h_asset_planning,
             "asset_generation": h_asset_generation, "audit": h_audit, "prose_audit": h_prose_audit,
             "rewrite": h_rewrite, "prose_editing": h_prose_editing, "final_audit": h_final_audit, "design": h_design,
@@ -1077,7 +1248,7 @@ def completion_gates(ctx, include_package=True):
     asset_errors = (asset_module.check_plan(chapters, ctx.project) if chapters else ["no chapters"]) or asset_module.check_generation(chapters, ctx.records())
     gate(10, "Required figures/tables/equations complete", not asset_errors, "; ".join(asset_errors[:5]) or "ok", "asset_generation", "asset generation")
     ledger = run_integration_checks(ctx, "audit") if chapters else audit.load_ledger()
-    citation_open = [e for e in audit.open_issues(ledger, ("high",)) if e["type"] in ("source-mismatch", "bibliography", "cross-reference")]
+    citation_open = [e for e in audit.open_issues(ledger, ("high",)) if e["type"] in ("source-mismatch", "bibliography", "cross-reference", "source-role")]
     gate(11, "Citation/reference validation passed", not citation_open, "; ".join(e["detail"] for e in citation_open[:5]) or "ok", "rewrite", "citation errors")
     final = accepted(ctx.state, "final_audit")
     fresh = final is not None and final.get("fingerprint") == ctx.manuscript_fingerprint()
@@ -1118,6 +1289,8 @@ def completion_gates(ctx, include_package=True):
          "validation", "image asset")
     intent = user_intent_gate(ctx)
     gate(22, "User intent governed the book", intent["passed"], intent["detail"], intent["phase"], "user intent")
+    arch_gate = architecture_gate(ctx, chapters)
+    gate(23, "Publication architecture QA", arch_gate["passed"], arch_gate["detail"], arch_gate["phase"], "publication architecture")
     if include_package:
         from common import output_paths
         target = ROOT / "publish/result.zip"
@@ -1126,6 +1299,19 @@ def completion_gates(ctx, include_package=True):
         gate(16, "Requested output package generated", outputs_ok and packaged, "publish/result.zip" if packaged else "missing or older than build", "package", "build")
     write_json(ROOT / "reports/completion-gates.json", {"checked_at": now(), "passed": all(g["passed"] for g in gates), "gates": gates})
     return gates
+
+
+def architecture_gate(ctx, chapters):
+    """Gate 23: the book was designed for its purpose (reports/publication-architecture-qa.yaml). Jobs that predate the
+    protocol pass trivially."""
+    if not architecture_active(ctx) or not chapters: return {"passed": True, "detail": "legacy job (started before publication architecture)" if chapters else "no chapters", "phase": "validation"}
+    import architecture_qa
+    try: result = architecture_qa.run(chapters, ctx.by_chapter(), ctx.project)
+    except Exception as exc: return {"passed": False, "detail": f"architecture QA failed: {exc}"[:400], "phase": "validation"}
+    high = [f for f in result["findings"] if f["severity"] == "high" and not f.get("waived")]
+    detail = f"{result['summary']['high']} high, {result['summary']['medium']} medium, {result['summary']['low']} low ({result['summary']['mode']}, {result['summary']['archetype']})"
+    if high: detail += ": " + "; ".join(f"{f['rule']}: {f['detail']}" for f in high[:4])
+    return {"passed": result["ok"], "detail": detail[:500], "phase": architecture_qa.phase_of(result)}
 
 
 def user_intent_gate(ctx):
@@ -1171,6 +1357,16 @@ def handle_failed_gates(ctx, failing):
         return Result(tasks=[task("resolve-image-assets", "validation", "Resolve required generated images",
                                   problems + ["Configure a provider, repair the requested image, or change the editorial/visual plan and rebuild."],
                                   checks=problems[:10])])
+    if earliest["id"] == 23 and earliest["phase"] in ("build", "validation", "source_ingestion"):
+        path = ROOT / "reports/publication-architecture-qa.yaml"
+        report = yaml_data(path) if path.is_file() else {}
+        high = [f for f in as_list(report.get("findings")) if isinstance(f, dict) and f.get("severity") == "high" and not f.get("waived")]
+        return Result(tasks=[task("fix-architecture-qa", "validation", "Resolve publication architecture QA findings",
+                                  [f"{f.get('rule')}: {f.get('detail')}" for f in high[:20]] + [
+                                      "Fix the cause (manuscript, visual plan, source roles, uploaded asset decisions) and run bookorder goal; see "
+                                      "reports/publication-architecture-qa.yaml. A structural or intent finding that truly cannot be met (for example the "
+                                      "sources contain no case) may stand only with qa_waivers: [{rule, reason}] in plan/publication-architecture.yaml, "
+                                      "and the reason goes into your final report."], checks=[str(f.get("detail"))[:200] for f in high[:10]])])
     reopen(ctx.state, earliest["phase"], f"gate {earliest['id']} failed: {earliest['name']} ({earliest['detail']})")
     return Result(info=f"Reopened {earliest['phase']}: {earliest['name']}")
 
@@ -1298,6 +1494,7 @@ def write_summary(ctx):
         "renderer_outputs": build.get("outputs") if build and build.get("ok") else [],
         "validation": {"ok": validation.get("ok"), "errors": len(validation.get("errors", []))} if validation else None,
         "completion_gates": gates, "diagnosis": diagnosis, "user_intent": __import__("user_intent").summary(ctx.project),
+        "publication_architecture": architecture_summary(ctx),
         "files": {"state": "project-state.json", "events": "run-events.jsonl", "source_status": "research/source-status.json",
                   "source_index": "research/index.json", "search_log": "research/search-log.jsonl", "research_lock": "research/research-lock.json",
                   "corpus_summary": "research/corpus-summary.yaml", "book_bible": "plan/book-bible.yaml", "outline": "source/metadata/outline.yaml",
@@ -1306,6 +1503,20 @@ def write_summary(ctx):
                   "validation_report": "reports/validation-report.json", "completion_gates": "reports/completion-gates.json"}}
     write_json(SUMMARY, summary)
     return summary
+
+
+def architecture_summary(ctx):
+    try:
+        import publication_architecture as pa
+        arch = pa.load(ctx.project)
+        qa = ROOT / "reports/publication-architecture-qa.yaml"
+        return {"mode": arch["mode"], "legacy": arch.get("legacy", False), "archetype": arch.get("archetype"), "exercise_policy": arch.get("exercise_policy"),
+                "forbidden_blocks": arch["block_policy"].get("forbidden"), "citation_policy": __import__("bibliography").policy(ctx.project)["summary"],
+                "files": {"intent": "plan/publication-intent.yaml", "architecture": "plan/publication-architecture.yaml", "visual_plan": "plan/visual-plan.yaml",
+                          "source_roles": "plan/source-roles.yaml", "uploaded_assets": "plan/uploaded-assets.yaml", "qa": "reports/publication-architecture-qa.yaml",
+                          "bibliography": "reports/bibliography.json"},
+                "qa_ok": (yaml_data(qa).get("ok") if qa.is_file() else None)}
+    except Exception as exc: return {"error": str(exc)[:200]}
 
 
 def status_text(state, tasks, info):

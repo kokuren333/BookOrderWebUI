@@ -16,7 +16,9 @@ POLICY = {"phrases": ["ではなく", "ただし", "本章"], "lexical_window": 
 class SkillDiscoveryTests(unittest.TestCase):
     def test_existing_and_new_skills_are_recursively_discovered(self):
         found = skills.discover(ROOT / "job-template/skills")
-        self.assertEqual(len(found), 13)
+        self.assertEqual(len(found), 15)
+        self.assertEqual(found["publication-architecture"], "skills/planning/publication-architecture.md")
+        self.assertEqual(found["visual-planning"], "skills/design/visual-planning.md")
         self.assertEqual(found["editing"], "skills/editorial/editing.md")
         self.assertEqual(found["publication-qa"], "skills/quality/publication-qa.md")
         self.assertIn("whole-book-review", found)

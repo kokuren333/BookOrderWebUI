@@ -107,13 +107,19 @@ def init_supplied(index=None):
     project = read_project()
     known_paths = {s["path"] for s in index["sources"] if s["origin"] == "supplied" and s["kind"] == "file"}
     known_urls = [s["url"] for s in index["sources"] if s["origin"] == "supplied" and s["kind"] == "url"]
+    import source_roles
+    by_path = {s["path"]: s for s in index["sources"] if s["origin"] == "supplied" and s["kind"] == "file"}
     for item in project["input"].get("sources", []):
+        # Per-file role metadata from the WebUI (source_roles.py). Files that are not content never reach this list.
+        usage = source_roles.usage(item) or None
         if item["path"] not in known_paths:
-            register(index, kind="file", path=item["path"], original_name=item.get("original_name"))
+            register(index, kind="file", path=item["path"], original_name=item.get("original_name"), usage=usage)
+        elif usage and by_path[item["path"]].get("usage") != usage: by_path[item["path"]]["usage"] = usage
     remaining = list(known_urls)
+    url_usage = project["input"].get("url_usage") if isinstance(project["input"].get("url_usage"), dict) else {}
     for url in project["input"].get("urls", []):
         if url in remaining: remaining.remove(url); continue
-        register(index, kind="url", url=url)
+        register(index, kind="url", url=url, usage=source_roles.usage({"usage": url_usage.get(url)}) or None)
     save_index(index)
     return index
 

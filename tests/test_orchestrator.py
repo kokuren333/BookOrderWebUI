@@ -18,7 +18,8 @@ REPO = Path(__file__).resolve().parent.parent
 BASE = REPO / ".test-output/unit"
 MODULES = ["common", "crossref", "sources", "research", "planning", "manuscript", "assets", "audit", "citations", "orchestrator",
            "design", "diagrams", "book_ir", "schema", "validate", "build", "package", "check_env",
-           "publication_profile", "pacing", "layout_metrics", "figure_spec", "figure_check", "chartkit", "visual_review", "editorial_plan", "user_intent"]
+           "publication_profile", "pacing", "layout_metrics", "figure_spec", "figure_check", "chartkit", "visual_review", "editorial_plan", "user_intent",
+           "publication_architecture", "source_roles", "bibliography", "visual_plan", "architecture_qa", "skills"]
 
 
 def make_job(name, pages=300, language="ja", urls=(), files=(), web_research=True, coverage=True):
@@ -460,14 +461,14 @@ class Persistence(unittest.TestCase):
         root, m = make_job("persist", pages=4, urls=["https://example.invalid/a"])
         orch, src = m["orchestrator"], m["sources"]
         project, state = orch.load_state()
-        for phase in orch.PHASES[:6]: state["phases"][phase] = "complete"
+        for phase in orch.PHASES[:orch.PHASES.index("reference_assignment") + 1]: state["phases"][phase] = "complete"
         orch.save_state(state)
         project, again = orch.load_state()
         self.assertEqual(again["phases"]["reference_assignment"], "complete")
         self.assertEqual(again["scale"]["target_characters"], 2100)  # 4-page target, short profile page model
         orch.reopen(again, "architecture", "outline changed")
         self.assertEqual(again["phases"]["research_frozen"], "complete")
-        self.assertTrue(all(again["phases"][p] == "pending" for p in orch.PHASES[4:]))
+        self.assertTrue(all(again["phases"][p] == "pending" for p in orch.PHASES[orch.PHASES.index("architecture"):]))
         index = src.init_supplied(); index["sources"][0]["ingest_status"] = "fetching"; src.save_index(index)
         index = src.reset_interrupted(src.load_index())
         self.assertEqual(index["sources"][0]["ingest_status"], "pending")
