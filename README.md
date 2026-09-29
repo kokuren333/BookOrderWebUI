@@ -1,98 +1,80 @@
-# Portable Publishing Job Generator v0.2 (BookOrder vNext)
+# BookOrder WebUI
 
-A completely static React / TypeScript / Vite application. Book instructions, URLs and uploaded files are packaged with JSZip in the browser. There is no AI API, backend, database, account system or automatic agent execution.
+BookOrder is a browser-based interface for planning a book and preparing a portable publishing job for an AI agent. It helps you describe the book, organize sources by role, set publication and research preferences, and choose deliverables. The downloaded job contains the project instructions and tools the agent uses to research, plan, write, edit, build, and validate the publication.
 
-## Run
+> 日本語での案内は [README.ja.md](README.ja.md) をご覧ください。
 
-```
+## Use the WebUI
+
+1. Open the deployed static site, or run it locally (see [Run locally](#run-locally)).
+2. Choose **Quick** or **Advanced publishing**.
+3. Enter the title, goal, target readers, language, and approximate scale.
+4. Add source URLs and files, review their estimated roles, and edit the roles where needed.
+5. Write the book-specific instructions in your own words. These are carried into the agent's work throughout the job.
+6. In Advanced publishing, optionally set the publication structure, evidence and research policy, citations and bibliography, outputs, layout, and design.
+7. Choose the OS and CPU of the machine that will run the agent, then download the Publishing Job ZIP.
+8. Extract the ZIP, open its `publishing-job` folder with a file-capable AI agent, and ask it to read `AGENTS.md` and run the job to completion. With Codex, the generated task gives a `/goal` command.
+
+The WebUI does not run the agent or fetch the URLs. The agent performs research after you pass it the downloaded job.
+
+## Quick and Advanced modes
+
+**Quick** keeps the form focused on the book plan, source materials, instructions, target scale, requested outputs, and runtime. BookOrder estimates source roles and lets you edit them; the agent resolves the book's structure, figures, and citation approach from the stated intent.
+
+**Advanced publishing** exposes the publication type and optional secondary type, AUTO/GUIDED/FIXED structure mode, chapter block policy, exercise and visual policy, source authority and usage, research settings, citation and bibliography styles, and publication format and design controls. Leave a field automatic when you want the agent to decide from the book's purpose and your instructions.
+
+The additional-instructions field is for book-specific editorial intent: voice, difficulty, explanation depth, subjects to include or exclude, chapter shape, examples, and what should be shown as a figure or table. It is passed through to the agent as written. Structured controls remain authoritative for the settings they represent, such as scale, output formats, and page layout.
+
+## Source roles and citations
+
+Files and URLs use the same Source Role System. URL lists accept one URL per line; each URL gets an editable role card. You can edit one URL at a time or bulk-edit selected URLs. Estimates are marked as estimates and can be changed.
+
+| Role | How BookOrder uses it | Appears in the finished book |
+|---|---|---|
+| `evidence` | Supports factual claims and can be cited in the text. | In-text citation and cited references when used. |
+| `background` | Informs the author's understanding, viewpoint, or topic exploration. | Not cited and not listed. Authoring use only. |
+| `further_reading` | A source explicitly recommended to readers. | Optional Further reading / 参考資料 list; no in-text citation. |
+| `structure_reference` | Informs organization or explanation sequence. | Not cited or listed. |
+| `layout_reference`, `style_reference`, `visual_reference` | Informs presentation or visual design, not factual content. | Not included in the literature bibliography. |
+| `redraw_source` | Source for a figure that is actually drawn or adapted. | Figure credit only when the figure is used. |
+
+No single phrase or source role is a verdict about a source. In Advanced publishing, **authority**, **citation**, **intended chapter**, **usage**, and **notes** provide additional context. Role semantics still apply: background is never made citable just by changing its citation setting.
+
+In-text citation style and bibliography formatting/grouping are separate choices. Evidence sources used for factual claims belong in cited references. Background materials stay private to the authoring process. Only sources assigned `further_reading` are eligible for the reader-facing Further reading list.
+
+## What happens in the publishing job
+
+The WebUI creates a ZIP; the agent runs the job in the extracted folder. BookOrder's intent-driven architecture plans each book from the user's intent, audience, publication type, and source roles instead of applying a fixed chapter template.
+
+The job separates responsibilities across its workflow:
+
+- Research ingests supplied sources and, when allowed, discovers additional web sources. Supplied and agent-discovered sources follow the same role and citation rules.
+- Publication planning resolves the book's structure and chapter-specific blocks. AUTO, GUIDED, and FIXED control how much structure is inferred or constrained.
+- Drafting and editing produce canonical chapter Markdown, with citations, cross-references, and figures connected to source metadata.
+- Audit and QA check source roles, citations, structure, visual assets, and requested outputs.
+- Build and validation create the selected formats. Packaging requires the applicable publication checks to pass.
+
+The canonical editable content is the chapter Markdown and associated project metadata and assets. PDF, DOCX, HTML, EPUB, and the static site are outputs; they do not replace the canonical source.
+
+## Data handling
+
+Files are handled in the browser and included in the ZIP; the WebUI does not upload them to a BookOrder server. The WebUI does not persist the form to an account or database. Keep the downloaded ZIP secure because it contains the book instructions and source materials. See the in-app **Safety & data handling** page for details about bundled runtimes, licenses, and execution.
+
+## Run locally
+
+```sh
 npm ci
 python tools/prepare-runtimes.py
 npm run dev
 ```
 
-Open http://127.0.0.1:5173. `npm run build` writes the deployable app to `dist/`. Serve that folder through Cloudflare Pages, GitHub Pages or another static host. For deployment below a path, set Vite's base at build time: `npm run build -- --base=/repository/`. No hosting deployment is performed by this repository.
+Open `http://127.0.0.1:5173`. The runtime preparation command downloads pinned runtime assets for packaging the generated jobs. `npm run build` creates the static site in `dist/`; deploy that directory to a static host. For hosting under a path, set Vite's base, for example `npm run build -- --base=/repository/`.
 
-## User flow
+## Further documentation
 
-Enter the book plan, source files, URLs, research and figure policies, and requested outputs. Download the job ZIP, extract it and open it with a file/command capable AI agent. Give one instruction — with Codex: `/goal AGENTS.mdを読み、bookorder goal が STATUS: COMPLETE を表示するまで出版ジョブを最後まで実行してください。` The job's root orchestrator (`bookorder goal`) then owns every phase — source ingestion, supplementary research, corpus synthesis, research freeze, publication planning, Book Bible, architecture, visual planning, chapter contracts, chapter-by-chapter drafting and expansion, integration, assets, audit, targeted rewrite, re-audit, design, layout, build, validation, packaging — and is the only component that can declare the publication complete (23 publication gates). See [docs/vnext-audit.md](docs/vnext-audit.md) and [docs/production-e2e.md](docs/production-e2e.md). Read publications in publish/ and retain publish/result.zip as the editable completed project.
-
-Files remain in browser memory until included in the download; nothing is uploaded or persisted. Very large source collections require enough browser memory for the source data and compressed ZIP.
-
-## Implementation
-
-The runtime preparer is a maintainer step requiring Python and internet access. It downloads pinned official releases, matching source and notices, verifies SHA-256 locks, and writes split static assets to `public/runtimes/`. The lock file is retained; generated archives are ignored by Git. `npm run build` refuses missing/corrupt packs. Deploy the entire `dist/`, including all runtime parts; allow roughly 1 GB of host storage. No dependency download occurs when executing a bundled job. The browser fetches its packs from the same static host. The shared source pack makes job ZIPs relatively large.
-
-Choose the OS/CPU of the machine running the agent: Windows 10+ x64, macOS 15+ arm64/x64, Linux glibc 2.17+ arm64/x64. The ZIP contains Python/Pandoc/Typst, Japanese fonts, notices and locally available corresponding source. The agent uses `run.cmd` or `sh run.sh`; prerequisites are not installed system-wide. The WebUI includes dedicated contents/licensing and safety/data-handling pages, with links beside the download action.
-
-- src/job.ts: portable schema, path-safe source filenames and ZIP generator.
-- job-template/: agent instructions, plain Markdown skills, templates and portable Python scripts.
-- The canonical source is chapter Markdown, metadata YAML, BibTeX and editable figure assets.
-- Pandoc performs Markdown/YAML parsing, citations and document conversion. Typst builds PDF. Python scripts require no third-party Python packages.
-- Semantic DOCX uses distinct paragraph styles for DTP mapping. Semantic HTML is separate from the multi-page publication website. The static site has chapter navigation, global cross-references, local search, syntax highlighting, responsive typography and print styling.
-- Validation checks canonical structure and references, built HTML links/assets, requested output integrity and source freshness. Packaging requires final validation plus editorial and layout inspection reports. Programmatic checks cannot replace visual/editorial review.
-
-## Verification
-
-```
-npm test
-npm run build
-python tests/test_orchestrator.py   # deterministic orchestration tests (Pandoc required)
-python tests/test_user_intent.py    # user instructions reach every phase; precedence, overrides, conflicts, gate 22
-python tests/test_publication_architecture.py   # archetypes, block policy, exercises, source roles, uploads, citations, visuals, modes
-python tests/architecture_e2e.py    # WebUI-generated AUTO job to STATUS: COMPLETE (layout reference, background source, uploaded figure, footnotes + numbered lists)
-python tests/mini_e2e.py            # real /goal orchestration with a scripted mock agent (Pandoc + Typst)
-python tests/e2e.py                 # legacy build pipeline on the npm-test job ZIP
-python tests/design.py              # themes, tokens, fonts, previews
-```
-
-The integration check uses PANDOC and TYPST environment variables when tools are not on PATH. It extracts the ZIP produced by npm test, fills a representative Japanese two-chapter manuscript with a citation, table, figure, code, footnote and cross-chapter references, then builds all formats and checks failure cases. Test tools may be provided as portable executables; app dependencies remain React, JSZip, TypeScript and Vite.
-
-This demonstrates the publishing pipeline with a short fixture. An external agent's actual research quality, 50–400-page writing, licensing review and complete editorial work depend on that agent and its available tools. A generated job alone does not guarantee those outcomes.
-
-## Intent-driven publication architecture
-
-BookOrder designs each publication from the user's intent, the purpose of the book and the role of every input — it
-does not pour text into a fixed template. A new `publication_planning` phase decides the publication archetype
-(practical guide, textbook, exam preparation, handbook …), a block policy over a block library (summary, checklist,
-exercises + answer key, pitfalls, next actions, cases, templates, dialogue examples, algorithm cards, decision tables,
-comparison tables, infographics …), the exercise and visual policy and the evidence policy; chapters then choose
-their own blocks, a `visual_planning` phase plans what must be seen before drafting, the citation form in the text is
-separate from numbered, grouped bibliography lists (引用文献 / 参考資料 / 図表・画像出典), and gate 23 checks the result.
-Modes: AUTO (WebUI default), GUIDED, FIXED (legacy template; every job without `publication_architecture`).
-See [docs/INTENT_DRIVEN_PUBLICATION_ARCHITECTURE.md](docs/INTENT_DRIVEN_PUBLICATION_ARCHITECTURE.md),
-[docs/SOURCE_ROLE_SYSTEM.md](docs/SOURCE_ROLE_SYSTEM.md), [docs/CITATION_AND_BIBLIOGRAPHY.md](docs/CITATION_AND_BIBLIOGRAPHY.md),
-[docs/VISUAL_PLANNING.md](docs/VISUAL_PLANNING.md) and the audit [docs/INTENT_DRIVEN_PUBLICATION_AUDIT.md](docs/INTENT_DRIVEN_PUBLICATION_AUDIT.md).
-
-## Settings layout (what goes where)
-
-The WebUI has two input modes. **Quick** needs only the book plan, files, the free-text intent, scale, outputs and
-runtime: roles of uploaded files are estimated (marked 「推定」, editable) and the structure mode is AUTO.
-**Advanced publishing** shows every section below (details behind accordions).
-
-| Section | Quick | Advanced publishing |
-|---|---|---|
-| 01 本の企画 | title, goal, readers, language, **Target scale** (the only scale input) | tier override (automatic by default) |
-| 02 資料と指示 | URLs, files with a role each (evidence / background / layout reference / asset / redraw …), additional instructions — book-wide priority instruction, carried verbatim into every phase; outranks BookOrder defaults, not structured settings or integrity rules ([docs/USER_INTENT.md](docs/USER_INTENT.md)) | per-file label, asset role, authority, citation, chapter / section, usage, priority, caption, crop / redraw / transform / verbatim, free instruction |
-| 03 出版物の設計 | the explicit wishes read from the instructions; AUTO | structure mode (AUTO / GUIDED / FIXED), publication type (+ secondary, free text), exercise policy, visual density, per-block policy, visual types, chapter architecture, evidence policy, tone, layout strategy |
-| 04 調査・引用・参考文献 | defaults | research, in-text citation, footnote style, bibliography style, numbering, grouping; whether tables/diagrams/charts/images may be made |
-| 05 希望する出力 | output formats | — |
-| 06 出版形式とデザイン | defaults | Publication preset, Genre, Theme, Layout, Page size, Columns · Geometry · Typography · Visual grammar · Expert |
-| 07 実行環境 | runtime OS/CPU | — |
-
-A **Publication preset** (Standard Book, Technical / Reference, Medical / Scientific, Magazine / Mook, Compact) fills genre, layout preset, PDF style preset and theme at once; any later edit wins. **Genre** = kind of content, **Layout** = page size, columns and margins, **Theme** = typefaces, colour and component look. Each concept has exactly one control: page size and orientation belong to the layout; density, chapter opener and accent belong to the Design Spec and, when changed from the theme default, are passed on to the StyleBible automatically. Changing the theme keeps the values you changed and the whole layout; only untouched values follow the new theme. The right-hand summary shows the resolved format, typography, tier, PDF style and outputs next to a schematic page and the theme sample.
-
-The WebUI writes only request fields that the job's resolvers already read (`profile`, `layout_preset`, `layout_spec`, `style_preset`, `style_controls`, and `style_bible` only for an explicit accent colour) plus `book.design.yaml`; the job resolves them into plan/profile.resolved.yaml, plan/layout-spec.yaml and plan/style-bible.yaml. Presets, paper sizes, validation limits and the pages→tier rule are shared with the Python resolvers through `job-template/schemas/publication-presets.json`. Untouched settings produce the same project.json and book.design.yaml as earlier releases. Resolution order and the full field mapping: [docs/webui-information-architecture.md](docs/webui-information-architecture.md).
-
-Tests: `npm test` (payload, single authorities, compatibility fixtures), `python tests/test_publication_ui.py` (resolvers + WebUI payload + TypeScript/Python parity), `python tests/ui_interaction.py` (headless Chromium via Playwright; skips without it), and after `python tests/mini_e2e.py --keep`, `python tests/publication_e2e.py` (A5 one-column and B5 two-column PDFs from WebUI payloads).
-
-## Book design
-
-See [the design system guide](job-template/docs/design-system.md). Section 05 of the GUI configures five themes, role fonts, density, components, vector diagrams and custom CSS (page size and orientation are part of the layout). Content IR, Design Spec and renderer are separate; CSS/Typst/DOCX share normalized tokens. Theme preview builds an isolated sample. No alternate PDF backend or print PDF/X certification is implemented.
-
-
-Design integration: python tests/design.py (PANDOC/TYPST must be available). Portable integration: node --experimental-strip-types tools/make-portable-fixture.mjs, then python tests/e2e.py --portable.
-
-## Editorial prose review
-
-Generated jobs now run a whole-book prose audit after fact/citation correction, followed by targeted developmental and cadence editing and a final fact/citation audit. The deterministic `reports/prose-signals.json` records lexical and structural signals only; its Japanese phrase list is configurable in `config/prose-signals/ja.json`. The agent records contextual decisions in `plan/prose-audit.yaml` and `plan/prose-editing.yaml`. See [Skill architecture](docs/SKILLS_ARCHITECTURE.md) and [prose quality](docs/PROSE_QUALITY.md).
+- [Source Role System](docs/SOURCE_ROLE_SYSTEM.md)
+- [Citation and bibliography behavior](docs/CITATION_AND_BIBLIOGRAPHY.md)
+- [Intent-driven publication architecture](docs/INTENT_DRIVEN_PUBLICATION_ARCHITECTURE.md)
+- [WebUI information architecture](docs/webui-information-architecture.md)
+- The in-app **Safety & data handling** page (runtime, licensing, and execution details)
 

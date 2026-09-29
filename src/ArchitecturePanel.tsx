@@ -201,6 +201,6 @@ export function CitationControls({ inText, value, onInText, onChange }: { inText
     </div>
     <fieldset className="multi"><legend>Bibliography grouping — 巻末リストを分ける</legend><div className="chips">{Object.entries(groups).map(([id, g]) =>
       <label className="check chip" key={id}><input type="checkbox" checked={value.groups[id as keyof typeof value.groups]} onChange={e => set('groups', { ...value.groups, [id]: e.target.checked })} />{g.ja}</label>)}</div>
-      <small>引用文献（本文で引用した根拠資料）と参考資料（内容の参考にした背景資料・経験記事）は別リストになります。</small></fieldset>
+      <small>引用文献には本文で引用した根拠資料を掲載します。背景資料は執筆時だけ参照し、一覧には出ません。「読者向け参考資料」に指定した資料だけが、本文引用なしで参考資料一覧に掲載されます。</small></fieldset>
   </div>;
 }

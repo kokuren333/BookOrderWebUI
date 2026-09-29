@@ -76,7 +76,7 @@ export default function App() {
           </div>
           <div className="attachment-heading"><strong>添付ファイル</strong><span aria-live="polite">{files.length}件 ・ {formatFileSize(files.reduce((total, file) => total + file.size, 0))}</span>{files.length > 0 && <button type="button" className="remove-all" onClick={() => { setFiles([]); setUsages([]); setSuccess(''); }}>すべて削除</button>}</div>
           {files.length > 0 ? <><FileRoles files={files} usages={usages} names={names} uiMode={form.uiMode} onChange={setUsage} onRemove={removeFile} />
-            <small>資料はすべて同じ「ソース」ではありません。根拠資料（引用可）・背景資料（参考資料として掲載、事実の根拠にはしない）・レイアウト参考（内容としては読まない）・素材・再作図元などの役割を選べます。「推定」はファイル名からの推定で、未指定の役割はAgentがコーパス分析で見直します。</small></>
+            <small>資料は役割ごとに扱いが異なります。根拠資料は本文で引用できます。背景資料は執筆時だけ参照し、本文や巻末一覧には掲載しません。読者に紹介する資料は「読者向け参考資料」を選ぶと、本文では引用せず参考資料一覧に掲載します。構成参考・レイアウト参考・素材・再作図元も役割に応じて扱います。「推定」はファイル名からの推定で、未指定の役割はAgentが資料を読んで見直します。</small></>
             : <p className="empty-files">まだファイルは添付されていません。</p>}
           <p className="privacy">ファイルはブラウザ内でのみ処理し、生成するPublishing Job ZIPに含めます。サーバーには送信しません。</p>
           <label>Additional user instructions — 本全体への優先指示<textarea value={form.instructions} onChange={e => field('instructions', e.target.value)} placeholder="文体・語り口、説明の濃さ、難易度、章構成、扱う／扱わないテーマ、重点を置く論点、取り上げる事例、図表で示す内容、「教科書的にしない」「章末まとめは付けない」など、この本固有の希望を書いてください。" rows={6} /><small>この欄は本全体に対する優先指示です。入力内容は原文のまま保存され、調査・構成・執筆・編集・デザイン・最終確認の各工程でAgentへ毎回そのまま渡されます。文体、説明の濃さ、扱う／扱わない内容、構成、事例などは、BookOrderの既定方針（章末まとめ・反論の併記・教科書的な補助要素など）よりこの指示を優先します。</small><small>ただし、この画面で選んだ規模・出力・判型・レイアウト・デザインの設定と、引用・事実性・安全性・ビルドの成立に関する必須条件は上書きしません。矛盾する場合は黙って無視せず、最終レポートに記録します。</small></label>
