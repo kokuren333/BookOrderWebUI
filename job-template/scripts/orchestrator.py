@@ -294,7 +294,9 @@ def h_supplementary_research(ctx):
             tasks.append(task("research:supplementary", "supplementary_research", "Identify research gaps and perform supplementary research", [
                 "Read research/source-status.json and skim every ingested source to find gaps: missing definitions, primary references, official documentation, standards, statistics, newer developments, contradictory evidence, terminology.",
                 ("For each gap search the web. Log EVERY search: bookorder research log --query \"...\" --gap gap-01 --tool <search tool> --candidates <json/yaml file> --selected <url or src id>. "
-                 "Add each selected source: bookorder source add --url <url> --query \"...\" --gap gap-01 --reason \"why\" (it is fetched and persisted automatically)."
+                 "Add each selected source: bookorder source add --url <url> --query \"...\" --gap gap-01 --reason \"why\" --role evidence|background|further_reading|structure_reference --authority <authority> [--citation no] "
+                 "(it is fetched and persisted automatically). evidence = may support facts, numbers, definitions and recommendations; background = for the author's "
+                 "understanding, viewpoints or field experience, never cited or listed; further_reading = not cited, but explicitly listed for readers; --citation no for pages you read but must not cite."
                  if allowed else "Web research is DISABLED for this job: do not discover sources. Record gaps as limitations (status: unresolvable) using only supplied material."),
                 "Write research/research-plan.yaml: web_research (performed|disabled|not_needed), gaps: [{id, description, priority, status: resolved|unresolvable|not_needed, sources: [src-...], queries: [q-...], note}].",
                 "Important findings must be persisted as sources (source add) — never rely on conversation memory."],
@@ -316,7 +318,7 @@ def h_corpus_analysis(ctx):
         tasks.append(task(f"analyze:{batch[0]}", "corpus_analysis", f"Analyze sources {batch[0]}…{batch[-1]} ({len(batch)})", [
             "Read each source's COMPLETE persisted text (research/<origin>/<id>/source.md) — not only its opening.",
             "For each, write research/notes/<id>.yaml: source, relevance (core|supporting|background|irrelevant|duplicate), duplicate_of?, reliability (primary|secondary|tertiary|unknown), summary (whole-source synthesis), key_claims: [{text, locator}], concepts: [terms], limitations, bibliographic: {title, authors, published, container, publisher, type}, "
-            "source_role (your estimate unless the user set it: evidence = may support facts, numbers, definitions, recommendations | background = informs understanding and field experience, not cited for facts | structure_reference | redraw_source) and authority ("
+            "source_role (your estimate unless the user set it: evidence = may support facts, numbers, definitions, recommendations | background = informs the author only, not cited or listed | further_reading = listed for readers without in-text citation | structure_reference | redraw_source) and authority ("
             + "|".join(__import__("source_roles").AUTHORITY) + "). The user's role/authority from the WebUI wins (plan/source-roles.yaml shows the resolved table).",
             "Sources: " + ", ".join(batch)], outputs=[f"research/notes/{x}.yaml" for x in batch], group="analyze"))
     invalid = [e for e in note_errors if not e.startswith("Missing")]
@@ -380,9 +382,9 @@ def h_publication_planning(ctx):
             "needs exercises WITH answers/explanations. Never add a block to every chapter by habit. Blocks the user excluded stay forbidden "
             "(BookOrder re-applies them); record in intent_trace how each explicit user phrase shaped the architecture.",
             "Source Classifier: check plan/source-roles.yaml. Where the user did not set a role, estimate source_role and authority in "
-            "research/notes/<id>.yaml; evidence supports factual claims, background (experience articles, blogs) informs but is not cited for facts."]
+            "research/notes/<id>.yaml; evidence supports factual claims, background (experience articles, blogs) informs the author but is not cited or listed, and further_reading is listed only when explicitly assigned that role."]
         if layout_refs:
-            lines.append("Layout references (" + ", ".join(f"{a['id']} {a['label']}: {a['path']}" for a in layout_refs) + ") are COMPOSITION ONLY — never content, "
+            lines.append("Layout references (" + ", ".join(f"{a['id']} {a['label']}: {a['path'] or a['url']}" for a in layout_refs) + ") are COMPOSITION ONLY — never content, "
                          "never cited, never copied. Look at them and write plan/layout-references.yaml: references: [{asset, features: {"
                          + ", ".join(pa.VOCAB["layout_reference_fields"]) + "}, apply: [what the design adopts], do_not_copy: [...], content_used: false}].")
         uploads = [a for a in source_roles.uploaded_assets(ctx.project) if a["role"] not in ("layout_reference",)]

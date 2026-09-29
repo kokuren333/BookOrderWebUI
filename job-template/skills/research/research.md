@@ -50,14 +50,16 @@ key_claims:
 concepts: [term, term]
 limitations: "..."
 bibliographic: {title: "...", authors: ["..."], published: "2024-05-01", container: "...", publisher: "...", type: webpage}
-source_role: evidence      # your estimate unless the user set it: evidence | background | structure_reference | redraw_source
+source_role: evidence      # your estimate unless the user set it: evidence | background | further_reading | structure_reference | redraw_source
 authority: guideline       # primary_authoritative | guideline | governmental | peer_reviewed | institutional | textbook |
                            # expert_commentary | professional_experience | anecdotal | unknown
 ```
 
-Source role is separate from relevance: a highly relevant nurse's blog is `relevance: core` and `source_role:
-background` — it shapes the book's field perspective and appears under 参考資料, but facts, numbers and
-recommendations cite evidence (guidelines, official data, peer-reviewed work). A role the user chose in the WebUI
+When you add a source found by web research, declare its role: `bookorder source add --url … --role evidence|background|further_reading|structure_reference --authority … [--citation no]`. Pages used only for the author's viewpoint or experience are `background`; pages to recommend to readers are `further_reading`; neither role gets in-text citations, and only `further_reading` appears in the back matter.
+
+Source role is separate from relevance: a highly relevant nurse's blog can be `relevance: core` and `source_role:
+background` — it shapes the book's field perspective but is not cited or shown to readers. Use `further_reading` only
+when you explicitly recommend it to readers. Facts, numbers and recommendations cite evidence (guidelines, official data, peer-reviewed work). A role the user chose in the WebUI
 always wins over your estimate (plan/source-roles.yaml). Files the user marked as layout, style or visual
 references are not sources and never reach this registry.
 

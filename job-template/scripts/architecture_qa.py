@@ -118,10 +118,11 @@ def run(ctx_chapters=None, records=None, project=None, write=True):
     except Exception as exc: findings.append(finding("uploaded_asset_check_failed", "low", str(exc)[:200], "asset_planning", None, "assets"))
     import source_roles
     uploads = source_roles.uploaded_assets(project)
-    reference_paths = {a["path"] for a in uploads if a["role"] in ("layout_reference", "style_reference", "visual_reference")}
+    reference_paths = {a["path"] for a in uploads if a["role"] in ("layout_reference", "style_reference", "visual_reference") and a.get("path")}
     import sources as registry
+    reference_urls = {registry.normalize_url(a["url"]) for a in uploads if a["role"] in ("layout_reference", "style_reference", "visual_reference") and a.get("url")}
     for s in registry.load_index()["sources"]:
-        if s.get("path") in reference_paths:
+        if s.get("path") in reference_paths or (s.get("url") and s.get("normalized") in reference_urls):
             findings.append(finding("reference_as_content", "high", f"{s['id']} is a layout/style/visual reference but was registered as a content source", "source_ingestion", None, "sources"))
     # --- sources and citations
     roles = source_roles.table(write=False)

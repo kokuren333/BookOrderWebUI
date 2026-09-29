@@ -301,7 +301,7 @@ def coverage(usage, project=None, index=None):
         elif relevance == "irrelevant": status = "irrelevant"
         elif relevance == "background": status = "background_only"
         elif not roles.get(identifier, {}).get("citation_allowed", True) and identifier in assigned:
-            status = "consulted"  # background / structure reference: informs a chapter, listed in the background bibliography
+            status = "consulted"  # background / structure reference: informs a chapter, not necessarily reader-facing
         elif note: status = "analyzed"
         else: status = "ingested"
         entry = {"status": status, "origin": source["origin"], "relevance": relevance, "role": roles.get(identifier, {}).get("role"), "used_in": usage.get(identifier, [])}

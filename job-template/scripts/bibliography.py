@@ -10,12 +10,11 @@ project.json `citations` (all optional; the WebUI writes them for new jobs):
     bibliography_sort        citation_order | author | title
     bibliography_grouping    {cited, background, visual, design: bool}   separate lists, each can be switched off
     citation_source_roles    roles whose sources may be cited in the text (default: evidence, redraw_source)
-    reference_source_roles   roles listed under 参考資料 when consulted but not cited (default: background, evidence,
-                             structure_reference)
+    reference_source_roles   roles listed under 参考資料 (default: further_reading only)
 
-Groups: 引用文献 (sources cited in the text), 参考資料 (consulted, not cited: background reading, experience articles),
-図表・画像出典 (sources of figures, redraw sources, uploaded images), デザイン参考資料 (layout/style/visual references;
-off by default). A source appears in one group only.
+Groups: 引用文献 (sources cited in the text), 参考資料 / Further reading (explicitly designated reader-facing sources),
+図表・画像出典 (sources of figures, redraw sources, uploaded images actually used), デザイン references never appear in
+the bibliography. Background sources are used during writing only and are not exposed. A source appears in one group only.
 
 A project without any of the new keys keeps the legacy behaviour exactly (one CSL for text and list, citeproc's own
 bibliography). Otherwise citeproc renders only the in-text form (suppress-bibliography) and this module builds the
@@ -69,7 +68,7 @@ def policy(project):
               "bibliography_numbering": numbering, "cited_numbering": cited_numbering, "numbering_scope": scope, "bibliography_sort": sort,
               "bibliography_grouping": groups,
               "citation_source_roles": [str(r) for r in as_list(c.get("citation_source_roles"))] or list(VOCAB["citable_roles"]),
-              "reference_source_roles": [str(r) for r in as_list(c.get("reference_source_roles"))] or ["background", "evidence", "structure_reference"],
+              "reference_source_roles": [str(r) for r in as_list(c.get("reference_source_roles"))] or ["further_reading"],
               "adjustments": adjustments}
     in_label = {"numeric": "numeric [n]", "author-year": "author-year (Author, Year)", "note": f"footnotes ({footnote})"}[in_text]
     result["summary"] = ("legacy: one CSL style for text and bibliography" if legacy else
@@ -133,11 +132,16 @@ def collect(project, cited, pol):
     visual_ids = []
     plan_path = ROOT / "plan/assets-plan.yaml"
     plan = yaml_data(plan_path) if plan_path.is_file() else {}
+    import visual_review
+    decisions = visual_review.decisions() or {}
+    # A planned source is credited as a visual source only when its figure/table is actually in the manuscript.
+    import manuscript
+    used_visuals = {identifier for record in manuscript.analyze_all().values()
+                    for identifier in record.get("figures", []) + record.get("tables", [])}
     for asset in as_list(plan.get("assets")):
-        if isinstance(asset, dict) and asset.get("decision", "accepted") != "rejected":
+        if (isinstance(asset, dict) and asset.get("id") in used_visuals and asset.get("decision", "accepted") != "rejected"
+                and decisions.get(asset.get("id")) != "rejected"):
             visual_ids += [str(s) for s in as_list(asset.get("source_ids")) + as_list(asset.get("sources"))]
-    for sid, entry in roles.items():
-        if entry["role"] == "redraw_source" and entry["status"] in registry.USABLE: visual_ids.append(sid)
     for sid in dict.fromkeys(visual_ids):
         if sid in records and sid not in placed:
             groups["visual"].append({"id": sid, "kind": "source", "record": records.get(sid)}); placed.add(sid)
@@ -148,16 +152,15 @@ def collect(project, cited, pol):
             label = asset.get("label") or asset.get("original_name")
             credit = decision.get("credit") or asset.get("caption") or ""
             groups["visual"].append({"id": asset["id"], "kind": "asset", "text": f"{label}" + (f" — {credit}" if credit and credit != label else "") + "（提供資料）"})
-        elif asset["role"] in ("layout_reference", "style_reference", "visual_reference"):
-            groups["design"].append({"id": asset["id"], "kind": "asset", "text": f"{asset.get('label') or asset.get('original_name')}（{source_roles.ROLES[asset['role']]['label']}）"})
-    assigned = _assigned_sources()
+    # Only the explicit further_reading role is reader-facing. Background and structural references
+    # may inform authoring and chapter planning without appearing in the finished book.
     for s in index["sources"]:
         sid = s["id"]
         if sid in placed or s["ingest_status"] not in registry.USABLE or sid not in records: continue
         note = notes.get(sid, {}); entry = roles.get(sid, {})
         if note.get("relevance") in ("irrelevant", "duplicate"): continue
-        if entry.get("role") not in pol["reference_source_roles"]: continue
-        if entry.get("role") == "background" or sid in assigned:
+        if entry.get("role") != "further_reading" or entry.get("role") not in pol["reference_source_roles"]: continue
+        if entry.get("role") == "further_reading":
             groups["background"].append({"id": sid, "kind": "source", "record": records.get(sid)}); placed.add(sid)
     return groups
 
@@ -165,17 +168,6 @@ def collect(project, cited, pol):
 def _references():
     path = ROOT / "source/references/references.json"
     return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else []
-
-
-def _assigned_sources():
-    outline = ROOT / "source/metadata/outline.yaml"
-    found = set()
-    if outline.is_file():
-        for chapter in as_list(yaml_data(outline).get("chapters")):
-            if isinstance(chapter, dict):
-                srcs = chapter.get("sources") or {}
-                found |= {str(x) for x in (as_list(srcs.get("primary")) + as_list(srcs.get("supporting")) if isinstance(srcs, dict) else as_list(srcs))}
-    return found
 
 
 def build(doc, project, language="ja"):
@@ -272,7 +264,7 @@ def check_report(project, report=None):
     for g in report["groups"]:
         if g["group"] == "background":
             for e in g["entries"]:
-                if e["id"] in report["cited_in_text"]: problems.append({"rule": "background_contains_cited", "severity": "high", "detail": f"{e['id']} is cited but listed as 参考資料"})
+                if e["id"] in report["cited_in_text"]: problems.append({"rule": "further_reading_contains_cited", "severity": "high", "detail": f"{e['id']} is cited but listed as 参考資料"})
     for sid in report["cited_in_text"]:
         entry = roles.get(sid)
         if entry and entry["role"] not in pol["citation_source_roles"] and not (entry["citation_allowed"] and entry["citation_allowed_origin"] == "user"):

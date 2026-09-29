@@ -1,3 +1,4 @@
+import { useState } from 'react';
 // Intent-driven publication architecture in the WebUI:
 //   ArchitectureSection  — structure mode (AUTO / GUIDED / FIXED), publication type, block / exercise / visual / evidence policy
 //   FileRoles            — per-file role, authority, citation, intended chapter/section, asset flags and free instruction
@@ -5,7 +6,7 @@
 // Quick mode shows only what is needed to run (roles are estimated and editable, the design is AUTO); Advanced mode
 // exposes every setting behind progressive disclosure. Vocabulary: src/architecture.ts (shared JSON with the job).
 import {
-  applyQuickUse, ARCHETYPES, ASSET_ROLES, AUTHORITY, BLOCK_IDS, BLOCKS, CITATIONS, detectSignals, EXERCISE_POLICIES, isImage, QUICK_USES, quickUseOf,
+  applyBulk, applyQuickUse, ARCHETYPES, URL_ROLES, ASSET_ROLES, AUTHORITY, BLOCK_IDS, BLOCKS, CITATIONS, detectSignals, EXERCISE_POLICIES, isImage, QUICK_USES, quickUseOf,
   signalText, SOURCE_ROLES, STRUCTURE_MODES, VISUAL_DENSITIES, VISUAL_TYPES,
   type ArchitectureOptions, type BlockState, type CitationOptions, type FileUsage, type StructureMode, type UiMode,
 } from './architecture';
@@ -76,6 +77,77 @@ export function ArchitectureSection({ value, uiMode, intentText, onChange }: { v
   </section>;
 }
 
+/** Shared by files and URLs: the role select with its 「推定」 marker and the role's meaning. */
+export function RoleSelect({ usage, name, roles, labels, onChange }: { usage: FileUsage; name: string; roles?: readonly string[]; labels?: Record<string, string>; onChange: (role: string) => void }) {
+  const role = SOURCE_ROLES[usage.role];
+  return <div className="role-line">
+    <label className="compact">役割{usage.roleOrigin === 'inferred' && <span className="badge" title="名前・アドレスからの推定です。変更できます。">推定</span>}
+      <select value={usage.role} aria-label={`${name}の役割`} onChange={e => onChange(e.target.value)}>
+        {(roles ?? Object.keys(SOURCE_ROLES)).map(id => <option key={id} value={id}>{labels?.[id] ?? SOURCE_ROLES[id].label}（{id}）</option>)}</select></label>
+    <small className="role-help">{role?.description_ja}</small>
+  </div>;
+}
+
+/** Shared by files, URLs and the bulk editor: authority, citation, chapter, intended usage and notes. */
+export function SourceUsageFields({ usage, set, notesLabel = '自由記述 / notes', notesPlaceholder }: { usage: FileUsage; set: (patch: Partial<FileUsage>) => void; notesLabel?: string; notesPlaceholder?: string }) {
+  return <>
+    <div className="row">
+      <label>Authority — 資料の種類・権威性<select value={usage.authority} onChange={e => set({ authority: e.target.value })}>{Object.entries(AUTHORITY).map(([id, a]) => <option key={id} value={id}>{a.label}</option>)}</select></label>
+      <label>本文での引用<select value={usage.citationAllowed} onChange={e => set({ citationAllowed: e.target.value as FileUsage['citationAllowed'] })}>
+        <option value="auto">役割に従う</option><option value="yes">引用可</option><option value="no">引用しない</option></select></label>
+    </div>
+    <div className="row">
+      <label>使う章（例：第2章）<input value={usage.intendedChapter} onChange={e => set({ intendedChapter: e.target.value })} /></label>
+      <label>用途（intended usage）<input value={usage.intendedUsage} onChange={e => set({ intendedUsage: e.target.value })} placeholder="例：第3章の数値の根拠" /></label>
+    </div>
+    <label>{notesLabel}<textarea rows={2} value={usage.notes} onChange={e => set({ notes: e.target.value })} placeholder={notesPlaceholder} /></label>
+  </>;
+}
+
+const URL_ROLE_LABEL: Record<string, string> = { evidence: '根拠・引用資料', background: '執筆時の参考', further_reading: '読者向け参考資料', structure_reference: '構成参考', layout_reference: 'レイアウト参考', visual_reference: '図解参考' };
+
+/** Pasted URLs expanded into cards: estimated roles, per-URL settings, and bulk editing of selected URLs. */
+export function UrlRoles({ urls, usageOf, uiMode, onChange }: { urls: string[]; usageOf: (url: string) => FileUsage; uiMode: UiMode;
+  onChange: (next: Record<string, FileUsage>) => void }) {
+  const [selected, setSelected] = useState<string[]>([]);
+  const [bulk, setBulk] = useState<{ role: string; authority: string; citationAllowed: string; intendedChapter: string; intendedUsage: string }>({ role: '', authority: '', citationAllowed: '', intendedChapter: '', intendedUsage: '' });
+  if (!urls.length) return null;
+  const current = Object.fromEntries(urls.map(url => [url, usageOf(url)])) as Record<string, FileUsage>;
+  const live = selected.filter(url => urls.includes(url));
+  const applyToSelected = () => {
+    const patch: Partial<FileUsage> = {};
+    if (bulk.role) patch.role = bulk.role;
+    if (bulk.authority) patch.authority = bulk.authority;
+    if (bulk.citationAllowed) patch.citationAllowed = bulk.citationAllowed as FileUsage['citationAllowed'];
+    if (bulk.intendedChapter) patch.intendedChapter = bulk.intendedChapter;
+    if (bulk.intendedUsage) patch.intendedUsage = bulk.intendedUsage;
+    if (Object.keys(patch).length && live.length) onChange(applyBulk(current, live, patch));
+  };
+  const estimated = urls.filter(url => current[url].roleOrigin === 'inferred').length;
+  return <div className="url-roles">
+    <div className="attachment-heading"><strong>URL（{urls.length}件）</strong><span>{estimated ? `${estimated}件は推定のまま` : 'すべて指定済み'}</span>
+      <label className="check chip"><input type="checkbox" aria-label="すべてのURLを選択" checked={live.length === urls.length} onChange={e => setSelected(e.target.checked ? [...urls] : [])} />すべて選択</label></div>
+    {live.length > 0 && <div className="bulk-edit" role="group" aria-label="選択したURLを一括編集">
+      <strong>{live.length}件を一括編集</strong>
+      <select aria-label="一括：役割" value={bulk.role} onChange={e => setBulk({ ...bulk, role: e.target.value })}><option value="">役割（変更しない）</option>{URL_ROLES.map(id => <option key={id} value={id}>{URL_ROLE_LABEL[id]}</option>)}</select>
+      <select aria-label="一括：Authority" value={bulk.authority} onChange={e => setBulk({ ...bulk, authority: e.target.value })}><option value="">Authority（変更しない）</option>{Object.entries(AUTHORITY).map(([id, a]) => <option key={id} value={id}>{a.label}</option>)}</select>
+      <select aria-label="一括：本文での引用" value={bulk.citationAllowed} onChange={e => setBulk({ ...bulk, citationAllowed: e.target.value })}><option value="">引用（変更しない）</option><option value="auto">役割に従う</option><option value="yes">引用可</option><option value="no">引用しない</option></select>
+      <input aria-label="一括：使う章" placeholder="使う章" value={bulk.intendedChapter} onChange={e => setBulk({ ...bulk, intendedChapter: e.target.value })} />
+      <input aria-label="一括：用途" placeholder="用途" value={bulk.intendedUsage} onChange={e => setBulk({ ...bulk, intendedUsage: e.target.value })} />
+      <button type="button" className="secondary" onClick={applyToSelected}>選択したURLに適用</button></div>}
+    <ul className="files file-roles url-cards">{urls.map((url, i) => {
+      const u = current[url]; const set = (patch: Partial<FileUsage>) => onChange({ ...current, [url]: { ...u, ...patch, roleOrigin: 'user' } });
+      return <li key={url} className="url-card"><div className="file-row">
+        <label className="check url-select"><input type="checkbox" aria-label={`${url}を選択`} checked={live.includes(url)} onChange={e => setSelected(e.target.checked ? [...live, url] : live.filter(x => x !== url))} />
+          <span className="file-name"><strong>{url}</strong><small>URL {i + 1} ・ Authority：{AUTHORITY[u.authority]?.label}{u.citationAllowed !== 'auto' && ` ・ ${u.citationAllowed === 'yes' ? '引用可' : '引用しない'}`}{u.intendedChapter && ` ・ ${u.intendedChapter}`}</small></span></label></div>
+        <RoleSelect usage={u} name={url} roles={URL_ROLES} labels={URL_ROLE_LABEL} onChange={role => set({ role })} />
+        {uiMode === 'advanced' && <details className="file-details"><summary>詳細設定（Authority・引用・章・用途・自由記述）</summary>
+          <SourceUsageFields usage={u} set={set} notesPlaceholder="例：数値はこのページを根拠にする／雰囲気だけ参考にする" /></details>}
+      </li>;
+    })}</ul>
+  </div>;
+}
+
 export function FileRoles({ files, usages, names, uiMode, onChange, onRemove }: { files: File[]; usages: FileUsage[]; names: string[]; uiMode: UiMode;
   onChange: (index: number, usage: FileUsage) => void; onRemove: (index: number) => void }) {
   const size = (bytes: number) => bytes < 1024 * 1024 ? `${(bytes / 1024).toLocaleString('ja', { maximumFractionDigits: 1 })} KB` : `${(bytes / 1024 / 1024).toLocaleString('ja', { maximumFractionDigits: 1 })} MB`;
@@ -85,12 +157,7 @@ export function FileRoles({ files, usages, names, uiMode, onChange, onRemove }: 
     const role = SOURCE_ROLES[u.role];
     return <li key={`${file.name}-${i}`}><div className="file-row"><span className="file-name"><strong>{file.name}</strong><small>{file.type || 'ファイル'} ・ {size(file.size)}{names[i] !== file.name && ` ・ ZIP内：${names[i]}`}</small></span>
       <button type="button" className="remove" aria-label={`${file.name}を削除`} onClick={() => onRemove(i)}>削除</button></div>
-      <div className="role-line">
-        <label className="compact">役割{u.roleOrigin === 'inferred' && <span className="badge" title="ファイル名と種類からの推定です。変更できます。">推定</span>}
-          <select value={u.role} aria-label={`${file.name}の役割`} onChange={e => set({ role: e.target.value, assetRole: SOURCE_ROLES[e.target.value].content ? (e.target.value === 'redraw_source' ? 'redraw_source' : '') : (u.assetRole || (e.target.value === 'asset' ? 'inline_figure' : e.target.value)) })}>
-            {Object.entries(SOURCE_ROLES).map(([id, r]) => <option key={id} value={id}>{r.label}（{id}）</option>)}</select></label>
-        <small className="role-help">{role?.description_ja}</small>
-      </div>
+      <RoleSelect usage={u} name={file.name} onChange={value => set({ role: value, assetRole: SOURCE_ROLES[value].content ? (value === 'redraw_source' ? 'redraw_source' : '') : (u.assetRole || (value === 'asset' ? 'inline_figure' : value)) })} />
       {visual && <div className="quick-uses" role="radiogroup" aria-label={`${file.name}の使い方`}>{Object.entries(QUICK_USES).map(([id, q]) =>
         <label key={id} className="check chip"><input type="radio" name={`use-${i}`} checked={quickUseOf(u) === id} onChange={() => onChange(i, applyQuickUse(u, id))} />{q.label}</label>)}</div>}
       {uiMode === 'advanced' && <details className="file-details"><summary>詳細設定（用途・章・権威性・加工可否・自由指示）</summary>
@@ -99,23 +166,14 @@ export function FileRoles({ files, usages, names, uiMode, onChange, onRemove }: 
           <label>Asset role<select value={u.assetRole} onChange={e => set({ assetRole: e.target.value })}><option value="">（素材ではない）</option>
             {Object.entries(ASSET_ROLES).map(([id, a]) => <option key={id} value={id}>{a.label}（{id}）</option>)}</select></label>
         </div>
+        <SourceUsageFields usage={u} set={set} notesLabel="このファイルへの指示（自由記述）" notesPlaceholder="例：そのまま貼らず、情報構造だけ再作図する／表紙には使用しない／色味と余白だけ参考にする" />
         <div className="row">
-          <label>Authority — 資料の種類・権威性<select value={u.authority} onChange={e => set({ authority: e.target.value })}>{Object.entries(AUTHORITY).map(([id, a]) => <option key={id} value={id}>{a.label}</option>)}</select></label>
-          <label>本文での引用<select value={u.citationAllowed} onChange={e => set({ citationAllowed: e.target.value as FileUsage['citationAllowed'] })}>
-            <option value="auto">役割に従う</option><option value="yes">引用可</option><option value="no">引用しない</option></select></label>
-        </div>
-        <div className="row">
-          <label>使う章（例：第2章）<input value={u.intendedChapter} onChange={e => set({ intendedChapter: e.target.value })} /></label>
           <label>使う節・場所<input value={u.intendedSection} onChange={e => set({ intendedSection: e.target.value })} placeholder="例：病棟業務の流れを説明する場所" /></label>
-        </div>
-        <div className="row">
-          <label>用途（intended usage）<input value={u.intendedUsage} onChange={e => set({ intendedUsage: e.target.value })} placeholder="例：右ページに大きく配置" /></label>
           <label>優先度<select value={u.priority} onChange={e => set({ priority: e.target.value as FileUsage['priority'] })}><option value="low">low</option><option value="normal">normal</option><option value="high">high</option></select></label>
         </div>
         <label>キャプション<input value={u.caption} onChange={e => set({ caption: e.target.value })} /></label>
         <div className="flags">{([['cropAllowed', 'トリミング可'], ['redrawAllowed', '再作図可'], ['transformAllowed', '色・サイズ等の加工可'], ['useVerbatim', 'そのまま使用']] as const).map(([key, text]) =>
           <label className="check" key={key}><input type="checkbox" checked={u[key]} onChange={e => set({ [key]: e.target.checked } as Partial<FileUsage>)} />{text}</label>)}</div>
-        <label>このファイルへの指示（自由記述）<textarea rows={2} value={u.notes} onChange={e => set({ notes: e.target.value })} placeholder="例：そのまま貼らず、情報構造だけ再作図する／表紙には使用しない／色味と余白だけ参考にする" /></label>
       </details>}
     </li>;
   })}</ul>;

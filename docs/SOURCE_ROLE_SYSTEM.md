@@ -9,14 +9,15 @@ keeps them apart from the upload to the bibliography. Vocabulary: `job-template/
 
 | SOURCE_ROLE | Content? | Citable for facts? | Back matter | Use |
 |---|---|---|---|---|
-| evidence | yes | yes | 引用文献 when cited, else 参考資料 | facts, definitions, numbers, recommendations, claims |
-| background | yes | no (unless the user allows it per file) | 参考資料 | understanding, viewpoints, field experience, topic discovery |
-| structure_reference | yes | no | — (参考資料 if assigned) | chapter order and explanation sequence |
-| style_reference | **no** | no | デザイン参考資料 (off by default) | voice and atmosphere; never copied |
-| layout_reference | **no** | no | デザイン参考資料 (off by default) | margins, columns, typesetting, figure placement only |
-| visual_reference | **no** | no | デザイン参考資料 (off by default) | visual design reference |
+| evidence | yes | yes | 引用文献 when cited; otherwise omitted | facts, definitions, numbers, recommendations, claims |
+| background | yes | no | omitted; authoring use only | understanding, viewpoints, field experience, topic discovery |
+| further_reading | yes | no | 参考資料 / Further reading when assigned this role | reader-facing sources to recommend explicitly |
+| structure_reference | yes | no | omitted | chapter order and explanation sequence |
+| style_reference | **no** | no | omitted | voice and atmosphere; never copied |
+| layout_reference | **no** | no | omitted | margins, columns, typesetting, figure placement only |
+| visual_reference | **no** | no | omitted | visual design reference |
 | asset | **no** | no | 図表・画像出典 when placed | placed in the publication |
-| redraw_source | yes | yes (figure credit) | 図表・画像出典 | understood and redrawn |
+| redraw_source | yes | no prose citation | 図表・画像出典 only if actually used in a figure | understood and redrawn |
 
 ## Where each input goes
 
@@ -35,7 +36,7 @@ fails with `reference_as_content` if one is ever registered as a source.
 
 `label, role, asset_role, authority, citation_allowed, intended_usage, intended_chapter, intended_section, priority,
 caption, crop_allowed, redraw_allowed, transform_allowed, use_verbatim, notes (free instruction), role_origin
-(user | inferred)`. Examples of free instructions: 「第2章の病棟業務の流れを説明する場所で使用」「この画像の色味と余白だけ全体
+(user | inferred | agent)`. Examples of free instructions: 「第2章の病棟業務の流れを説明する場所で使用」「この画像の色味と余白だけ全体
 デザインの参考にする」「そのまま貼らず、情報構造だけ再作図する」「表紙には使用しない」「第4章の右ページに大きく配置したい」.
 
 `intended_chapter` may be an outline id, a number (「第2章」, "2", "chapter 2") or a title; `source_roles.chapter_ref()`
@@ -56,10 +57,11 @@ resolves it once the outline exists.
 
 ## Role resolution
 
-`source_roles.resolve()`: the user's explicit role (WebUI, `role_origin: user`) wins; else the agent's estimate in
-`research/notes/<id>.yaml` (`source_role`, `authority`); else the WebUI's own estimate (`role_origin: inferred`); else
-`evidence`. `citation_allowed` defaults from the role; the user may set it per file. Non-content roles are never
-citable. The resolved table is `plan/source-roles.yaml`.
+`source_roles.resolve()`: the user's explicit role wins; then an explicit role passed by the research agent; then the
+agent's estimate in `research/notes/<id>.yaml`; then the WebUI estimate; finally `evidence`. `background`,
+`further_reading` and `structure_reference` are never cited. Background is for authoring only and never appears in the
+manuscript or bibliography. Further reading is never cited and appears in the reader-facing list only when explicitly
+assigned that role. The resolved table is `plan/source-roles.yaml`.
 
 Quick-mode estimates (src/architecture.ts `inferUsage`): images → asset/inline_figure; names with layout/レイアウト/組版/
 誌面 → layout reference; style/文体/トーン → style (or visual) reference; logo/cover/扉 → the matching asset role;
@@ -80,5 +82,30 @@ paragraph with numbers or dates cites only sources of a known lower rank.
 
 - `source-role` (high): a citation of a non-citable source; a factual paragraph supported only by background sources.
 - `evidence-authority` (medium): see above.
-- Coverage: a supplied background source assigned to a chapter counts as `consulted` (it appears under 参考資料),
-  not as an orphan.
+- Coverage: a supplied background source assigned to a chapter counts as `consulted`; it remains an authoring input
+  and is not exposed to readers.
+
+## URLs (same model as files)
+
+URLs use the same usage model (`role, authority, citation_allowed, intended_chapter, intended_usage, notes,
+role_origin`), UI parts (`RoleSelect`, `SourceUsageFields`) and validation (`source_roles.usage/validate_usage`).
+
+- **WebUI**: paste many URLs at once (one per line). Each line becomes a URL card with a role estimated from the
+  address (`inferUrlUsage`: `.go.jp`/`.gov`/mhlw → evidence, governmental; PubMed/DOI/J-STAGE → evidence,
+  peer_reviewed; ガイドライン/guideline → guideline; 学会/`.or.jp`/`.ac.jp` → institutional; note.com/blog/体験 →
+  background; layout/見本/template → layout_reference; dribbble/図解 → visual_reference; Wikipedia/まとめ → background),
+  marked 「推定」. Roles offered for URLs: 根拠・引用資料 (evidence), 執筆時の参考 (background), 読者向け
+ 参考資料 (further_reading), 構成参考 (structure_reference), レイアウト参考 (layout_reference), 図解参考 (visual_reference). Select several cards (or
+  「すべて選択」) to set role, authority, citation, chapter and usage in one step; Advanced publishing opens per-URL details.
+  The WebUI never fetches pages, so page titles cannot inform the estimate; unset roles are re-estimated by the agent
+  after reading (notes `source_role`), and the user's choice always wins.
+- **project.json**: content URLs stay in `input.urls` (unchanged format) with `input.url_usage: {url: usage}` beside it;
+  layout / visual reference URLs go to `input.assets` as `{id, kind: "url", url, usage}` and are never registered as
+  sources (even a hand-edited `input.urls` entry with a reference role is skipped). A project without `url_usage`
+  behaves exactly as before (every URL is evidence).
+- **Agent research**: `bookorder source add --url … --role evidence|background|further_reading|structure_reference --authority …
+  [--citation no] [--intended-usage …] [--intended-chapter …] [--notes …]` records the same metadata with
+  `role_origin: agent` (below the user's choices, above estimates and defaults). `background` is not cited or listed;
+  `further_reading` is listed without in-text citations. Layout and visual reference roles are refused for sources.
+- Downstream nothing is URL-specific: plan/source-roles.yaml, packets, the `source-role` audit, gate 23 (including a
+  reference URL registered as a source) and the 引用文献 / 参考資料 lists treat URL and file sources alike.

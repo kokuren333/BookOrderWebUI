@@ -318,3 +318,31 @@ test('intent signals are read with the same patterns as the job (TypeScript / Py
   assert.deepEqual(ts, py);
   assert.ok(VOCAB.blocks.answer_key && VOCAB.visual_types.decision_tree && VOCAB.source_roles.layout_reference.content === false);
 });
+
+// ---------------------------------------------------------------- URLs share the Source Role System
+import { applyBulk as bulk, inferUrlUsage, URL_ROLES } from '../src/architecture.ts';
+test('pasted URLs get estimated roles from the address; user edits win; reference URLs are not content', async () => {
+  assert.equal(inferUrlUsage('https://www.mhlw.go.jp/stf/guideline.html').authority, 'guideline');
+  assert.deepEqual([inferUrlUsage('https://www.mhlw.go.jp/stf/seisaku.html').role, inferUrlUsage('https://www.mhlw.go.jp/stf/seisaku.html').authority], ['evidence', 'governmental']);
+  assert.equal(inferUrlUsage('https://pubmed.ncbi.nlm.nih.gov/123/').authority, 'peer_reviewed');
+  assert.equal(inferUrlUsage('https://note.com/nurse/n/abc').role, 'background');
+  assert.ok(URL_ROLES.includes('further_reading'));
+  assert.equal(inferUrlUsage('https://example.com/layout-sample').role, 'layout_reference');
+  assert.equal(inferUrlUsage('https://dribbble.com/shots/1').role, 'visual_reference');
+  assert.equal(inferUrlUsage('https://example.org/x').roleOrigin, 'inferred');
+  const urls = ['https://www.mhlw.go.jp/a', 'https://note.com/b', 'https://example.org/c', 'https://example.com/layout-sample'];
+  const estimated = Object.fromEntries(urls.map(u => [u, inferUrlUsage(u)]));
+  const edited = bulk(estimated, [urls[1], urls[2]], { role: 'background', citationAllowed: 'no', intendedChapter: '第3章', intendedUsage: '現場感', authority: 'professional_experience' });
+  assert.deepEqual([edited[urls[1]].role, edited[urls[2]].role, edited[urls[2]].intendedChapter, edited[urls[2]].roleOrigin, edited[urls[0]].roleOrigin], ['background', 'background', '第3章', 'user', 'inferred']);
+  const form = { ...baseForm(), urls: urls.join('\n'), urlUsage: edited };
+  const project = projectData(form, [], []) as { input: { urls: string[]; url_usage: Record<string, Record<string, unknown>>; assets: { url: string; usage: { role: string } }[] } };
+  assert.deepEqual(project.input.urls, urls.slice(0, 3), 'content URLs stay in input.urls (old format)');
+  assert.deepEqual(project.input.url_usage[urls[2]], { role: 'background', role_origin: 'user', label: urls[2], authority: 'professional_experience', citation_allowed: false, intended_usage: '現場感', intended_chapter: '第3章' });
+  assert.equal(project.input.url_usage[urls[0]].role_origin, 'inferred');
+  assert.deepEqual(project.input.assets.map(a => [a.url, a.usage.role]), [[urls[3], 'layout_reference']]);
+  const zip = await JSZip.loadAsync((await generateJob(form, [], await templateFiles())).data);
+  assert.ok((await zip.file('publishing-job/TASK.md')!.async('string')).includes(`${urls[2]}: background`));
+  // Without the architecture (older callers) input.urls is exactly the pasted list.
+  const { architecture: _a, ...legacyForm } = form;
+  assert.deepEqual((projectData(legacyForm as typeof form, [], []) as { input: { urls: string[]; url_usage?: unknown } }).input, { urls, sources: [] });
+});

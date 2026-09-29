@@ -16,8 +16,8 @@ wired into `common.combined()`.
 | `numbering_scope` | per_group, continuous | numbers restart per list, or run through all lists |
 | `bibliography_sort` | citation_order, author, title | order within a list (default: citation order for numeric, author otherwise) |
 | `bibliography_grouping` | `{cited, background, visual, design}` | which lists to produce |
-| `citation_source_roles` | default `[evidence, redraw_source]` | roles that may be cited in the text |
-| `reference_source_roles` | default `[background, evidence, structure_reference]` | consulted-but-not-cited sources listed under 参考資料 |
+| `citation_source_roles` | default `[evidence]` | roles that may be cited in the text |
+| `reference_source_roles` | default `[further_reading]` | reader-facing sources listed under 参考資料; background is never listed |
 
 The WebUI (Advanced → 04 調査・引用・参考文献) writes all of them for new jobs. A `project.json` without any of the new
 keys keeps the legacy single-CSL behaviour exactly.
@@ -27,9 +27,9 @@ keys keeps the legacy single-CSL behaviour exactly.
 | Group | Title (ja / en) | Contents |
 |---|---|---|
 | cited | 引用文献 / Cited references | every source cited in the text, in the configured order |
-| background | 参考資料 / Background sources | usable sources with a reference role that were consulted (assigned to a chapter, or role background) but not cited: experience articles, commentary, background reading |
-| visual | 図表・画像出典 / Figure and image sources | sources named by accepted visuals (`source_ids`), redraw sources, and uploaded images the asset plan placed or redrew (with credit) |
-| design | デザイン参考資料 / Design references | layout / style / visual references (off by default) |
+| background | 参考資料 / Further reading | usable sources explicitly assigned the `further_reading` role; never cited in the text |
+| visual | 図表・画像出典 / Figure and image sources | sources named by figures actually present in the manuscript and uploaded images actually placed or redrawn (with credit); no prose citation |
+| design | (not emitted) | layout / style / visual references never appear in a bibliography |
 
 A source appears in one list only. Empty lists and lists switched off are omitted. `reports/bibliography.json` records
 the policy, the order of first citation in the text and every list with its numbers.
@@ -55,7 +55,7 @@ Footnotes in the text, numbered back matter:
 ```
 本文: 観察は4時間ごとに行う。¹            脚注: ¹ 日本看護学会, 急性期看護ガイドライン, 2024年.
 引用文献  [1] 日本看護学会. 急性期看護ガイドライン. 2024.
-参考資料  [1] 山田花子. 新人看護師の一年. 2023.
+参考資料  [1] 山田花子. 新人看護師の一年. 2023. (`further_reading` role)
 ```
 
 Author-year in the text, numbered back matter (`numbering_scope: continuous`):
@@ -63,7 +63,7 @@ Author-year in the text, numbered back matter (`numbering_scope: continuous`):
 ```
 本文: 観察は4時間ごとに行う (日本看護学会, 2024)。
 引用文献  [1] 日本看護学会 (2024). 急性期看護ガイドライン.
-参考資料  [2] 山田花子 (2023). 新人看護師の一年.
+参考資料  [2] 山田花子 (2023). 新人看護師の一年. (`further_reading` role)
 ```
 
 ## QA

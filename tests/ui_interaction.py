@@ -212,5 +212,40 @@ class WebUI(unittest.TestCase):
         self.assertEqual(usage["notes"], "そのまま貼らず、情報構造だけ再作図する")
         self.assertFalse(self.errors, self.errors)
 
+    def test_pasted_urls_expand_into_cards_with_bulk_edit(self):
+        """Paste many URLs at once -> one card per URL with an estimated role -> bulk edit -> roles in project.json."""
+        page = self.open()
+        urls = ["https://www.mhlw.go.jp/stf/guideline.html", "https://note.com/nurse/n/abc", "https://example.org/report", "https://example.com/layout-sample", "https://example.org/recommended"]
+        page.locator("label", has_text="Reference URLs").locator("textarea").fill("\n".join(urls))
+        self.assertEqual(page.locator(".url-card").count(), 5)
+        roles = [page.get_by_label(f"{u}の役割").input_value() for u in urls]
+        self.assertEqual(roles, ["evidence", "background", "evidence", "layout_reference", "evidence"])
+        self.assertEqual(page.locator(".url-card .badge", has_text="推定").count(), 5)
+        for u in urls[1:3]: page.get_by_label(f"{u}を選択").check()
+        page.get_by_label("一括：役割").select_option("background")
+        page.get_by_label("一括：本文での引用").select_option("no")
+        page.get_by_label("一括：使う章").fill("第3章")
+        page.get_by_label("一括：用途").fill("現場の観点")
+        page.get_by_role("button", name="選択したURLに適用").click()
+        self.assertEqual(page.get_by_label(f"{urls[2]}の役割").input_value(), "background")
+        self.assertEqual(page.locator(".url-card .badge", has_text="推定").count(), 2)
+        page.get_by_label(f"{urls[4]}の役割").select_option("further_reading")
+        card = page.locator(".url-card").nth(0)
+        card.locator("details summary").click()
+        card.locator("label", has_text="Authority").locator("select").select_option("governmental")
+        page.get_by_label("Book title").fill("URLs"); page.get_by_label("Book description / goal").fill("goal"); page.get_by_label("Target readers").fill("readers")
+        page.locator("label", has_text="OS / CPU").locator("select").select_option("none")
+        with page.expect_download() as info: page.get_by_role("button", name="Generate Publishing Job").click()
+        with zipfile.ZipFile(io.BytesIO(Path(info.value.path()).read_bytes())) as z:
+            project = json.loads(z.read("publishing-job/project.json"))
+        usage = project["input"]["url_usage"]
+        self.assertEqual(project["input"]["urls"], urls[:3] + [urls[4]])
+        self.assertEqual((usage[urls[0]]["role"], usage[urls[0]]["authority"], usage[urls[0]]["role_origin"]), ("evidence", "governmental", "user"))
+        for u in urls[1:3]:
+            self.assertEqual((usage[u]["role"], usage[u]["citation_allowed"], usage[u]["intended_chapter"], usage[u]["intended_usage"]), ("background", False, "第3章", "現場の観点"))
+        self.assertEqual(usage[urls[4]]["role"], "further_reading")
+        self.assertEqual([(a["url"], a["usage"]["role"]) for a in project["input"]["assets"]], [(urls[3], "layout_reference")])
+        self.assertFalse(self.errors, self.errors)
+
 
 if __name__ == "__main__": unittest.main()

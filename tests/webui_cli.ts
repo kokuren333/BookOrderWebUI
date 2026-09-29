@@ -7,7 +7,7 @@ import { join, relative } from 'node:path';
 import { defaults, generateJob, projectData, templateTheme, validateForm } from '../src/job.ts';
 import { applyLayoutPreset, applyPublicationPreset, defaultPublication, previewLayout, publicationPayload, type PublicationOptions } from '../src/publication.ts';
 import { designFromTheme, defaultDesign, type DesignOptions } from '../src/design.ts';
-import { inferUsage, type FileUsage } from '../src/architecture.ts';
+import { inferUrlUsage, inferUsage, type FileUsage } from '../src/architecture.ts';
 
 async function templateFiles(dir = 'job-template'): Promise<Record<string, string | Uint8Array>> {
   const output: Record<string, string | Uint8Array> = {};
@@ -51,6 +51,8 @@ if (command === 'zip') {
   const spec = JSON.parse(arg);
   const form = { ...structuredClone(defaults), runtimeTarget: 'none' as const, title: 'WebUI architecture test', description: 'E2E', targetReaders: 'Editors', ...(spec.form ?? {}) };
   if (spec.form?.architecture) form.architecture = { ...structuredClone(defaults.architecture), ...spec.form.architecture };
+  // Per-URL edits as the URL cards make them: the estimate from the address, then the user's changes.
+  if (spec.urlUsage) form.urlUsage = Object.fromEntries(Object.entries(spec.urlUsage as Record<string, Partial<FileUsage>>).map(([url, patch]) => [url, { ...inferUrlUsage(url), ...patch, roleOrigin: 'user' as const }]));
   if (spec.form?.bibliography) form.bibliography = { ...structuredClone(defaults.bibliography), ...spec.form.bibliography };
   const files = await Promise.all((spec.files ?? []).map(async (item: { path: string; name?: string; type?: string; usage?: Partial<FileUsage> }) => {
     const data = new Uint8Array(await readFile(item.path)); const name = item.name ?? item.path.split(/[\\/]/).pop()!;

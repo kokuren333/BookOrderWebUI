@@ -166,7 +166,7 @@ def citation_issues(records, project):
             elif key in roles and not roles[key]["citation_allowed"]:
                 entry = roles[key]
                 issues.append(issue("source-role", "high", record["id"], f"{key} ({entry.get('title')}) is a {entry['role']} source: it may inform the text but is not a "
-                                    "citation for claims. Cite an evidence source, or drop the citation (it is listed under 参考資料)", cite["section"], evidence=key))
+                                    "citation for claims. Cite an evidence source, or drop the citation (background sources are not listed in the publication)", cite["section"], evidence=key))
         for section, block in iter_blocks(record):
             if block["t"] in ("Para", "Plain"):
                 text = plain(block["c"])

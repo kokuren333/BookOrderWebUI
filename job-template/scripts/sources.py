@@ -119,7 +119,14 @@ def init_supplied(index=None):
     url_usage = project["input"].get("url_usage") if isinstance(project["input"].get("url_usage"), dict) else {}
     for url in project["input"].get("urls", []):
         if url in remaining: remaining.remove(url); continue
-        register(index, kind="url", url=url, usage=source_roles.usage({"usage": url_usage.get(url)}) or None)
+        usage = source_roles.usage({"usage": url_usage.get(url)}) or None
+        # A reference-only URL (layout / visual / style reference) is not content: it never enters the corpus.
+        if usage and usage.get("role") in source_roles.ROLES and not source_roles.ROLES[usage["role"]]["content"]: continue
+        register(index, kind="url", url=url, usage=usage)
+    for source in index["sources"]:
+        if source["origin"] == "supplied" and source["kind"] == "url" and source.get("url") in url_usage:
+            usage = source_roles.usage({"usage": url_usage[source["url"]]}) or None
+            if usage and source.get("usage") != usage: source["usage"] = usage
     save_index(index)
     return index
 
@@ -423,11 +430,21 @@ def mark_unavailable(identifier, reason, attempt=None):
     save_index(index); return source
 
 
-def add_discovered(url=None, path=None, title=None, reason=None, query=None, gap=None, post_draft=False, issue=None):
+def add_discovered(url=None, path=None, title=None, reason=None, query=None, gap=None, post_draft=False, issue=None,
+                   role=None, authority=None, citation_allowed=None, intended_usage=None, intended_chapter=None, notes=None):
+    """A source found by the agent's research, with the same role metadata as supplied files and URLs
+    (role_origin: agent — below the user's choices, same meaning: evidence may be cited, background is read only)."""
+    import source_roles
+    raw = {"role": role, "authority": authority, "citation_allowed": citation_allowed, "intended_usage": intended_usage,
+           "intended_chapter": intended_chapter, "notes": notes}
+    usage = source_roles.usage({"usage": {k: v for k, v in raw.items() if v not in (None, "")}}) or None
+    if usage: usage["role_origin"] = "agent"
+    errors = source_roles.validate_usage({"usage": usage or {}}, "input.sources[discovered]")
+    if errors: raise ValueError("; ".join(errors))
     index = load_index()
     if post_draft and not reason: raise ValueError("Post-draft sources require --reason (and preferably --issue)")
     source = register(index, kind="url" if url else "file", url=url, path=path, origin="discovered", title=title,
-                      discovery={"query": query, "gap": gap, "reason": reason, "issue": issue}, post_draft=post_draft)
+                      discovery={"query": query, "gap": gap, "reason": reason, "issue": issue}, post_draft=post_draft, usage=usage)
     save_index(index)
     if post_draft:
         from research import record_post_draft

@@ -91,6 +91,10 @@ def main():
     una = src.add_parser('unavailable'); una.add_argument('id'); una.add_argument('--reason', required=True); una.add_argument('--attempt')
     add = src.add_parser('add'); add.add_argument('--url'); add.add_argument('--file'); add.add_argument('--title'); add.add_argument('--reason')
     add.add_argument('--query'); add.add_argument('--gap'); add.add_argument('--post-draft', action='store_true'); add.add_argument('--issue'); add.add_argument('--no-fetch', action='store_true')
+    add.add_argument('--role', help='evidence | background | structure_reference | redraw_source (what the source may be used for)')
+    add.add_argument('--authority', help='guideline, governmental, peer_reviewed, institutional, textbook, expert_commentary, professional_experience, anecdotal, …')
+    add.add_argument('--citation', choices=['auto', 'yes', 'no'], default='auto', help='yes/no overrides the role default for citing it')
+    add.add_argument('--intended-usage'); add.add_argument('--intended-chapter'); add.add_argument('--notes')
 
     res = commands.add_parser('research').add_subparsers(dest='research_command', required=True)
     log = res.add_parser('log'); log.add_argument('--query', required=True); log.add_argument('--gap'); log.add_argument('--tool')
@@ -230,7 +234,9 @@ def main():
                 file = Path(args.file).resolve()
                 if not file.is_relative_to(ROOT): raise ValueError('Copy the file into the job (e.g. input/discovered/) first')
                 path = file.relative_to(ROOT).as_posix()
-            s = sources.add_discovered(url=args.url, path=path, title=args.title, reason=args.reason, query=args.query, gap=args.gap, post_draft=args.post_draft, issue=args.issue)
+            s = sources.add_discovered(url=args.url, path=path, title=args.title, reason=args.reason, query=args.query, gap=args.gap, post_draft=args.post_draft, issue=args.issue,
+                                        role=args.role, authority=args.authority, citation_allowed={'yes': True, 'no': False}.get(args.citation),
+                                        intended_usage=args.intended_usage, intended_chapter=args.intended_chapter, notes=args.notes)
             if not args.no_fetch and s['ingest_status'] == 'pending': sources.ingest(ids={s['id']})
             s = sources.get(sources.load_index(), s['id'])
             print(f"{s['id']}: {s['ingest_status']} {s.get('chars', 0)} characters" + (f" (duplicate of {s['duplicate_of']})" if s.get('duplicate_of') else '') + ('' if s['ingest_status'] in sources.USABLE else f" — limitations: {'; '.join(s.get('limitations', []))}"))

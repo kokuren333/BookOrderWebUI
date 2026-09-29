@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { defaults, generateJob, uniqueNames, validateForm, type BookForm } from './job';
+import { defaults, generateJob, uniqueNames, urlLines, urlUsageOf, validateForm, type BookForm } from './job';
 import { loadTemplates } from './templates';
 import { loadRuntime, runtimeCatalog, runtimeTargets, type RuntimeCatalog, type RuntimeTarget } from './runtime';
 import { InfoPages, type InfoPage } from './InfoPages';
 import { PublicationPanel, TierOverride } from './PublicationPanel';
-import { ArchitectureSection, CitationControls, FileRoles, UiModeSwitch } from './ArchitecturePanel';
+import { ArchitectureSection, CitationControls, FileRoles, UiModeSwitch, UrlRoles } from './ArchitecturePanel';
 import { inferUsage, type FileUsage } from './architecture';
 
 export default function App() {
@@ -69,7 +69,8 @@ export default function App() {
           <TierOverride publication={form.publication} targetPages={form.targetPages} onChange={value => field('publication', value)} />
         </section>
         <section><div className="section-heading"><span>02</span><h2>資料と指示</h2></div>
-          <label>Reference URLs<textarea value={form.urls} onChange={e => field('urls', e.target.value)} placeholder="https://example.org/article\n1行に1つのURL" rows={3} /><small>ここではURLを取得しません。資料の調査はAgentが行います。</small></label>
+          <label>Reference URLs<textarea value={form.urls} onChange={e => field('urls', e.target.value)} placeholder="https://example.org/article\n1行に1つのURL（複数まとめて貼り付けできます）" rows={3} /><small>ここではURLを取得しません。資料の調査はAgentが行います。貼り付けたURLは下でURLごとのカードに展開され、アドレスから役割（根拠・参考資料・レイアウト参考など）を推定します。必要なものだけ直してください。</small></label>
+          <UrlRoles urls={[...new Set(urlLines(form.urls))]} usageOf={url => urlUsageOf(form, url)} uiMode={form.uiMode} onChange={next => field('urlUsage', { ...form.urlUsage, ...next })} />
           <div className={`dropzone ${dragging ? 'dragging' : ''}`} onDragOver={e => { e.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={e => { e.preventDefault(); setDragging(false); if (!busy) addFiles(e.dataTransfer.files); }}>
             <strong>参考資料をここにドロップ</strong><p>PDF / Markdown / DOCX / TXT / CSV / JSON / HTML ほか</p><input className="file-picker" type="file" multiple aria-label="参考資料を選択" onChange={e => { if (e.target.files) addFiles(e.target.files); e.target.value = ''; }} />
           </div>

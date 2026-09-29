@@ -8,8 +8,8 @@ Inputs are never all "sources". project.json keeps two lists (written by the Web
 
 Each entry may carry `usage` (label, role, asset_role, authority, citation_allowed, intended_usage, intended_chapter,
 intended_section, priority, caption, crop_allowed, redraw_allowed, transform_allowed, use_verbatim, notes,
-role_origin: user | inferred). The user's explicit role and authority win; otherwise the agent's estimate in
-research/notes/<id>.yaml (`source_role`, `authority`); otherwise the default (evidence, unknown authority).
+role_origin: user | inferred | agent). The user's explicit role and authority win; then an agent-declared choice;
+then the agent's estimate in research/notes/<id>.yaml (`source_role`, `authority`); otherwise the default.
 Authority is advisory: role, the user's choices and context decide what may be cited.
 
 plan/source-roles.yaml is the resolved table (generated, deterministic).
@@ -73,7 +73,7 @@ def uploaded_assets(project=None):
         asset_role = u.get("asset_role") or {"layout_reference": "layout_reference", "style_reference": "style_reference",
                                              "visual_reference": "visual_reference", "redraw_source": "redraw_source"}.get(u.get("role"), "inline_figure")
         role = u.get("role") if u.get("role") in ROLES and origin == "assets" else ASSET_ROLES[asset_role]["source_role"]
-        items.append({"id": entry.get("id") or f"asset-{number:03d}", "path": entry.get("path"), "original_name": entry.get("original_name"),
+        items.append({"id": entry.get("id") or f"asset-{number:03d}", "path": entry.get("path"), "url": entry.get("url"), "original_name": entry.get("original_name") or entry.get("url"),
                       "label": u.get("label") or entry.get("original_name"), "role": role, "asset_role": asset_role,
                       "also_content": origin == "sources", "intended_usage": u.get("intended_usage"), "intended_chapter": u.get("intended_chapter"),
                       "intended_section": u.get("intended_section"), "priority": u.get("priority") or "normal", "caption": u.get("caption"),
@@ -81,7 +81,7 @@ def uploaded_assets(project=None):
                       "transform_allowed": u.get("transform_allowed", True), "use_verbatim": u.get("use_verbatim", asset_role in ("inline_figure", "logo")),
                       "instruction": u.get("notes"), "role_origin": u.get("role_origin") or "user",
                       "requires_decision": asset_role in DECISION_ROLES,
-                      "placeable_path": f"source/assets/uploaded/{(entry.get('path') or '').rsplit('/', 1)[-1]}" if ROLES[role]["group"] == "visual" or asset_role in DECISION_ROLES else None})
+                      "placeable_path": f"source/assets/uploaded/{(entry.get('path') or '').rsplit('/', 1)[-1]}" if entry.get("path") and (ROLES[role]["group"] == "visual" or asset_role in DECISION_ROLES) else None})
     return items
 
 
@@ -132,23 +132,27 @@ def for_chapter(chapter_id, project=None, chapters=None):
 
 def resolve(source, note=None, legacy=False):
     """(role, role_origin, authority, authority_origin, citation_allowed) for one registry source. In a legacy job
-    (no publication_architecture) the agent's role estimate is recorded but does not restrict citation, so FIXED
-    jobs made before the role system cite exactly as before; the user's own role choice always applies."""
+    (no publication_architecture) role semantics still apply: background and further_reading are never cited, and
+    redraw_source is only a figure credit. User choices outrank agent declarations and estimates."""
     u = source.get("usage") or {}
     note = note or {}
-    if u.get("role") in ROLES and u.get("role_origin") != "inferred": role, role_origin = u["role"], "user"
+    if u.get("role") in ROLES and u.get("role_origin") not in ("inferred", "agent"): role, role_origin = u["role"], "user"
+    elif u.get("role") in ROLES and u.get("role_origin") == "agent": role, role_origin = u["role"], "agent_declared"
     elif note.get("source_role") in ROLES: role, role_origin = note["source_role"], "agent_estimate"
     elif u.get("role") in ROLES: role, role_origin = u["role"], "webui_estimate"
     else: role, role_origin = "evidence", "default"
-    if u.get("authority") in AUTHORITY: authority, authority_origin = u["authority"], "user"
+    if u.get("authority") in AUTHORITY and u.get("role_origin") not in ("inferred", "agent"): authority, authority_origin = u["authority"], "user"
+    elif u.get("authority") in AUTHORITY and u.get("role_origin") == "agent": authority, authority_origin = u["authority"], "agent_declared"
     elif note.get("authority") in AUTHORITY: authority, authority_origin = note["authority"], "agent_estimate"
+    elif u.get("authority") in AUTHORITY: authority, authority_origin = u["authority"], "webui_estimate"
     else: authority, authority_origin = "unknown", "default"
     explicit = u.get("citation_allowed")
     allowed = explicit if isinstance(explicit, bool) else ROLES[role]["citation_allowed"]
-    if legacy and role_origin != "user" and ROLES[role]["content"] and not isinstance(explicit, bool): allowed = True
-    if not ROLES[role]["content"]: allowed = False
+    # These roles have a fixed publication contract: the manuscript may consult the source, but never
+    # cites it. Further reading is exposed only in the separate back-matter list.
+    if role in ("background", "further_reading", "structure_reference", "redraw_source") or not ROLES[role]["content"]: allowed = False
     return {"role": role, "role_origin": role_origin, "authority": authority, "authority_origin": authority_origin,
-            "citation_allowed": bool(allowed), "citation_allowed_origin": "user" if isinstance(explicit, bool) else "role",
+            "citation_allowed": bool(allowed), "citation_allowed_origin": ("agent" if u.get("role_origin") == "agent" else "user") if isinstance(explicit, bool) else "role",
             "group": ROLES[role]["group"] if not (allowed and role == "background") else "cited"}
 
 
@@ -170,8 +174,8 @@ def table(index=None, notes=None, write=True):
         out[s["id"]] = entry
     if write:
         write_yaml(TABLE, {"schema": "bookorder/source-roles@1", "citable_roles": list(CITABLE),
-                           "rule": "evidence may support factual claims; background informs but is not cited for facts; layout/style/visual "
-                                   "references are never content (they live in plan/uploaded-assets.yaml).", "sources": out},
+                           "rule": "evidence may support factual claims; background is authoring-only; further_reading is listed without citation; "
+                                   "redraw_source is credited only for visuals actually used; layout/style/visual references are never content.", "sources": out},
                    "Generated by BookOrder (Source Classifier). Change a role in the WebUI or with source_role/authority in research/notes/<id>.yaml.")
     return out
 

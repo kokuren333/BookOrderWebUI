@@ -95,6 +95,35 @@ export function inferUsage(name: string, type = ''): FileUsage {
     caption: '', cropAllowed: true, redrawAllowed: role === 'redraw_source' || role === 'visual_reference', transformAllowed: true, useVerbatim: assetRole === 'inline_figure' || assetRole === 'logo',
     notes: '', roleOrigin: 'inferred' };
 }
+/** Roles a URL can take (a web page is never a placed asset or a redraw file). */
+export const URL_ROLES = ['evidence', 'background', 'further_reading', 'structure_reference', 'layout_reference', 'visual_reference'] as const;
+/** URL role estimate from the address alone (the WebUI never fetches pages; the agent refines unset roles after reading). */
+export function inferUrlUsage(url: string, title = ''): FileUsage {
+  let host = ''; let path = '';
+  try { const u = new URL(url); host = u.hostname.toLowerCase(); path = decodeURIComponent(u.pathname + u.search).toLowerCase(); } catch { path = url.toLowerCase(); }
+  const text = `${host} ${path} ${title}`.normalize('NFKC').toLowerCase();
+  const has = (re: RegExp) => re.test(text);
+  let role = 'evidence'; let authority = 'unknown';
+  if (has(/layout|レイアウト|組版|誌面|紙面|template|テンプレート|page-?sample|見本|behance|dribbble|pinterest/)) role = has(/behance|dribbble|pinterest|illustration|図解|infographic/) ? 'visual_reference' : 'layout_reference';
+  else if (has(/図解|infographic|illustration/)) role = 'visual_reference';
+  else if (has(/(^|\.)note\.com|hatenablog|ameblo|livedoor|blog|ブログ|medium\.com|qiita|zenn\.dev|体験|経験談|感想|コラム|column|essay/)) {
+    role = 'background'; authority = has(/体験|感想/) ? 'anecdotal' : 'professional_experience';
+  }
+  if (role === 'evidence') {
+    if (has(/guideline|ガイドライン|指針|minds\.jcqhc/)) authority = 'guideline';
+    else if (has(/pubmed|ncbi\.nlm|doi\.org|jstage|cinii|nature\.com|sciencedirect|springer|wiley|nejm|jamanetwork|thelancet|bmj\.com|arxiv/)) authority = has(/arxiv/) ? 'expert_commentary' : 'peer_reviewed';
+    else if (has(/\.go\.jp|\.gov(\.|$|\/)|\.gov\b|\.lg\.jp|mhlw|who\.int|europa\.eu/)) authority = 'governmental';
+    else if (has(/\.or\.jp|\.ac\.jp|\.edu(\/|$)|gakkai|society|association|学会|協会/)) authority = 'institutional';
+    else if (has(/wikipedia|matome|まとめ/)) { role = 'background'; authority = 'unknown'; }
+  }
+  return { ...inferUsage(url), label: title || url, role, assetRole: '', authority, redrawAllowed: false, useVerbatim: false, roleOrigin: 'inferred' };
+}
+/** Bulk edit: apply the same fields to several usages (each becomes a user choice). */
+export function applyBulk<K extends string>(usages: Record<K, FileUsage>, keys: K[], patch: Partial<FileUsage>): Record<K, FileUsage> {
+  const out = { ...usages };
+  for (const key of keys) if (out[key]) out[key] = { ...out[key], ...patch, roleOrigin: 'user' };
+  return out;
+}
 export const isContent = (usage: FileUsage) => Boolean(SOURCE_ROLES[usage.role]?.content);
 export const isImage = (name: string) => IMAGE.test(name);
 

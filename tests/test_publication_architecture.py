@@ -136,7 +136,7 @@ class CitationsAndBibliography(unittest.TestCase):
 
     def build(self, name, citations):
         root, m = job(name, arch={"mode": "auto"}, citations=citations, files=self.FILES,
-                      usage=[{"role": "evidence", "authority": "guideline"}, {"role": "background", "authority": "professional_experience"}])
+                      usage=[{"role": "evidence", "authority": "guideline"}, {"role": "further_reading", "authority": "professional_experience"}])
         register_sources(m, root, self.NOTES)
         write(root, "source/metadata/outline.yaml", self.OUTLINE)
         html = render_html(m, "# A {#ch-a}\n\n## 節 {#sec-a}\n\n観察は4時間ごとに行う [cite:src-0001]。\n")
@@ -389,7 +389,7 @@ class AuditRegressions(unittest.TestCase):
     OUTLINE = {"chapters": [{"id": "ch-a", "title": "A", "file": "source/manuscript/01-a.md", "purpose": "p", "target_characters": 1000, "sources": {"primary": ["src-0001"], "supporting": ["src-0003"]}}]}
 
     def build(self, name, citations):
-        root, m = job(name, arch={"mode": "auto"}, citations=citations, files=self.FILES, usage=[{}, {}, {"role": "background"}, {}])
+        root, m = job(name, arch={"mode": "auto"}, citations=citations, files=self.FILES, usage=[{}, {}, {"role": "further_reading"}, {}])
         register_sources(m, root, self.NOTES); write(root, "source/metadata/outline.yaml", self.OUTLINE)
         html = render_html(m, "# A {#ch-a}\n\n## s {#sec-a}\n\n一 [cite:src-0001]。二 [cite:src-0002]。三 [cite:src-0001]。\n")
         return m, html, json.loads((root / "reports/bibliography.json").read_text(encoding="utf-8"))
@@ -434,11 +434,122 @@ class AuditRegressions(unittest.TestCase):
         write(root, "plan/publication-architecture.yaml", arch)
         self.assertTrue(qa.run(write=False)["ok"])
 
-    def test_legacy_job_agent_estimate_does_not_restrict_citation(self):
+    def test_legacy_job_uses_the_same_background_no_citation_rule(self):
         root, m = job("reg-legacy", files=self.FILES[:1])
         register_sources(m, root, {"src-0001": {"source_role": "background", "bibliographic": {"title": "t"}}})
         entry = m["source_roles"].table()["src-0001"]
-        self.assertEqual(entry["role"], "background"); self.assertTrue(entry["citation_allowed"])
+        self.assertEqual(entry["role"], "background"); self.assertFalse(entry["citation_allowed"])
+
+    def test_background_is_authoring_only_and_further_reading_is_explicit(self):
+        files = [("field-notes.md", "# Field notes\n\n" + LONG), ("recommended.md", "# Further reading\n\n" + LONG)]
+        root, m = job("background-vs-further-reading", arch={"mode": "auto"}, files=files,
+                      usage=[{"role": "background"}, {"role": "further_reading"}],
+                      citations={"style": "numeric", "in_text_citation_style": "numeric"})
+        register_sources(m, root, {"src-0001": {"bibliographic": {"title": "内部の現場メモ"}},
+                                   "src-0002": {"bibliographic": {"title": "読者向け資料"}}})
+        write(root, "source/metadata/outline.yaml", {"chapters": [{"id": "ch-a", "title": "A", "file": "source/manuscript/01-a.md", "purpose": "p", "target_characters": 1000,
+                                                                   "sources": {"supporting": ["src-0001"]}}]})
+        render_html(m, "# A {#ch-a}\n\n執筆時の参考情報。\n")
+        report = json.loads((root / "reports/bibliography.json").read_text(encoding="utf-8"))
+        listed = {e["id"] for group in report["groups"] for e in group["entries"]}
+        self.assertNotIn("src-0001", listed, "assigned background informs the author but is not exposed")
+        self.assertIn("src-0002", listed, "further_reading is explicitly reader-facing")
+        roles = m["source_roles"].table()
+        self.assertFalse(roles["src-0001"]["citation_allowed"])
+        self.assertFalse(roles["src-0002"]["citation_allowed"])
+
+    def test_redraw_source_is_credited_only_when_its_figure_is_in_the_manuscript(self):
+        root, m = job("visual-source-use", arch={"mode": "auto"}, files=[("redraw.md", "# Source\n\n" + LONG), ("evidence.md", "# Evidence\n\n" + LONG)],
+                      usage=[{"role": "redraw_source"}, {"role": "evidence"}], citations={"style": "numeric", "in_text_citation_style": "numeric"})
+        register_sources(m, root, {"src-0001": {"bibliographic": {"title": "図の元資料"}}, "src-0002": {"bibliographic": {"title": "根拠資料"}}})
+        write(root, "plan/assets-plan.yaml", {"assets": [{"id": "fig-source", "type": "screenshot", "chapter": "ch-a", "path": "source/assets/fig.png",
+                                                           "caption": "Source figure", "provenance": "Adapted from source", "source_ids": ["src-0001"],
+                                                           "information_shape": {"kind": "source_image"},
+                                                           "improvement_claim": {"kinds": ["anchor_abstraction"], "statement": "The source visual gives readers the outline at a glance."}}]})
+        write(root, "source/manuscript/01-a.md", "# A {#ch-a}\n\n本文。\n")
+        render_html(m, "# A {#ch-a}\n\n根拠 [cite:src-0002]。\n")
+        report = json.loads((root / "reports/bibliography.json").read_text(encoding="utf-8"))
+        self.assertNotIn("src-0001", {e["id"] for g in report["groups"] for e in g["entries"]})
+        figure_text = "# A {#ch-a}\n\n根拠 [cite:src-0002]。\n\n![Figure](https://example.org/fig.png){#fig-source}\n"
+        write(root, "source/manuscript/01-a.md", figure_text)
+        render_html(m, figure_text)
+        report = json.loads((root / "reports/bibliography.json").read_text(encoding="utf-8"))
+        self.assertIn("src-0001", {e["id"] for g in report["groups"] if g["group"] == "visual" for e in g["entries"]})
+        self.assertFalse(m["source_roles"].table()["src-0001"]["citation_allowed"])
+
+
+class UrlRoles(unittest.TestCase):
+    """URLs share the Source Role System with files (input.url_usage, discovered sources)."""
+    URLS = ["https://www.mhlw.go.jp/guideline.html", "https://note.com/nurse/n/abc", "https://example.org/nocite.html", "https://design.example/layout-sample.html"]
+
+    def build(self, name, url_usage=None, arch=True):
+        root, m = job(name, arch={"mode": "auto"} if arch else None)
+        project = json.loads((root / "project.json").read_text(encoding="utf-8"))
+        project["input"]["urls"] = self.URLS[:3] if url_usage is not None else list(self.URLS[:3])
+        if url_usage is not None:
+            project["input"]["url_usage"] = url_usage
+            project["citations"] = {"style": "numeric", "in_text_citation_style": "numeric", "bibliography_numbering": "numbered"}
+        (root / "project.json").write_text(json.dumps(project, ensure_ascii=False), encoding="utf-8")
+        index = m["sources"].init_supplied()
+        for s in index["sources"]: s["ingest_status"] = "fully_ingested"; s["title"] = s["url"]
+        m["sources"].save_index(index)
+        for s in index["sources"]:
+            write(root, f"research/notes/{s['id']}.yaml", {"source": s["id"], "relevance": "core", "summary": "要約。" * 30, "key_claims": ["主張の本文がここにある"],
+                                                            "bibliographic": {"title": s["url"], "authors": ["著者"], "published": "2024"}})
+        m["citations"].generate()
+        return root, m, {s["url"]: s["id"] for s in index["sources"]}
+
+    def test_url_roles_reach_the_registry_citations_and_bibliography(self):
+        usage = {self.URLS[0]: {"role": "evidence", "authority": "governmental", "role_origin": "user"},
+                 self.URLS[1]: {"role": "background", "authority": "professional_experience", "role_origin": "user", "intended_chapter": "第2章"},
+                 self.URLS[2]: {"role": "evidence", "citation_allowed": False, "role_origin": "user", "notes": "読むだけ"}}
+        root, m, ids = self.build("url-roles", usage)
+        roles = m["source_roles"].table()
+        self.assertTrue(roles[ids[self.URLS[0]]]["citation_allowed"]); self.assertEqual(roles[ids[self.URLS[0]]]["authority"], "governmental")
+        self.assertFalse(roles[ids[self.URLS[1]]]["citation_allowed"]); self.assertEqual(roles[ids[self.URLS[1]]]["intended_chapter"], "第2章")
+        self.assertFalse(roles[ids[self.URLS[2]]]["citation_allowed"], "citation_allowed=no is respected even for evidence")
+        write(root, "source/metadata/outline.yaml", {"chapters": [{"id": "ch-a", "title": "A", "file": "source/manuscript/01-a.md", "purpose": "p", "target_characters": 1000,
+                                                                   "sources": {"primary": [ids[self.URLS[0]]], "supporting": [ids[self.URLS[1]]]}}]})
+        text = "# A {#ch-a}\n\n## s {#sec-a}\n\n2023年に30%減った [cite:" + ids[self.URLS[0]] + "]。現場では2024年に10%増えた [cite:" + ids[self.URLS[1]] + "]。読んだだけ [cite:" + ids[self.URLS[2]] + "]。\n"
+        write(root, "source/manuscript/01-a.md", text)
+        records = {"ch-a": m["manuscript"].analyze_all()["source/manuscript/01-a.md"]}
+        flagged = {i["evidence"] for i in m["audit"].citation_issues(records, m["common"].read_project()) if i["type"] == "source-role" and i.get("evidence") in ids.values()}
+        self.assertEqual(flagged, {ids[self.URLS[1]], ids[self.URLS[2]]}, "background and no-citation URLs may not be cited; evidence may")
+        render_html(m, "# A {#ch-a}\n\n## s {#sec-a}\n\n根拠 [cite:" + ids[self.URLS[0]] + "]。\n")
+        groups = {g["group"]: [e["id"] for e in g["entries"]] for g in json.loads((root / "reports/bibliography.json").read_text(encoding="utf-8"))["groups"]}
+        self.assertEqual(groups["cited"], [ids[self.URLS[0]]]); self.assertNotIn(ids[self.URLS[1]], groups.get("background", []))
+
+    def test_reference_url_never_enters_the_corpus(self):
+        root, m = job("url-layout", arch={"mode": "auto"})
+        project = json.loads((root / "project.json").read_text(encoding="utf-8"))
+        project["input"]["urls"] = [self.URLS[3]]; project["input"]["url_usage"] = {self.URLS[3]: {"role": "layout_reference", "role_origin": "user"}}
+        project["input"]["assets"] = [{"id": "asset-001", "kind": "url", "url": self.URLS[3], "usage": {"role": "layout_reference", "role_origin": "user"}}]
+        project["citations"] = {"style": "numeric", "in_text_citation_style": "numeric", "bibliography_grouping": {"design": True}}
+        (root / "project.json").write_text(json.dumps(project, ensure_ascii=False), encoding="utf-8")
+        self.assertEqual(m["sources"].init_supplied()["sources"], [], "even if listed in input.urls, a reference URL is not registered")
+        asset = m["source_roles"].uploaded_assets()[0]
+        self.assertEqual((asset["role"], asset["url"], asset["placeable_path"]), ("layout_reference", self.URLS[3], None))
+        groups = m["bibliography"].collect(project, [], m["bibliography"].policy(project))
+        self.assertEqual(groups["design"], [], "layout/style references never appear in bibliography, even if its design group is enabled")
+        m["sources"].add_discovered(url=self.URLS[3], role="background")      # an agent adding it anyway is caught by QA
+        self.assertIn("reference_as_content", {f["rule"] for f in m["architecture_qa"].run(write=False)["findings"]})
+
+    def test_legacy_url_list_still_works(self):
+        root, m, ids = self.build("url-legacy", None, arch=False)
+        self.assertEqual(len(ids), 3)
+        self.assertTrue(all(e["role"] == "evidence" and e["citation_allowed"] for e in m["source_roles"].table().values()))
+
+    def test_agent_discovered_url_carries_role_metadata(self):
+        root, m = job("url-discovered", arch={"mode": "auto"})
+        read_only = m["sources"].add_discovered(url="https://blog.example/post", query="q", role="background", authority="anecdotal", citation_allowed=True, notes="観点の参考")
+        cited = m["sources"].add_discovered(url="https://pubmed.ncbi.nlm.nih.gov/1/", query="q", role="evidence", authority="peer_reviewed")
+        reading = m["sources"].add_discovered(url="https://recommended.example/guide", query="q", role="further_reading")
+        write(root, f"research/notes/{read_only['id']}.yaml", {"source_role": "evidence", "authority": "guideline"})
+        roles = m["source_roles"].table()
+        self.assertEqual((roles[read_only["id"]]["role"], roles[read_only["id"]]["role_origin"], roles[read_only["id"]]["citation_allowed"]), ("background", "agent_declared", False))
+        self.assertEqual((roles[cited["id"]]["role"], roles[cited["id"]]["citation_allowed"], roles[cited["id"]]["authority"]), ("evidence", True, "peer_reviewed"))
+        self.assertEqual((roles[reading["id"]]["role"], roles[reading["id"]]["citation_allowed"]), ("further_reading", False))
+        with self.assertRaises(ValueError): m["sources"].add_discovered(url="https://x.example/", role="layout_reference")
 
 
 if __name__ == "__main__": unittest.main()

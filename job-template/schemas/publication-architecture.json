@@ -939,12 +939,20 @@
       "description_ja": "事実・定義・数値・推奨の引用根拠にできる資料。"
     },
     "background": {
-      "label": "背景資料",
+      "label": "執筆時の参考",
+      "content": true,
+      "citation_allowed": false,
+      "group": null,
+      "description": "Understanding, viewpoints, field experience and topic discovery during writing; not exposed in the publication.",
+      "description_ja": "執筆時の内容理解・観点・現場感の参考。事実の引用根拠にせず、本文や巻末一覧には掲載しない。"
+    },
+    "further_reading": {
+      "label": "参考資料・さらに読む",
       "content": true,
       "citation_allowed": false,
       "group": "background",
-      "description": "Understanding, viewpoints, field experience and topic discovery; not a citation for factual claims.",
-      "description_ja": "内容理解・観点・現場感の参考。事実の引用根拠にはせず、参考資料として掲載。"
+      "description": "Optional reader-facing further reading; never cited in the text.",
+      "description_ja": "読者に紹介する参考資料。本文では引用せず、任意の参考資料一覧に掲載する。"
     },
     "structure_reference": {
       "label": "構成の参考",
@@ -958,7 +966,7 @@
       "label": "文体の参考",
       "content": false,
       "citation_allowed": false,
-      "group": "design",
+      "group": null,
       "description": "Voice and atmosphere only; never copied.",
       "description_ja": "文体・雰囲気の参考のみ（コピーしない）。"
     },
@@ -966,7 +974,7 @@
       "label": "レイアウト参考",
       "content": false,
       "citation_allowed": false,
-      "group": "design",
+      "group": null,
       "description": "Margins, columns, typesetting and figure placement only; never content.",
       "description_ja": "余白・段組・組版・図表配置の参考のみ。内容ソースとしては読まない。"
     },
@@ -974,7 +982,7 @@
       "label": "図解の参考",
       "content": false,
       "citation_allowed": false,
-      "group": "design",
+      "group": null,
       "description": "Visual design reference only.",
       "description_ja": "図解・見た目の参考のみ。"
     },
@@ -989,15 +997,14 @@
     "redraw_source": {
       "label": "再作図元",
       "content": true,
-      "citation_allowed": true,
+      "citation_allowed": false,
       "group": "visual",
-      "description": "Understood and redrawn; credited as the figure source.",
-      "description_ja": "内容を理解して再作図する元資料（図表出典として掲載）。"
+      "description": "Used only as a source for a figure that is actually drawn or adapted; never cited in the prose.",
+      "description_ja": "実際に作成・翻案した図表の出典としてのみ使用し、本文では引用しない。"
     }
   },
   "citable_roles": [
-    "evidence",
-    "redraw_source"
+    "evidence"
   ],
   "source_authority": {
     "primary_authoritative": {
@@ -1197,7 +1204,7 @@
       },
       "background": {
         "ja": "参考資料",
-        "en": "Background sources",
+        "en": "Further reading",
         "default": true
       },
       "visual": {

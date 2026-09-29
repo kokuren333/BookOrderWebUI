@@ -2,7 +2,7 @@ import JSZip from 'jszip';
 import type { RuntimeBundle, RuntimeTarget } from './runtime.ts';
 import { defaultDesign, designSpec, type DesignOptions } from './design.ts';
 import { defaultPublication, designPage, issueText, previewLayout, requestPayload, PUBLICATION_PRESETS, type PublicationOptions, type ThemeSpec } from './publication.ts';
-import { ARCHETYPES, architecturePayload, citationPayload, defaultArchitecture, defaultCitation, detectSignals, inferUsage, isContent, signalText, SOURCE_ROLES, usagePayload, type ArchitectureOptions, type CitationOptions, type FileUsage, type UiMode } from './architecture.ts';
+import { ARCHETYPES, inferUrlUsage, architecturePayload, citationPayload, defaultArchitecture, defaultCitation, detectSignals, inferUsage, isContent, signalText, SOURCE_ROLES, usagePayload, type ArchitectureOptions, type CitationOptions, type FileUsage, type UiMode } from './architecture.ts';
 
 export interface BookForm {
   title: string; description: string; targetReaders: string; language: string;
@@ -13,6 +13,7 @@ export interface BookForm {
   research: { allow_web_research: boolean; prefer_primary_sources: boolean; keep_provenance: boolean; require_supplied_coverage: boolean };
   citationStyle: 'numeric' | 'author-year' | 'note';   // in-text citation form (project.json citations.style / in_text_citation_style)
   bibliography: Omit<CitationOptions, 'inText'>;       // back matter: separate from how the text cites
+  urlUsage: Record<string, FileUsage>;                 // per-URL role metadata (same model as files); absent = estimate
   uiMode: UiMode;                                      // Quick / Advanced publishing (UI only; both write the same model)
   architecture: ArchitectureOptions;
   figures: { tables: boolean; diagrams: boolean; charts: boolean; generative_images: boolean };
@@ -23,11 +24,13 @@ export const defaults: BookForm = {
   design: structuredClone(defaultDesign),
   publication: structuredClone(defaultPublication),
   research: { allow_web_research: true, prefer_primary_sources: true, keep_provenance: true, require_supplied_coverage: true },
-  citationStyle: 'numeric', bibliography: structuredClone(defaultCitation), uiMode: 'quick', architecture: structuredClone(defaultArchitecture),
+  citationStyle: 'numeric', urlUsage: {}, bibliography: structuredClone(defaultCitation), uiMode: 'quick', architecture: structuredClone(defaultArchitecture),
   figures: { tables: true, diagrams: true, charts: true, generative_images: false },
   outputs: { canonical_markdown: true, docx: true, semantic_html: true, pdf: true, static_site: true, epub: false },
 };
 export interface SourceFile { name: string; data: Blob | Uint8Array; size: number; type?: string; usage?: FileUsage }
+/** A URL's role metadata: the user's choice, else the WebUI estimate from the address (role_origin: inferred). */
+export const urlUsageOf = (form: BookForm, url: string) => form.urlUsage?.[url] ?? inferUrlUsage(url);
 /** A file's role metadata: the user's choice, else the WebUI estimate (role_origin: inferred). */
 export const fileUsage = (file: SourceFile) => file.usage ?? inferUsage(file.name, file.type);
 /** ZIP path: content files are sources; layout / style / visual references and placed images are assets, never sources. */
@@ -109,7 +112,15 @@ export function inputPayload(form: BookForm, names: string[], files: SourceFile[
     if (isContent(usage) || !form.architecture) sources.push(entry);
     else assets.push({ id: `asset-${String(assets.length + 1).padStart(3, '0')}`, ...entry });
   }
-  return { urls: urlLines(form.urls), sources, ...(assets.length ? { assets } : {}) };
+  // URLs share the Source Role System: content URLs stay in input.urls (the old format) with input.url_usage beside
+  // them; layout / visual reference URLs are not content and go to input.assets, never to the research corpus.
+  const urls: string[] = []; const urlUsage: Record<string, unknown> = {};
+  for (const url of urlLines(form.urls)) {
+    const usage = urlUsageOf(form, url);
+    if (!form.architecture || isContent(usage)) { urls.push(url); if (form.architecture) urlUsage[url] = usagePayload(usage); }
+    else assets.push({ id: `asset-${String(assets.length + 1).padStart(3, '0')}`, kind: 'url', url, original_name: url, usage: usagePayload(usage) });
+  }
+  return { urls, ...(Object.keys(urlUsage).length ? { url_usage: urlUsage } : {}), sources, ...(assets.length ? { assets } : {}) };
 }
 /** TASK.md section: how the book should be designed and what each input is for. */
 export function architectureTask(form: BookForm, names: string[], files: SourceFile[]): string {
@@ -122,13 +133,19 @@ export function architectureTask(form: BookForm, names: string[], files: SourceF
   if (chosen.length) lines.push('Block choices from the WebUI: ' + chosen.map(([b, state]) => `${b}=${state}`).join(', ') + '.');
   if (signals.length) lines.push('Explicit wishes read from the user\'s words (enforced): ' + signals.map(s => `「${s.quote}」→ ${signalText(s.effect)}`).join('; ') + '.');
   lines.push('', '## Inputs and their roles');
-  if (!files.length) lines.push('(No uploaded files)');
+  if (!files.length && !urlLines(form.urls).length) lines.push('(No uploaded files or URLs)');
   files.forEach((file, i) => {
     const u = fileUsage(file);
     lines.push(`- ${filePath(file, names[i])}: ${u.role} (${SOURCE_ROLES[u.role]?.label}${u.assetRole ? ', ' + u.assetRole : ''}${u.roleOrigin === 'inferred' ? ', estimated' : ''})`
       + (u.intendedChapter ? `; chapter ${u.intendedChapter}` : '') + (u.notes ? `; instruction: ${u.notes}` : ''));
   });
-  lines.push('Only evidence (and redraw sources for figure credits) may be cited for facts. Background sources inform the book and are listed under 参考資料. Layout, style and visual references are never content.');
+  for (const url of urlLines(form.urls)) {
+    const u = urlUsageOf(form, url);
+    lines.push(`- ${url}: ${u.role} (${SOURCE_ROLES[u.role]?.label}${u.roleOrigin === 'inferred' ? ', estimated from the address' : ''}; authority ${u.authority}`
+      + (u.citationAllowed !== 'auto' ? `; citation ${u.citationAllowed === 'yes' ? 'allowed' : 'not allowed'}` : '') + ')'
+      + (u.intendedChapter ? `; chapter ${u.intendedChapter}` : '') + (u.intendedUsage ? `; usage: ${u.intendedUsage}` : '') + (u.notes ? `; instruction: ${u.notes}` : ''));
+  }
+  lines.push('Only evidence may be cited for factual claims. Background and structure references inform the author but are not cited or listed. Further-reading sources are never cited and appear in 参考資料 only when explicitly assigned that role. Redraw sources are credited only for figures actually used. Layout, style and visual references are never content or bibliography entries.');
   return lines.join('\n') + '\n\n';
 }
 /** Design Spec written to the job. A layout request's named page size is mirrored for the legacy CSS/HTML consumers;

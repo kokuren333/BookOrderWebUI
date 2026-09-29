@@ -40,17 +40,22 @@ def generate(base):
     """The job ZIP exactly as the WebUI generates it (Advanced publishing with per-file roles)."""
     if WORK.parent.exists(): shutil.rmtree(WORK.parent)
     WORK.parent.mkdir(parents=True)
-    urls = [f"{base}/transformer-architecture.html", f"{base}/training-dynamics.html", f"{base}/scaling-debate.html", f"{base}/history.md"]
+    urls = [f"{base}/transformer-architecture.html", f"{base}/training-dynamics.html", f"{base}/scaling-debate.html", f"{base}/history.md",
+            f"{base}/field-notes.html", f"{base}/layout-sample-page.html"]
     spec = {"form": {"title": "注意機構から大規模言語モデルへ", "description": "注意機構の原理から学習・評価までを一貫して解説する小冊子",
                      "targetReaders": "機械学習の基礎を知るエンジニア", "targetPages": 8, "instructions": INSTRUCTIONS, "urls": "\n".join(urls),
                      "uiMode": "advanced", "citationStyle": "note",
                      "bibliography": {"footnoteStyle": "full", "numbering": "numbered", "scope": "per_group"},
                      "architecture": {"mode": "auto"},
                      "outputs": {"canonical_markdown": True, "docx": True, "semantic_html": True, "pdf": True, "static_site": True, "epub": False}},
+            "urlUsage": {f"{base}/field-notes.html": {"role": "background", "authority": "professional_experience", "intendedChapter": "第4章",
+                                                      "notes": "現場の実感の参考。事実の根拠にはしない"},
+                         f"{base}/layout-sample-page.html": {"role": "layout_reference", "notes": "見出しと余白の参考"},
+                         f"{base}/transformer-architecture.html": {"role": "evidence", "authority": "expert_commentary", "intendedUsage": "第2章の構造の説明"}},
             "files": [{"path": str(FIXTURE / "sources/attention-basics.md"), "usage": {"role": "evidence", "authority": "textbook"}},
                       {"path": str(FIXTURE / "sources/evaluation.txt"), "usage": {"role": "evidence"}},
                       {"path": str(REPO / "tests/fixtures/reference-1.pdf"), "usage": {"role": "evidence"}},
-                      {"path": str(EXTRA / "practitioner-notes.md"), "usage": {"role": "background", "authority": "professional_experience"}},
+                      {"path": str(EXTRA / "practitioner-notes.md"), "usage": {"role": "further_reading", "authority": "professional_experience"}},
                       {"path": str(REPO / "tests/fixtures/pipeline.png"), "type": "image/png",
                        "usage": {"role": "asset", "assetRole": "inline_figure", "intendedChapter": "第2章", "caption": "Transformerの処理パイプライン",
                                  "notes": "第2章の処理の流れを説明する場所で使用。表紙には使用しない。", "priority": "high"}},
@@ -112,7 +117,9 @@ class ArchitectureAgent(MockAgent):
             self.put_json("plan/layout-references.yaml", {"references": [{"asset": "asset-002", "content_used": False,
                 "features": {"page_geometry": "B5縦", "margins": "外側広め", "columns": "1段", "heading_hierarchy": "章・節の2階層", "line_length": "40字前後",
                              "body_density": "標準", "figure_text_ratio": "図は各見開きに一つ程度", "caption_style": "図の下に小さく", "whitespace": "章扉に余白"},
-                "apply": ["外側余白を広くとる", "見出しは2階層に抑える"], "do_not_copy": ["本文", "図版"]}]})
+                "apply": ["外側余白を広くとる", "見出しは2階層に抑える"], "do_not_copy": ["本文", "図版"]},
+                {"asset": "asset-003", "content_used": False, "features": {k: "URLの見本ページで観察" for k in ("page_geometry", "margins", "columns", "heading_hierarchy",
+                 "line_length", "body_density", "figure_text_ratio", "caption_style")}, "apply": ["見出しの階層"], "do_not_copy": ["本文"]}]})
             return
         if identifier == "architecture":
             self.log.append(identifier); self.check_intent(task)
@@ -123,7 +130,7 @@ class ArchitectureAgent(MockAgent):
             for chapter in outline["chapters"]:
                 intent, blocks, visuals = CONTENT_INTENT[chapter["id"]]
                 chapter.update(content_intent=intent, blocks=blocks, visuals=visuals)
-                if chapter["id"] == "ch-evaluation": chapter["sources"]["supporting"].append(mapping["practitioner-notes"])
+                if chapter["id"] == "ch-evaluation": chapter["sources"]["supporting"] += [mapping["practitioner-notes"], mapping["field-notes"]]
             self.put_json("source/metadata/outline.yaml", outline)
             self.put_json("plan/user-intent.yaml", {"directives": [
                 {"id": "intent-001", "source_quote": "章末問題はいらない", "interpretation": "No exercises or quizzes anywhere.", "applies_to": ["publication_planning", "editorial_planning"]},
@@ -197,7 +204,7 @@ class ArchitectureAgent(MockAgent):
         super().handle(task)
         if identifier == "synthesize":
             clusters = job_yaml(WORK / "plan/source-clusters.yaml")
-            clusters["clusters"].append({"id": "cl-practice", "label": "現場の経験（背景資料）", "sources": [mapping["practitioner-notes"]]})
+            clusters["clusters"].append({"id": "cl-practice", "label": "現場の経験（背景資料）", "sources": [mapping["practitioner-notes"], mapping["field-notes"]]})
             self.put_json("plan/source-clusters.yaml", clusters)
         if kind in ("expand", "review") or (kind == "rewrite" and target == "ch-training"): self.transform(target)
         if identifier == "design":
@@ -234,7 +241,12 @@ def patch_analyze(agent):
             agent.log.append(task["id"]); agent.check_intent(task)
             for output in task["outputs"]:
                 sid = Path(output).stem
-                if by_id[sid] == "practitioner-notes":
+                if by_id[sid] == "field-notes":
+                    agent.put_json(output, {"source": sid, "relevance": "supporting", "reliability": "tertiary", "summary": "注意機構モデルを社内検索に導入した現場の記録。"
+                                    "長文の遅さ、評価のずれ、学習の不安定さについての体験を述べる。" * 2, "key_claims": [{"text": "現場では入力分割で文脈が途切れた", "locator": "第1段落"}],
+                                    "source_role": "evidence",   # the agent's estimate; the user's URL role (background) must win
+                                    "bibliographic": {"title": "現場メモ：注意機構モデルの運用で困ったこと", "authors": ["高橋 三郎"], "published": "2025", "type": "webpage"}})
+                elif by_id[sid] == "practitioner-notes":
                     agent.put_json(output, {"source": sid, "relevance": "supporting", "reliability": "tertiary", "summary": "エンジニアが注意機構モデルを一年運用した体験記。"
                                     "推論時間、評価のずれ、学習の不安定さについての現場の実感を述べる。" * 2, "key_claims": [{"text": "実運用ではベンチマークと満足度がずれる", "locator": "第2段落"}],
                                     "source_role": "background", "authority": "professional_experience",
@@ -252,10 +264,14 @@ def assertions(agent):
     # WebUI -> config
     assert project["publication_architecture"] == {"mode": "auto"}
     assert project["citations"]["in_text_citation_style"] == "note" and project["citations"]["bibliography_numbering"] == "numbered"
-    assert [a["usage"]["role"] for a in project["input"]["assets"]] == ["asset", "layout_reference"]
+    assert [a["usage"]["role"] for a in project["input"]["assets"]] == ["asset", "layout_reference", "layout_reference"]
     assert project["input"]["assets"][1]["path"] == "input/assets/layout-sample.pdf"
+    field_url = next(u for u in project["input"]["urls"] if u.endswith("field-notes.html"))
+    assert project["input"]["url_usage"][field_url]["role"] == "background" and project["input"]["url_usage"][field_url]["role_origin"] == "user"
+    assert not any(u.endswith("layout-sample-page.html") for u in project["input"]["urls"]), "a layout-reference URL is not a content URL"
+    assert any(a.get("url", "").endswith("layout-sample-page.html") and a["usage"]["role"] == "layout_reference" for a in project["input"]["assets"])
     background = next(s for s in project["input"]["sources"] if s["original_name"] == "practitioner-notes.md")
-    assert background["usage"]["role"] == "background"
+    assert background["usage"]["role"] == "further_reading"
     task_md = (WORK / "TASK.md").read_text(encoding="utf-8")
     assert "## Publication architecture" in task_md and "## Inputs and their roles" in task_md and "layout_reference" in task_md
     # config -> orchestration: phases
@@ -270,9 +286,13 @@ def assertions(agent):
     assert "case_study" in arch["block_policy"]["preferred"] and arch["visual_policy"]["density"] == "high"
     roles = job_yaml(WORK / "plan/source-roles.yaml")["sources"]
     practitioner = next(k for k, v in roles.items() if "現場" in str(v.get("title")))
-    assert roles[practitioner]["role"] == "background" and roles[practitioner]["citation_allowed"] in (False, "false")
+    assert roles[practitioner]["role"] == "further_reading" and roles[practitioner]["citation_allowed"] in (False, "false")
     index = json.loads((WORK / "research/index.json").read_text(encoding="utf-8"))
-    assert not any("layout-sample" in str(s.get("path")) or "pipeline" in str(s.get("path")) for s in index["sources"]), "references and assets are not sources"
+    assert not any("layout-sample" in str(s.get("path") or s.get("url")) or "pipeline" in str(s.get("path")) for s in index["sources"]), "references and assets are not sources"
+    field = next(k for k, v in roles.items() if "現場メモ" in str(v.get("title")))
+    assert roles[field]["role"] == "background" and roles[field]["role_origin"] == "user" and roles[field]["citation_allowed"] in (False, "false"), roles[field]
+    transformer = next(k for k, v in roles.items() if "Transformerの構造" in str(v.get("title")))
+    assert roles[transformer]["authority"] == "expert_commentary" and roles[transformer]["intended_usage"] == "第2章の構造の説明"
     # manuscript: no exercises, chapters differ, the uploaded figure is where the user asked
     manuscript = {p.name: p.read_text(encoding="utf-8") for p in (WORK / "source/manuscript").glob("*.md")}
     assert not any(".exercise" in t for t in manuscript.values())
@@ -289,7 +309,8 @@ def assertions(agent):
     bib = json.loads((WORK / "reports/bibliography.json").read_text(encoding="utf-8"))
     groups = {g["group"]: g for g in bib["groups"]}
     assert groups["cited"]["numbered"] and groups["cited"]["entries"][0]["number"] == 1
-    assert practitioner in [e["id"] for e in groups["background"]["entries"]] and practitioner not in bib["cited_in_text"]
+    assert practitioner in [e["id"] for e in groups["background"]["entries"]] and practitioner not in bib["cited_in_text"], "further_reading is explicitly listed, never cited"
+    assert field not in [e["id"] for e in groups["background"]["entries"]] and field not in bib["cited_in_text"], "background URL is authoring-only"
     assert "asset-001" in [e["id"] for e in groups["visual"]["entries"]]
     assert "design" not in groups, "design references are off by default"
     site = (WORK / "interchange/book.html").read_text(encoding="utf-8")
