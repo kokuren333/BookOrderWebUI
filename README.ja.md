@@ -70,6 +70,10 @@ npm run dev
 
 ## 詳細ドキュメント
 
+新規ジョブでは原稿制作・デザイン／作図・組版を分離しています。`bookorder write`、`design`、`render`で
+各工程を個別に実行・再開し、`--restart`で部分再実行できます。原稿完了時の引き継ぎZIP、役割単位のAgent指定、
+PDF実ページ数と目標との差、原稿工程への修正要求は[工程分離とページ数調整](job-template/docs/workflow-stages.md)を参照してください。
+
 - [Source Role System](docs/SOURCE_ROLE_SYSTEM.md)
 - [引用と参考文献](docs/CITATION_AND_BIBLIOGRAPHY.md)
 - [意図駆動の出版アーキテクチャ](docs/INTENT_DRIVEN_PUBLICATION_ARCHITECTURE.md)

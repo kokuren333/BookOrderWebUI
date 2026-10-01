@@ -88,6 +88,32 @@ class Resolution(unittest.TestCase):
         self.assertEqual(p["source"]["user_overrides"]["rhythm.max_text_only_pages"], 5)
         self.assertEqual(pp.scale(p)["maximum_chapters"], 14, "outline gate uses the resolved override")
 
+    def test_chars_per_page_override_survives_resolution(self):
+        p = pp.resolve(project(300, {"tier": "long", "overrides": {"scale.chars_per_text_page": 1200}}), A5)
+        self.assertEqual(p['scale']['chars_per_text_page'], 1200)
+        self.assertGreater(p['scale']['target_body_chars'], pp.resolve(project(300, 'long'), A5)['scale']['target_body_chars'])
+        invalid = {"tier": "long", "overrides": {"scale.chars_per_text_page": 0}}
+        with self.assertRaises(ValueError): pp.resolve(project(300, invalid), A5)
+
+    def test_layout_conditions_affect_budget_and_fingerprint(self):
+        base = project(300, 'long', layout_spec={'body': {'columns': 1}})
+        design = {'page': {'size': 'A5', 'margin': {'top': '18mm', 'bottom': '20mm', 'inner': '20mm', 'outer': '17mm'}},
+                  'typography': {'body': {'size': '10pt', 'line_height': 1.7}}}
+        a = pp.resolve(base, design)
+        variants = [
+            ({**base, 'layout_spec': {'body': {'columns': 2, 'gutter_mm': 6}}}, design),
+            (base, {**design, 'typography': {'body': {'size': '12pt', 'line_height': 1.7}}}),
+            (base, {**design, 'typography': {'body': {'size': '10pt', 'line_height': 2}}}),
+            ({**base, 'layout_spec': {'page': {'margin_top_mm': 30}}}, design),
+        ]
+        for request, appearance in variants:
+            b = pp.resolve(request, appearance)
+            self.assertNotEqual(a['inputs_fingerprint'], b['inputs_fingerprint'])
+            self.assertLess(b['scale']['chars_per_text_page'], a['scale']['chars_per_text_page'])
+        columns = pp.resolve(variants[0][0], variants[0][1])
+        self.assertGreater(columns['scale']['chars_per_text_page'], a['scale']['chars_per_text_page'] * .8,
+                           'Two columns do not double or halve usable page area')
+
     def test_legacy_settings_become_overrides(self):
         p = pp.resolve(project(300, scale={"target_characters": 100000, "minimum_ratio": 0.9}, pacing={"max_text_only_pages": 3}), A5)
         self.assertEqual((p["scale"]["target_body_chars"], p["scale"]["minimum_ratio"], p["rhythm"]["max_text_only_pages"]), (100000, 0.9, 3))

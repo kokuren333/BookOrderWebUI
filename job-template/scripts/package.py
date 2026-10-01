@@ -28,8 +28,8 @@ def package():
             raise RuntimeError(f"Missing human/agent QA record: reports/{review}. Inspect the outputs and record actual checks.")
     target = ROOT / "publish/result.zip"
     temporary = ROOT / "publish/.result.tmp"
-    folders = ("source", "input", "interchange", "publish", "reports", "scripts", "skills", "config", "templates", "third-party", "themes", "schemas", "docs")
-    files = [ROOT / name for name in ("project.json", "TASK.md", "README.md", "AGENTS.md", "run.cmd", "run.sh", "bookorder.cmd", "bookorder", "book.design.yaml", "custom.css", "custom.typ") if (ROOT / name).is_file()]
+    folders = ("source", "input", "interchange", "publish", "reports", "scripts", "skills", "config", "templates", "third-party", "themes", "schemas", "docs", "plan", "research", "handoff")
+    files = [ROOT / name for name in ("project.json", "project-state.json", "run-events.jsonl", "execution-summary.json", "TASK.md", "README.md", "AGENTS.md", "run.cmd", "run.sh", "bookorder.cmd", "bookorder", "book.design.yaml", "custom.css", "custom.typ") if (ROOT / name).is_file()]
     # Keep original runtime archives/fonts/licenses, not unpacked executable caches.
     for folder in ("runtime/archives", "runtime/fonts"):
         files += [p for p in (ROOT / folder).rglob("*") if p.is_file()]

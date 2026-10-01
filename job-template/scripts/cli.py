@@ -1,12 +1,15 @@
 """BookOrder CLI. `bookorder goal` is the single entry point that owns the publication lifecycle.
 
 Publication:  goal | done <task> | status [--json] | gates | block | unblock
+Stages:       write | design | render [--restart] [--agent role=assignment] | handoff --export ZIP
+Feedback:     pages | revision request --reason ... [--chapter ch-id]
 Sources:      source list | fetch | submit | confirm | accept-partial | unavailable | add
 Research:     research log | research status
 Audit:        audit resolve <id> --note ... [--wontfix] | audit report
 Design:       build [--theme] | fonts | theme list | theme preview <name>
 """
 import argparse
+from contextlib import redirect_stdout, nullcontext
 import json
 from pathlib import Path
 import shutil
@@ -55,9 +58,10 @@ def load_items(path):
     return data.get('candidates', data)
 
 
-def print_goal(as_json=False):
+def print_goal(as_json=False, stage=None, restart=False, agents=None):
     import orchestrator
-    state, tasks, info = orchestrator.advance()
+    with redirect_stdout(sys.stderr) if as_json else nullcontext():
+        state, tasks, info = orchestrator.advance(stage=stage, restart=restart, agent_overrides=agents)
     if as_json: print(json.dumps({'status': state['status'], 'phase': state['phase'], 'phases': state['phases'], 'tasks': tasks, 'info': info, 'blockers': state['blockers']}, ensure_ascii=False, indent=2))
     else: print(orchestrator.status_text(state, tasks, info))
     return 0
@@ -71,6 +75,17 @@ def main():
     commands = parser.add_subparsers(dest='command', required=True)
     goal = commands.add_parser('goal', help='Start or resume the publication; prints the next tasks'); goal.add_argument('--json', action='store_true')
     nxt = commands.add_parser('next', help='Alias of goal'); nxt.add_argument('--json', action='store_true')
+    for stage_name in ('write', 'design', 'render'):
+        stage_parser = commands.add_parser(stage_name, help='Run/resume the ' + stage_name + ' stage')
+        stage_parser.add_argument('--json', action='store_true'); stage_parser.add_argument('--restart', action='store_true')
+        stage_parser.add_argument('--agent', action='append', default=[], metavar='ROLE=ASSIGNMENT', help='Role routing metadata; the host runs this agent')
+    goal.add_argument('--agent', action='append', default=[], metavar='ROLE=ASSIGNMENT')
+    handoff = commands.add_parser('handoff', help='Show or export the portable manuscript handoff')
+    handoff.add_argument('--export', metavar='ZIP_PATH'); handoff.add_argument('--restore', action='store_true')
+    revision = commands.add_parser('revision').add_subparsers(dest='revision_command', required=True)
+    request = revision.add_parser('request', help='Return a required text change to the writer')
+    request.add_argument('--reason', required=True); request.add_argument('--chapter')
+    commands.add_parser('pages', help='Measure actual PDF pages and show the target difference')
     done = commands.add_parser('done', help='Report a task finished; BookOrder re-verifies and advances')
     done.add_argument('task'); done.add_argument('--note'); done.add_argument('--json', action='store_true')
     status = commands.add_parser('status'); status.add_argument('--json', action='store_true')
@@ -121,7 +136,32 @@ def main():
     sub_theme.add_parser('list'); show = sub_theme.add_parser('preview'); show.add_argument('name')
     args = parser.parse_args()
 
-    if args.command in ('goal', 'next'): return print_goal(args.json)
+    if args.command in ('goal', 'next', 'write', 'design', 'render'):
+        agents = {}
+        for assignment in getattr(args, 'agent', []):
+            role, sep, value = assignment.partition('=')
+            if not sep or role not in ('writer', 'designer', 'reviewer') or not value.strip():
+                raise ValueError('--agent expects writer|designer|reviewer=assignment')
+            agents[role] = value
+        return print_goal(args.json, 'all' if args.command == 'goal' else None if args.command == 'next' else args.command,
+                          getattr(args, 'restart', False), agents)
+    if args.command == 'pages':
+        import page_budget
+        from common import read_project
+        result = page_budget.measure(read_project()); print(page_budget.summary(result))
+        return 0 if result['actual_pages'] is not None else 1
+    if args.command == 'handoff':
+        import workflow
+        if args.restore: workflow.restore(); print('Frozen manuscript restored.'); return 0
+        if args.export: print(workflow.export(args.export)); return 0
+        path = ROOT / 'handoff/manifest.json'
+        if not path.is_file(): raise ValueError('No handoff; finish bookorder write first')
+        print(path.read_text(encoding='utf-8')); return 0
+    if args.command == 'revision':
+        import workflow, orchestrator
+        project, state = orchestrator.load_state()
+        workflow.request_revision(project, state, args.reason, args.chapter)
+        return print_goal(stage='write')
     if args.command == 'done':
         import orchestrator
         orchestrator.report_done(args.task, args.note)

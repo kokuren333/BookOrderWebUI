@@ -212,11 +212,12 @@ test('generated project.json and book.design.yaml stay compatible with the previ
     const expected = await golden(name);
     // Every field of the previous WebUI is unchanged. New jobs add the publication architecture (AUTO by default) and
     // decoupled citation / bibliography settings; the legacy citations.style value stays as it was.
-    const { publication_architecture, citations, ...rest } = projectData(form, [], [], modern) as Record<string, unknown>;
+    const { publication_architecture, citations, workflow, ...rest } = projectData(form, [], [], modern) as Record<string, unknown>;
     const { citations: oldCitations, ...expectedRest } = expected.project;
     assert.deepEqual(rest, expectedRest, name);
     assert.equal((citations as { style: string }).style, oldCitations.style, name);
     assert.deepEqual(publication_architecture, { mode: 'auto' }, name);
+    assert.deepEqual(workflow, { separated: true, agents: {} }, name);
     assert.equal((citations as { in_text_citation_style: string }).in_text_citation_style, oldCitations.style, name);
     assert.deepEqual(jobDesign(form, modern), expected.design, name);
   }

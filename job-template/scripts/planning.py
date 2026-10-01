@@ -21,6 +21,11 @@ def compute_scale(project, design=None, write=True):
     tier, genre and project overrides, written to plan/profile.resolved.yaml, and the scale is derived from it."""
     import publication_profile
     profile = publication_profile.resolve(project, design or {})
+    if (project.get('workflow') or {}).get('separated'):
+        import layout_spec, style_bible
+        layout = layout_spec.resolve(project, profile=profile, design=design or {})
+        style = style_bible.resolve(project, profile=profile, design=design or {})
+        profile = publication_profile.resolve(project, design or {}, layout, style)
     if write: publication_profile.write(profile)
     return publication_profile.scale(profile)
 

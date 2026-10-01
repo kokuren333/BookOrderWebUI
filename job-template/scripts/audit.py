@@ -188,10 +188,10 @@ def citation_issues(records, project):
     return issues
 
 
-def asset_issues(records, chapters):
+def asset_issues(records, chapters, defer_generation=False):
     import assets as asset_module
     issues = []
-    if asset_module.load_plan() is not None:
+    if asset_module.load_plan() is not None and not defer_generation:
         for error in asset_module.check_generation(chapters, {r["path"]: r for r in records.values() if r}):
             issues.append(issue("figure", "high", None, error, action="generate"))
     for chapter, identifier in asset_module.unplanned({r["path"]: r for r in records.values() if r}):
@@ -201,7 +201,7 @@ def asset_issues(records, chapters):
         diagrams.setdefault(hashlib.sha256(normalize(path.read_text(encoding="utf-8").split("title", 1)[-1]).encode()).hexdigest(), []).append(path.name)
     for names in diagrams.values():
         if len(names) > 1: issues.append(issue("figure", "medium", None, "Near-identical diagrams: " + ", ".join(names), action="rewrite"))
-    issues += legibility_issues(records) + visual_plan_issues()
+    issues += ([] if defer_generation else legibility_issues(records)) + visual_plan_issues()
     for record in records.values():
         if not record: continue
         equations = [e for e in record["equations"] if e]
@@ -317,9 +317,9 @@ def paragraph_length_issues(records, chapters, scale):
     return found
 
 
-def audit_checks(records, chapters, contracts, cov, project=None, scale=None):
+def audit_checks(records, chapters, contracts, cov, project=None, scale=None, defer_assets=False):
     project = project or read_project()
-    return (integration_checks(records, chapters, contracts) + citation_issues(records, project) + asset_issues(records, chapters)
+    return (integration_checks(records, chapters, contracts) + citation_issues(records, project) + asset_issues(records, chapters, defer_assets)
             + coverage_issues(cov) + design_issues() + pacing_issues(records)
             + paragraph_length_issues(records, chapters, scale or {}) + architecture_issues(records, chapters, project))
 

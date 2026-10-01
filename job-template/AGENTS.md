@@ -10,6 +10,18 @@ that BookOrder hands you one step at a time.
 
 ## The only loop you run
 
+New jobs use separate write, design and render stages (docs/workflow-stages.md). `bookorder goal` still runs
+the entire job. `bookorder write|design|render` runs only that stage; `done`/`next` preserve the selected stage.
+For a stage command stop at `STATUS: STAGE_COMPLETE`, and report that stage's result without claiming the
+publication is complete. Tasks carry provider-neutral writer/designer/reviewer assignments for the host.
+
+Writing must finish figure content, links, IDs and captions before handoff; visual files are generated in design.
+At the writing boundary BookOrder saves handoff/manifest.json and canonical snapshots. Design/render must not
+rewrite frozen manuscript/citation files or factual chart data. If text must change, use `bookorder revision
+request --reason "..." [--chapter ch-id]` and return to write. A page-count revision task belongs to the writer;
+preserve protected sections, citations and factual integrity. See docs/workflow-stages.md for transfer ZIPs,
+partial reruns and page-feedback settings.
+
 BookOrder's root orchestrator owns the lifecycle. It persists a strict phase state machine in
 `project-state.json`, runs all deterministic steps itself (fetching, extraction, registries, contracts,
 packets, audits, rendering, validation, packaging) and prints the exact authoring/review tasks that remain.
@@ -88,6 +100,9 @@ you as an `ingest:` task; fetch it with your own browsing tool and submit the fu
 source_ingestion → supplementary_research → corpus_analysis → research_frozen → publication_planning → architecture →
 reference_assignment → editorial_planning → visual_planning → drafting → chapter_review → asset_planning → asset_generation → integration → audit →
 rewrite → prose_audit → prose_editing → final_audit → design → layout → build → validation → package → complete
+
+For separated jobs, asset_generation moves after design. Writing ends at final_audit, design ends after
+asset_generation, and render begins at layout. Existing jobs retain the order above.
 
 Each task names the skill file(s) to read first:
 

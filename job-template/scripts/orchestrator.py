@@ -12,6 +12,7 @@ import time
 import traceback
 
 from common import ROOT, read_project, write_json, as_list, yaml_data, fingerprint as build_fingerprint, editorial_plan_fingerprint
+import workflow
 
 # outline (architecture) -> EditorialPlan -> section drafting -> VisualPlan / assets -> integration -> layout.
 PHASES = ["source_ingestion", "supplementary_research", "corpus_analysis", "research_frozen", "publication_planning", "architecture",
@@ -62,6 +63,8 @@ def new_state(project):
     from design import load_design
     try: design = load_design()
     except Exception: design = {}
+    # Existing jobs retain their character contracts. New separated jobs use physical typography.
+    if not workflow.separated(project): design = {k: v for k, v in design.items() if k != 'typography'}
     return {"format": "bookorder-project-state", "version": 1, "status": "running", "phase": PHASES[0],
             "phases": {name: "pending" for name in PHASES}, "phase_times": {}, "scale": compute_scale(project, design),
             "accepted": {}, "counters": {}, "blockers": [], "reviewed_hashes": {}, "created_at": now(), "updated_at": now(),
@@ -69,6 +72,7 @@ def new_state(project):
             "user_intent_protocol": 1,
             # Jobs started with this flag run publication planning, visual planning and the architecture QA (gate 23).
             "architecture_protocol": 1,
+            "stage_protocol": 1 if workflow.separated(project) else 0,
             "project": {"title": project["book"]["title"], "requested_pages": project["book"].get("target_pages"),
                         "language": project["book"].get("language"), "citation_style": project["citations"]["style"]}}
 
@@ -119,10 +123,11 @@ def set_phase(state, phase, value, reason=None):
 
 def reopen(state, phase, reason):
     """Invalidate a phase and everything after it. Later phases never keep 'complete' over a stale prerequisite."""
-    start = PHASES.index(phase)
+    order = workflow.phase_order(state, PHASES)
+    start = order.index(phase)
     key = "reopen:" + phase
     state["counters"][key] = state["counters"].get(key, 0) + 1
-    for name in PHASES[start:]:
+    for name in order[start:]:
         if state["phases"][name] != "pending": set_phase(state, name, "pending", reason if name == phase else f"after {phase} reopened")
     state["status"] = "running"
 
@@ -174,6 +179,11 @@ class Context:
         from research import coverage
         return self.get("coverage", lambda: coverage(self.usage(), self.project))
     def manuscript_fingerprint(self):
+        if workflow.separated(self.project, self.state):
+            import hashlib
+            # Rendered SVG/PNG bytes change in design; text/citations/data and planned semantic content do not.
+            content = {'files': workflow.hashes(), 'assets': workflow.semantic_assets(ROOT)['assets']}
+            return hashlib.sha256(json.dumps(content, ensure_ascii=False, sort_keys=True).encode('utf-8')).hexdigest()
         from manuscript import fingerprint
         return self.get("mfp", fingerprint)
 
@@ -572,7 +582,7 @@ def h_drafting(ctx):
     import citations
     citations.generate()
     chapters = ctx.outline(); mapped = ctx.by_chapter()
-    done = {c["id"] for c in chapters if drafted(c, mapped.get(c["id"]), ctx)}
+    done = {c["id"] for c in chapters if drafted(c, mapped.get(c["id"]), ctx) and c['id'] not in ctx.state.get('redraft_chapters', {})}
     tasks = []; waiting = []
     waves = {}
     for chapter in chapters:
@@ -588,6 +598,8 @@ def h_drafting(ctx):
         from planning import summary_path
         problems += intent_check_errors(ctx, summary_path(chapter["id"]))
         tasks.append(task(f"draft:{chapter['id']}", "drafting", f"Draft {chapter['id']} — {chapter['title']} ({chapter['target_characters']:,} characters)", [
+            *(['Explicit write restart: redraft this chapter from the existing sources. Preserve protected sections and factual/citation integrity.']
+              if chapter['id'] in ctx.state.get('redraft_chapters', {}) else []),
             f"Read plan/chapter-packets/{chapter['id']}.yaml first, then plan/book-bible.yaml, source/metadata/glossary.yaml and the packet's source texts. Do not redefine terminology, tone or thesis.",
             f"Write {chapter['file']} section by section: skeleton → each required section → source enrichment → examples → citations → transitions. Target {chapter['target_characters']:,} characters (minimum {chapter['minimum_characters']:,}); currently {current:,}.",
             "Cite with [cite:src-XXXX] only; cross-reference with @ch:/@sec:/@fig:/@tbl:/@eq:. Never type visible citation numbers.",
@@ -676,7 +688,8 @@ def run_integration_checks(ctx, scope):
     results, _ = ctx.contracts()
     records = {cid: rec for cid, rec in ctx.by_chapter().items()}
     if scope == "integration": found = audit.integration_checks(records, ctx.outline(), results)
-    else: found = audit.audit_checks(records, ctx.outline(), results, ctx.coverage(), ctx.project, ctx.scale)
+    else: found = audit.audit_checks(records, ctx.outline(), results, ctx.coverage(), ctx.project, ctx.scale,
+                                   defer_assets=workflow.separated(ctx.project, ctx.state) and workflow.stage_of(ctx.state['phase']) == 'write')
     log_event(scope, "invoke", tool="deterministic-" + scope, detected=len(found))
     return audit.update_ledger(found, scope, ctx.manuscript_fingerprint())
 
@@ -725,6 +738,14 @@ def h_asset_planning(ctx):
     fallback = editorial_fallback_task(ctx, review)
     if fallback: return Result(tasks=[fallback])
     assets.sync_figure_registry()
+    if workflow.separated(ctx.project, ctx.state):
+        tasks = slot_tasks(ctx, phase='asset_planning')
+        if tasks: return Result(tasks=tasks)
+        problems = workflow.asset_content_errors(ctx)
+        if problems:
+            return Result(tasks=[task('asset-content', 'asset_planning', 'Finish figure content and manuscript anchors',
+                problems + ['Specify semantic content in plan/assets-plan.yaml content, or in Diagram IR/data files. Place figure links with final paths, IDs and captions now; the designer will generate the files later.'],
+                outputs=['plan/assets-plan.yaml', 'source/manuscript/'], checks=problems)])
     return Result(done=True)
 
 
@@ -778,18 +799,31 @@ def h_asset_generation(ctx):
     errors = assets.check_generation(ctx.outline(), ctx.records())
     errors += [f"{item['asset_id']}: {item['detail']}" for item in image_check['checks'] if item['severity'] == 'high']
     if errors:
+        if workflow.separated(ctx.project, ctx.state):
+            text_errors = [e for e in errors if 'must show' in e or 'missing from' in e]
+            if text_errors:
+                workflow.request_revision(ctx.project, ctx.state, 'Asset placement/content needs a writer change: ' + '; '.join(text_errors)[:1500])
+                return Result(info='Asset placement revision sent to writer.')
         grouped = {}
         for error in errors: grouped.setdefault(error.split(":")[0], []).append(error)
         return Result(tasks=[task(f"asset:{identifier}", "asset_generation", f"Create and place {identifier}", problems + [
-            "Diagrams: write Diagram IR YAML (type, title, nodes, edges) and place ![caption](source/assets/figures/<name>.svg){#fig-id} in the planned section — the SVG is rendered by BookOrder.",
-            "Tables: pipe table followed by `Table: Caption {#tbl-id}`. Equations: ::: {.equation #eq-id} with $$LaTeX$$ :::. Refer to them with @fig:/@tbl:/@eq:.",
+            ("Diagrams: create Diagram IR YAML from the frozen asset content specification, preserving its labels/relations. Generate files at existing manuscript paths; do not edit figure links, captions or prose."
+             if workflow.separated(ctx.project, ctx.state) else "Diagrams: write Diagram IR YAML (type, title, nodes, edges) and place ![caption](source/assets/figures/<name>.svg){#fig-id} in the planned section — the SVG is rendered by BookOrder."),
+            ("Tables/equations are writer-owned content. Request a writer revision if their content or placement must change."
+             if workflow.separated(ctx.project, ctx.state) else "Tables: pipe table followed by `Table: Caption {#tbl-id}`. Equations: ::: {.equation #eq-id} with $$LaTeX$$ :::. Refer to them with @fig:/@tbl:/@eq:."),
             "Generated images: only accepted abstract/image candidates enter the ImageGenerationRequest pipeline. Configure project.image_generation.provider: fake for offline fixtures; without a provider, required images remain pending_provider and block completion. Review source/assets/generated/<id>.request.json and <id>.json.",
             "A rejected or pending visual must not appear in the text: follow its suggestion in reports/visual-review.yaml (prose, list, table or another type)."],
             group="assets", checks=problems) for identifier, problems in grouped.items()])
     results, _ = ctx.contracts()
     if any(r["status"] != "complete" for r in results):
+        if workflow.separated(ctx.project, ctx.state):
+            workflow.request_revision(ctx.project, ctx.state, 'Manuscript contracts changed during design; recheck writing before generating assets.')
+            return Result(info='Chapter contract revision sent to writer.')
         return Result(tasks=[expansion_task(r, next(c for c in ctx.outline() if c["id"] == r["id"]), "asset_generation") for r in results if r["status"] != "complete"])
     filling = slot_tasks(ctx)
+    if filling and workflow.separated(ctx.project, ctx.state):
+        workflow.request_revision(ctx.project, ctx.state, 'Unresolved manuscript slots require writer content before design can continue.')
+        return Result(info='Slot completion requested from writer.')
     if filling: return Result(tasks=filling)
     return Result(done=True)
 
@@ -799,7 +833,7 @@ def open_slots(ctx):
     return {cid: [s["id"] for s in rec.get("slots", [])] for cid, rec in ctx.by_chapter().items() if rec and rec.get("slots")}
 
 
-def slot_tasks(ctx):
+def slot_tasks(ctx, phase='asset_generation'):
     import editorial_plan as ep
     tasks = []
     by_id = {c["id"]: c for c in ctx.outline()}
@@ -813,7 +847,7 @@ def slot_tasks(ctx):
                          + (f" [sources: {', '.join(d.get('source_ids', []))}]" if d.get("source_ids") else ""))
         lines.append("Figures/tables come from plan/assets-plan.yaml (same id). Write components as ::: {.key-point #id} ... ::: etc. A device that cannot be produced "
                      "honestly falls back: bookorder editorial fallback <id> --to prose|table|case_study|summary --reason ...")
-        tasks.append(task(f"slots:{chapter}", "asset_generation", f"Fill {len(slots)} open slots in {chapter}", lines, outputs=[by_id[chapter]["file"]], group="slots",
+        tasks.append(task(f"slots:{chapter}", phase, f"Fill {len(slots)} open slots in {chapter}", lines, outputs=[by_id[chapter]["file"]], group="slots",
                           checks=[f"open slot {i}" for i in slots]))
     return tasks
 
@@ -1067,6 +1101,12 @@ def h_layout(ctx):
         error = run_build(ctx, "layout")
         if error:
             return Result(tasks=[task("fix-build", "layout", "Fix the proof build", ["The proof build failed:", error[:3000], "Fix canonical source/design (not generated files) and run bookorder goal."], checks=[error[:300]])])
+    if workflow.separated(ctx.project, ctx.state) and ctx.project['outputs'].get('pdf'):
+        import page_budget
+        pages = page_budget.measure(ctx.project)
+        feedback = workflow.design_feedback(ctx, pages)
+        if isinstance(feedback, dict): return Result(blockers=[feedback])
+        if feedback: return Result(info='Page feedback sent to writer; resume bookorder write, then design/render.')
     built = (ROOT / "reports/build-report.json").stat().st_mtime
     walls = layout_pacing(ctx)
     if walls: return walls
@@ -1104,6 +1144,9 @@ def layout_pacing(ctx):
     if any(f["rule"] == "layout_unmeasured" for f in high):
         return Result(tasks=[task("fix-layout-metrics", "layout", "Make the layout measurable", [high[0]["detail"]], checks=[high[0]["detail"][:300]])])
     by_id = {c["id"]: c for c in ctx.outline()}
+    if workflow.separated(ctx.project, ctx.state):
+        workflow.request_revision(ctx.project, ctx.state, 'Measured layout pacing needs a manuscript revision: ' + '; '.join(f['detail'] for f in high)[:1500])
+        return Result(info='Layout pacing revision sent to writer.')
     limit = result["limits"]
     tasks = []
     for chapter in sorted({f["chapter"] for f in high if f.get("chapter") in by_id}):
@@ -1254,6 +1297,7 @@ def completion_gates(ctx, include_package=True):
     gate(11, "Citation/reference validation passed", not citation_open, "; ".join(e["detail"] for e in citation_open[:5]) or "ok", "rewrite", "citation errors")
     final = accepted(ctx.state, "final_audit")
     fresh = final is not None and final.get("fingerprint") == ctx.manuscript_fingerprint()
+    if workflow.separated(ctx.project, ctx.state): fresh = fresh and not workflow.check_frozen()
     gate(12, "Whole-book audit passed on the final manuscript", fresh and accepted(ctx.state, "audit") is not None,
          "fresh" if fresh else ("manuscript changed after the final audit" if final else "not run"), "final_audit", "editorial inconsistency")
     # Layout pacing is judged on the current pages by gate 17, not by what the ledger remembers.
@@ -1263,7 +1307,16 @@ def completion_gates(ctx, include_package=True):
     gate(13, "High-severity audit issues resolved", not high and not medium, f"{len(high)} high, {len(medium)} medium open", "rewrite", "editorial inconsistency")
     design_problems = audit.design_issues()
     gate(14, "Design validation passed", not design_problems, "; ".join(i["detail"] for i in design_problems) or "ok", "design", "design")
-    gate(15, "Build passed and is current", build_fresh(), "fresh" if build_fresh() else "missing, failed or stale", "build", "build")
+    feedback_failed = False
+    if workflow.separated(ctx.project, ctx.state) and ctx.project['outputs'].get('pdf') and (ctx.project.get('page_feedback') or {}).get('enabled', True):
+        page_report = ROOT / 'reports/page-count.json'
+        if page_report.is_file():
+            pages = json.loads(page_report.read_text(encoding='utf-8'))
+            feedback_failed = pages.get('status') in ('over_target', 'under_target')
+    fresh_build = build_fresh()
+    gate(15, "Build passed and is current", fresh_build and not feedback_failed,
+         "page count needs writer feedback" if feedback_failed else "fresh" if fresh_build else "missing, failed or stale",
+         "layout" if feedback_failed else "build", "page count" if feedback_failed else "build")
     import pacing
     walls = pacing.check(ctx.project)
     detail = f"{walls['summary'].get('high', 0)} high, {walls['summary'].get('medium', 0)} medium; max text-only run " \
@@ -1340,7 +1393,8 @@ def user_intent_gate(ctx):
 
 
 def handle_failed_gates(ctx, failing):
-    earliest = min(failing, key=lambda g: PHASES.index(g["phase"]))
+    order = workflow.phase_order(ctx.state, PHASES)
+    earliest = min(failing, key=lambda g: order.index(g["phase"]))
     log_event("goal", "gates_failed", gates=[g["id"] for g in failing])
     if earliest["id"] == 20:
         path = ROOT / "reports/art-direction-check.yaml"
@@ -1375,16 +1429,80 @@ def handle_failed_gates(ctx, failing):
 
 # ---------------------------------------------------------------- driver
 
-def advance(max_steps=80):
+def refresh_page_inputs(ctx):
+    """Track resolved geometry/type, preserving accepted manuscript budgets during design-only changes."""
+    if not workflow.separated(ctx.project, ctx.state): return
+    import page_budget, layout_spec, style_bible
+    from design import load_design
+    spec = load_design()
+    layout = layout_spec.load_or_create(project=ctx.project, design=spec)
+    style = style_bible.load_or_resolve(project=ctx.project, design=spec)
+    inputs = page_budget.layout_inputs(ctx.project, spec, layout, style)
+    inputs['target_pages'] = ctx.project['book'].get('target_pages')
+    inputs['page_feedback'] = ctx.project.get('page_feedback') or {}
+    previous = ctx.state.get('page_layout_inputs')
+    ctx.state['page_layout_inputs'] = inputs
+    from publication_profile import TEXT_PAGE_CHARS
+    language = str(ctx.project['book'].get('language', 'en')).split('-')[0]
+    ctx.state['page_capacity_estimate'] = page_budget.estimated_capacity(inputs, TEXT_PAGE_CHARS.get(language, TEXT_PAGE_CHARS['default']))
+    if previous is not None and previous != inputs:
+        reopen(ctx.state, 'layout', 'Resolved page geometry or typography changed; re-render and measure actual PDF pages')
+
+
+def advance(max_steps=80, stage=None, restart=False, agent_overrides=None):
     project, state = load_state()
     ctx = Context(project, state)
+    if stage in workflow.STAGES:
+        state['stage_protocol'] = 1
+    if stage is not None: state['execution_stage'] = stage
+    selected = state.get('execution_stage', 'all')
+    if agent_overrides: state.setdefault('agent_overrides', {}).update(agent_overrides)
+    if state['blockers'] and state['status'] == 'blocked' and not restart:
+        save_state(state)
+        return state, [], ['BLOCKED — see blockers; after resolving run bookorder unblock']
+    if restart:
+        if selected not in workflow.STAGES: raise ValueError('--restart requires write, design or render')
+        if selected != 'write' and workflow.check_frozen(): raise ValueError('Manuscript handoff missing or changed; resume write first')
+        reopen(state, workflow.STAGES[selected][0], f'{selected} stage restarted')
+        state['blockers'] = []
+        for key in list(state.get('reported', {})):
+            if selected == 'write' or key == 'layout-review' or (selected == 'design' and (key == 'design' or key.startswith(('asset:', 'assets:')))):
+                state['reported'].pop(key, None)
+        if selected == 'write':
+            state['accepted'] = {}; state['reviewed_hashes'] = {}
+            state['counters']['page_feedback_rounds'] = 0
+            previous_request = state.pop('revision_request', None)
+            if previous_request:
+                previous_request['status'] = 'superseded_by_write_restart'
+                write_json(ROOT / 'plan/manuscript-revision-request.json', previous_request)
+            state['redraft_chapters'] = {cid: digest for cid, digest in chapter_hashes(ctx).items() if digest}
+    refresh_page_inputs(ctx)
     tasks = []; info = []
     refresh_editorial_plan_dependency(state)
     if state["blockers"] and state["status"] == "blocked":
         return state, [], ["BLOCKED — see blockers; after resolving run `bookorder unblock`"]
     for _ in range(max_steps):
         # A completed publication is re-verified on every call: persisted "complete" flags are never trusted alone.
-        current = next((p for p in PHASES if state["phases"][p] != "complete"), "complete")
+        order = workflow.phase_order(state, PHASES)
+        current = next((p for p in order if state["phases"][p] != "complete"), "complete")
+        if workflow.separated(project, state):
+            if state.get('revision_request'):
+                if selected not in ('write', 'all'):
+                    state['status'] = 'waiting_for_write'; info.append('Writer revision pending; run bookorder write.'); break
+                tasks = [workflow.revision_task(ctx)]; state['status'] = 'running'; break
+            if workflow.stage_of(current) != 'write':
+                if not (ROOT / 'handoff/manifest.json').is_file(): workflow.freeze(project)
+                changed = workflow.check_frozen()
+                if changed:
+                    state['status'] = 'waiting_for_write'
+                    info.append('Frozen manuscript changed: ' + ', '.join(changed) + '. Restore it or explicitly restart write.'); break
+            if selected in workflow.STAGES and current not in workflow.STAGES[selected]:
+                if order.index(current) < order.index(workflow.STAGES[selected][0]):
+                    state['status'] = 'waiting_for_' + workflow.stage_of(current)
+                    info.append('Prerequisite stage incomplete; run bookorder ' + workflow.stage_of(current) + '.')
+                else:
+                    state['status'] = 'stage_complete'; info.append(selected + ' stage complete. Publication may still be incomplete.')
+                break
         if current == "complete" and state["phases"]["complete"] == "complete":
             gates = completion_gates(ctx, include_package=True)
             failing = [g for g in gates if not g["passed"]]
@@ -1411,10 +1529,11 @@ def advance(max_steps=80):
             if current == "editorial_planning":
                 state.setdefault("artifact_fingerprints", {})["editorial_plan"] = editorial_plan_fingerprint()
             set_phase(state, current, "complete")
+            if workflow.separated(project, state) and current == 'final_audit': workflow.freeze(project)
             if current == "complete": state["status"] = "complete"; break
             continue
         if result.tasks:
-            state["status"] = "running"; tasks = result.tasks
+            state["status"] = "running"; tasks = [workflow.attach_task(t, project, state) for t in result.tasks]
             for item in tasks:
                 if item["kind"] == "agent":
                     for skill in item["skills"] or [None]:
@@ -1424,6 +1543,7 @@ def advance(max_steps=80):
     else:
         info.append("Step limit reached; run bookorder goal again")
     save_state(state)
+    tasks = [t if t.get('role') else workflow.attach_task(t, project, state) for t in tasks]
     write_summary(ctx)
     return state, tasks, info
 
@@ -1431,6 +1551,16 @@ def advance(max_steps=80):
 def report_done(identifier, note=None):
     project, state = load_state()
     ctx = Context(project, state)
+    if identifier == 'manuscript-revision': workflow.complete_revision(ctx)
+    if identifier.startswith('draft:'):
+        chapter = identifier.split(':', 1)[1]
+        original = state.get('redraft_chapters', {}).get(chapter)
+        if original:
+            if chapter_hashes(ctx).get(chapter) == original: raise ValueError('Write restart requires a revised chapter, not the unchanged previous draft')
+            if (ROOT / 'handoff/manifest.json').is_file():
+                protected = workflow.protected_sections_changed(project)
+                if protected: raise ValueError('Protected section changed: ' + protected)
+            state['redraft_chapters'].pop(chapter)
     record = {"at": now(), "note": note}
     if identifier.startswith("reaudit:"):
         record["hash"] = chapter_hashes(ctx).get(identifier.split(":", 1)[1])
@@ -1482,8 +1612,13 @@ def write_summary(ctx):
     summary = {
         "generated_at": now(), "publication_status": state["status"], "current_phase": state["phase"],
         "complete": state["status"] == "complete",
-        "phases": [{"phase": p, "state": state["phases"][p], **state["phase_times"].get(p, {})} for p in PHASES],
+        "phases": [{"phase": p, "state": state["phases"][p], **state["phase_times"].get(p, {})} for p in workflow.phase_order(state, PHASES)],
+        "execution_stage": state.get('execution_stage', 'all'),
+        "page_count": build.get('page_count') if build else None,
+        "handoff": 'handoff/manifest.json' if (ROOT / 'handoff/manifest.json').is_file() else None,
+        "revision_request": state.get('revision_request'),
         "scale": state["scale"],
+        "page_layout_inputs": state.get('page_layout_inputs'), "page_capacity_estimate": state.get('page_capacity_estimate'),
         "sources": {"supplied": registry.counts(index, "supplied"), "discovered": registry.counts(index, "discovered"),
                     "post_draft": sum(1 for s in index["sources"] if s.get("post_draft"))},
         "searches_logged": len(__import__("research").search_entries()),
@@ -1525,9 +1660,14 @@ def status_text(state, tasks, info):
     lines = []
     status = state["status"].upper()
     lines.append(f"STATUS: {status}   phase: {state['phase']}")
-    done = [p for p in PHASES if state["phases"][p] == "complete"]
-    lines.append(f"phases complete: {len(done)}/{len(PHASES)}  (" + ", ".join(f"{p}={state['phases'][p]}" for p in PHASES if state['phases'][p] != 'pending') + ")")
+    order = workflow.phase_order(state, PHASES)
+    done = [p for p in order if state["phases"][p] == "complete"]
+    lines.append(f"phases complete: {len(done)}/{len(order)}  (" + ", ".join(f"{p}={state['phases'][p]}" for p in order if state['phases'][p] != 'pending') + ")")
     for item in info: lines.append("note: " + item)
+    pages_path = ROOT / 'reports/page-count.json'
+    if pages_path.is_file():
+        import page_budget
+        lines.append(page_budget.summary(json.loads(pages_path.read_text(encoding='utf-8'))))
     for blocker in state.get("blockers", []): lines.append(f"BLOCKER [{blocker['category']}]: {blocker['detail']}")
     if state["status"] == "complete":
         lines.append("Publication COMPLETE. Deliverables: publish/, interchange/, publish/result.zip. See execution-summary.json.")
@@ -1541,6 +1681,7 @@ def status_text(state, tasks, info):
         lines.append(f"\nNEXT TASKS ({len(tasks)}){' — independent tasks in the same parallel_group may run in parallel' if len(agent) > 1 else ''}:")
         for item in tasks:
             lines.append(f"\n## {item['id']} — {item['title']}" + (f"  [group: {item['parallel_group']}]" if item["parallel_group"] else ""))
+            if item.get('role'): lines.append(f"Role: {item['role']}  Agent assignment: {json.dumps(item.get('agent'), ensure_ascii=False)} (executed by your host)")
             if item["skills"]: lines.append("Read: " + ", ".join(item["skills"]))
             if item.get("user_intent"):
                 import user_intent
@@ -1551,5 +1692,7 @@ def status_text(state, tasks, info):
             if item["outputs"]: lines.append("Outputs: " + ", ".join(item["outputs"][:12]))
             if item["failing_checks"]: lines.append("Currently failing: " + " | ".join(str(c) for c in item["failing_checks"][:12]))
             lines.append(f"When finished: {item['done']}" if item["kind"] == "agent" else "Then run: bookorder goal")
-    lines.append("\nDo not stop: after each task run `bookorder done <id>` (or `bookorder goal`) until STATUS: COMPLETE.")
+    if state.get('execution_stage', 'all') != 'all':
+        lines.append('\nAfter each task run bookorder done <id>; stop at STATUS: STAGE_COMPLETE. Use the next stage command to continue.')
+    else: lines.append("\nDo not stop: after each task run `bookorder done <id>` (or `bookorder goal`) until STATUS: COMPLETE.")
     return "\n".join(lines)

@@ -45,7 +45,14 @@ Verified on Windows with Node.js, Python 3.12, Pandoc 3.11 and Typst 0.15.1.
 - At a 390px viewport, the chapter layout has no horizontal page overflow; figures and tables remain within the page.
 - All five sample PDF pages were rendered with Poppler and visually inspected: title page, publication-information page, table of contents, chapter pages, running title, page numbers, code, table, figure, footnote and bibliography are legible.
 
-## Scope and limits
+## Writing/design separation and PDF page feedback (2026-10-01)
+
+- Regression checks cover explicit `chars_per_text_page` overrides, column/typography/geometry inputs, real PDF page counts including blank pages, and target-versus-actual reports.
+- Stage tests cover immutable manuscript/citation handoffs, portable ZIP continuation, role-based agent assignments, partial restarts, protected sections and writer revision requests with revised chapter budgets.
+- `python tests/stages_e2e.py` completes writing, exports and extracts a handoff into another folder, completes design and all publication outputs, and confirms unchanged manuscript hashes. Its actual 12-page PDF against an 8-page target also returns a revision request to the writer when feedback is enabled.
+- Existing orchestration/citation tests, the original mini E2E, frontend tests and production build pass. These fixtures use scripted author responses; external model execution and long-book page convergence have not been verified.
+
+## Existing fixture limitations
 
 This is a short pipeline fixture, not a completed 50–400-page book or a comparison of external agent capabilities. The agent authoring instructions are supplied, but actual long-form research and editorial quality depend on the executing agent.
 

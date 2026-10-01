@@ -91,6 +91,7 @@ export function projectData(form: BookForm, names: string[], files: SourceFile[]
     format: 'portable-publishing-job', format_version: '0.2',
     book: { title: form.title.trim(), description: form.description, target_readers: form.targetReaders, target_pages: form.targetPages, language },
     user_instructions: form.instructions, research: form.research, figures: form.figures,
+    workflow: { separated: true, agents: {} },
     citations: form.bibliography ? citationPayload(form.citationStyle, form.bibliography) : { style: form.citationStyle },
     outputs: { ...form.outputs, canonical_markdown: true },
     runtime: { target: form.runtimeTarget, bundled: form.runtimeTarget !== 'none' },

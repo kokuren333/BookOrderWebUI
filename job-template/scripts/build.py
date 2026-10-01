@@ -258,6 +258,10 @@ def epub_check(path):
 
 
 def build(theme=None):
+    import workflow
+    if (ROOT / 'handoff/manifest.json').is_file():
+        changed = workflow.check_frozen()
+        if changed: raise ValueError('Frozen manuscript/content changed; finish writer revision first: ' + ', '.join(changed))
     project = read_project(); outputs = project['outputs']
     spec = load_design(theme)
     if theme:
@@ -315,9 +319,14 @@ def build(theme=None):
         pandoc(absolute_images(prepare_ast(ir, 'docx'), raster=True), '-t', 'docx', '--reference-doc', reference, '--toc', '-o', path)
         docx_styles(path, tokens)
     if outputs.get('semantic_html'): semantic_html(html_doc, project, tokens)
-    layout = None
+    layout = None; page_count = None
     if outputs.get('pdf'):
         renderer(tokens['pdf_backend']).render(ir, tokens, ROOT / 'publish/book.pdf', layout_definition)
+        import page_budget
+        page_count = page_budget.measure(project)
+        if page_count['actual_pages'] is None:
+            raise RuntimeError('PDF page measurement failed: ' + page_count.get('error', 'unknown'))
+        print(page_budget.summary(page_count))
         if not project['book'].get('preview'): layout = measure_layout(tokens)
     if outputs.get('epub'):
         path = ROOT / 'publish/book.epub'
@@ -331,7 +340,7 @@ def build(theme=None):
     hashes = artifact_hashes(project)
     report('build-report.json', {'ok': True, 'fingerprint': fingerprint(), 'theme': tokens['theme'],
         'outputs': [p.relative_to(ROOT).as_posix() for p in output_paths(project)], 'artifact_hashes': hashes, 'notes': notes, 'diagrams': diagrams,
-        'layout': layout, 'layout_capabilities': capabilities, 'style_check': style_findings['summary'],
+        'layout': layout, 'page_count': page_count, 'layout_capabilities': capabilities, 'style_check': style_findings['summary'],
         'art_direction_check': art_check['summary'], 'image_assets_check': image_check['summary'], 'figures': figures})
     print('Build complete. Inspect publications, then run validate.py and package.py.')
 

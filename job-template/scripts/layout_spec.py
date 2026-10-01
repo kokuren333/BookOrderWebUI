@@ -245,13 +245,20 @@ def renderer_issues(spec, renderer="typst"):
 
 
 def load_or_create(project=None, profile=None, design=None):
-    if PATH.is_file(): return validate(yaml_data(PATH))
     project = project or read_project()
+    marker = PATH.with_name('layout-request.json')
+    inputs = {'request': request(project), 'design_page': (design or {}).get('page', {})}
+    previous = json.loads(marker.read_text(encoding='utf-8')) if marker.is_file() else None
+    if PATH.is_file() and (previous is None or previous == inputs):
+        if previous is None:
+            marker.write_text(json.dumps(inputs, ensure_ascii=False, sort_keys=True), encoding='utf-8')
+        return validate(yaml_data(PATH))
     spec = resolve(project, profile, design)
     if requested(project) and (project.get("outputs") or {}).get("pdf", True):
         issues = renderer_issues(spec)
         if issues: raise LayoutSpecError(issues)
     write_yaml(PATH, spec, "LayoutSpec: geometry and writing flow. Edit this file after initial resolution.")
+    marker.write_text(json.dumps(inputs, ensure_ascii=False, sort_keys=True), encoding='utf-8')
     return spec
 
 

@@ -167,7 +167,7 @@ def page_basis(project, design):
     return size, round(width * height / A5_AREA_MM2, 3)
 
 
-def resolve(project, design=None):
+def resolve(project, design=None, layout=None, style=None):
     """The resolved profile (a dict). Deterministic: no clock, no environment beyond the arguments and data files."""
     design = design or {}
     ask = request(project)
@@ -189,10 +189,21 @@ def resolve(project, design=None):
     language = str((project.get("book") or {}).get("language", "en")).split("-")[0].lower()
     size, area = page_basis(project, design); density = (design.get("layout") or {}).get("density", "standard")
     overrides = dict(ask["overrides"])
+    explicit_per_page = overrides.pop("scale.chars_per_text_page", None)
+    if explicit_per_page is not None:
+        errors = []
+        _check('scale.chars_per_text_page', explicit_per_page, SPEC['scale']['chars_per_text_page'], errors)
+        if errors: raise ValueError('; '.join(errors))
     for path in [p for p in overrides if p.startswith("scale.")]:
         if path != "scale.target_body_chars": _set(profile, path, overrides.pop(path))
-    per_page = overrides.pop("scale.chars_per_text_page", None) or TEXT_PAGE_CHARS.get(language, TEXT_PAGE_CHARS["default"]) * area * DENSITY.get(density, 1.0)
-    if ask["compatibility"]["characters_per_page"]:  # legacy: effective characters per page, devices included
+    import page_budget
+    physical = page_budget.layout_inputs(project, design, layout, style)
+    physical_model = bool(project.get("layout_spec") or project.get("layout_preset") or design.get("typography") or
+                          (project.get("workflow") or {}).get("separated"))
+    baseline = TEXT_PAGE_CHARS.get(language, TEXT_PAGE_CHARS["default"])
+    per_page = explicit_per_page if explicit_per_page is not None else (
+        page_budget.estimated_capacity(physical, baseline) if physical_model else baseline * area * DENSITY.get(density, 1.0))
+    if explicit_per_page is None and ask["compatibility"]["characters_per_page"]:  # legacy: effective characters per page, devices included
         per_page = float(ask["compatibility"]["characters_per_page"]) / (1 - scale["nonprose_share_target"])
     per_page = round(float(per_page))
     front = scale["front_matter_pages"]
@@ -214,7 +225,7 @@ def resolve(project, design=None):
     if origin.startswith("book.target_pages"): resolved_from.append(f"project.json {origin} (compatibility: body size)")
 
     inputs = {"tier": tier, "genre": genre, "request": {k: ask[k] for k in ("tier", "genre", "overrides", "compatibility")},
-              "language": language, "page_size": size, "density": density}
+              "language": language, "page_size": size, "density": density, "layout": physical}
     if size not in PAGE_AREA: inputs["page_area"] = area
     fingerprint = "sha256:" + hashlib.sha256(json.dumps(inputs, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()[:24]
     result = {"schema": SCHEMA, "id": f"{ask['tier']}.{ask['genre'] or 'general'}", "tier": ask["tier"], "genre": ask["genre"] or "general",
