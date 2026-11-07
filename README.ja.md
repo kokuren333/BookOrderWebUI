@@ -42,6 +42,20 @@ WebUI自体はAgentを実行せず、URLのページも取得しません。ダ�
 
 本文での引用形式と巻末リストの書式・グループ分けは別々に設定します。事実の根拠として使った`evidence`は引用文献に掲載します。`background`は執筆時の参照にとどまり、読者向け一覧に出るのは`further_reading`に指定した資料だけです。
 
+## Claude Code オーケストレーション（既定のAgent構成）
+
+WebUIの「Agent構成」で **Claude Code が統括・執筆・デザイン／調査は Codex CLI に委譲** を選ぶと（既定）、ジョブに `CLAUDE.md` と `.claude/commands/`（`/book`、`/book-design`）が入ります。ZIPを展開したフォルダーをClaude Codeで開き、`/book` と入力します。
+
+- **役割分担**：Claudeがジョブ全体を統括し、構成・本文・デザインを担当します。資料の取得とWeb調査、資料ノート、章ごとのエビデンスマップ、ファクトチェック、デザイン参考書籍の収集、挿絵の生成は、Claudeが `bookorder delegate …` / `bookorder images …` でCodex CLI（`codex exec`）を呼び出して行います。Codexは本文を書かず、構造化された根拠を返します。
+- **資料は任意**：「調査要件」に集めて欲しい情報と根拠の基準を書けば、Claudeが調査計画（`plan/research-brief.md`）を立て、Codexが一次情報と信頼できる二次情報を探します。
+- **引用資料と参考資料**：事実・数値・科学的知見の根拠は `evidence`（本文で引用し、引用したものだけを巻末の引用文献に掲載）、一般的な知見は `background`（執筆時の参照のみ・非掲載）として区別します。
+- **エビデンス検証**：執筆前にエビデンスマップ（主張・出典・該当箇所・原文引用・根拠の強さ）を作り、執筆後にCodexのファクトチェックと機械的検証（`bookorder evidence verify`：引用文が実際に資料本文に存在するか、引用先がevidenceか）を行います。章の監査とゲート24はこれが通るまで完了しません。
+- **文体**：根拠の強さに見合った断定で書き、保険的な定型句を減らします（`skills/authoring/voice.md`、`bookorder voice`）。
+- **ハーネスの緩さ**：事実・引用・ユーザーの指示・出力形式・ページ目標・可読性は厳守し、編集計画の装置数・テキストの壁・アートディレクションのずれ・構成QAは助言扱いにします（`workflow.strictness: "strict"` で従来どおり）。
+- **デザインは対話で**：参考書籍の選定と公開サンプルページの収集（`bookorder delegate design-refs`）→ 方向性の提案 → 実際の誌面プルーフ（`bookorder proof`、参考書籍との比較 `compare.html`）→ 自然言語のフィードバック → ユーザーの承認（`bookorder design-approve`）で確定します。本専用テーマ（`bookorder theme fork`）も作れます。
+- **挿絵の統一**：承認したデザインから画像スタイルシート（`plan/image-style.md`）を作り、候補（`bookorder images samples`）からスタイルアンカー画像を選ぶと、すべての生成画像がそのスタイルと画像を参照して作られます。配色適合度とコンタクトシート（`proofs/images.html`）で全体をレビューします。
+- Codex CLIのインストールとログインが、Agentを実行するマシンに必要です。このモードを選ぶと、ジョブの資料はCodexのモデル提供元に送られます。
+
 ## 出版ジョブのアーキテクチャ
 
 WebUIは入力をZIPにまとめ、展開後のジョブはAI Agentが実行します。BookOrderのintent-driven architectureは固定の章テンプレートに本文を流し込むのではなく、ユーザーの意図、読者、出版物タイプ、資料の役割から本ごとの構成を設計します。

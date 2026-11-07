@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { defaults, generateJob, uniqueNames, urlLines, urlUsageOf, validateForm, type BookForm } from './job';
+import { AGENT_SETUPS, CLAUDE_PROMPT, CLAUDE_PROMPT_TEXT, GOAL_PROMPT, defaults, generateJob, uniqueNames, urlLines, urlUsageOf, validateForm, type AgentSetup, type BookForm } from './job';
 import { loadTemplates } from './templates';
 import { loadRuntime, runtimeCatalog, runtimeTargets, type RuntimeCatalog, type RuntimeTarget } from './runtime';
 import { InfoPages, type InfoPage } from './InfoPages';
@@ -79,6 +79,7 @@ export default function App() {
             <small>資料は役割ごとに扱いが異なります。根拠資料は本文で引用できます。背景資料は執筆時だけ参照し、本文や巻末一覧には掲載しません。読者に紹介する資料は「読者向け参考資料」を選ぶと、本文では引用せず参考資料一覧に掲載します。構成参考・レイアウト参考・素材・再作図元も役割に応じて扱います。「推定」はファイル名からの推定で、未指定の役割はAgentが資料を読んで見直します。</small></>
             : <p className="empty-files">まだファイルは添付されていません。</p>}
           <p className="privacy">ファイルはブラウザ内でのみ処理し、生成するPublishing Job ZIPに含めます。サーバーには送信しません。</p>
+          <label>Research requirements — 調査要件（任意）<textarea value={form.researchRequirements} onChange={e => field('researchRequirements', e.target.value)} placeholder="集めて欲しい情報と根拠の基準。例：国内外の診療ガイドラインと系統的レビューを優先。統計は2020年以降の公的統計。法令は条文を一次資料として引用。英語文献も可。個人ブログ・まとめサイトは根拠に使わない。" rows={4} /><small>資料を自分で全部用意する必要はありません。Agentがこの要件と本の目的から調査計画を立て、一次情報と信頼できる二次情報を探して集めます。事実・数値・科学的知見の根拠（引用資料）は本文で引用して巻末の引用文献に載せ、一般的な知見の参考資料は執筆時に参照するだけで巻末には載せません。</small></label>
           <label>Additional user instructions — 本全体への優先指示<textarea value={form.instructions} onChange={e => field('instructions', e.target.value)} placeholder="文体・語り口、説明の濃さ、難易度、章構成、扱う／扱わないテーマ、重点を置く論点、取り上げる事例、図表で示す内容、「教科書的にしない」「章末まとめは付けない」など、この本固有の希望を書いてください。" rows={6} /><small>この欄は本全体に対する優先指示です。入力内容は原文のまま保存され、調査・構成・執筆・編集・デザイン・最終確認の各工程でAgentへ毎回そのまま渡されます。文体、説明の濃さ、扱う／扱わない内容、構成、事例などは、BookOrderの既定方針（章末まとめ・反論の併記・教科書的な補助要素など）よりこの指示を優先します。</small><small>ただし、この画面で選んだ規模・出力・判型・レイアウト・デザインの設定と、引用・事実性・安全性・ビルドの成立に関する必須条件は上書きしません。矛盾する場合は黙って無視せず、最終レポートに記録します。</small></label>
         </section>
         <ArchitectureSection value={form.architecture} uiMode={form.uiMode} intentText={`${form.instructions}\n${form.description}`} onChange={value => field('architecture', value)} />
@@ -88,6 +89,15 @@ export default function App() {
           onChange={next => { setForm(prev => ({ ...prev, ...(next.publication ? { publication: next.publication } : {}), ...(next.design ? { design: next.design } : {}) })); setSuccess(''); }} /></div>
         {form.uiMode === 'quick' && <p className="quick-mode-note">判型・デザイン・引用形式・調査方針は既定値を使います（Advanced publishing で変更できます）。</p>}
         <section><div className="section-heading"><span>07</span><h2>Agentが実行する環境</h2></div>
+          <label>Agent構成<select value={form.agentSetup} onChange={e => field('agentSetup', e.target.value as AgentSetup)}>{Object.entries(AGENT_SETUPS).map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select>
+            <small>{form.agentSetup === 'claude-codex'
+              ? 'Claude Codeがジョブ全体を統括し、本文を執筆します。資料の取得・Web調査・資料ノート・章ごとのエビデンスマップ・ファクトチェックは、Claudeが `bookorder delegate` でCodex CLIを呼び出して実行します（同じマシンにCodex CLIのインストールとログインが必要。資料はCodexのモデル提供元に送られます）。デザインはClaudeとの対話で、実際の誌面プルーフを見ながら決め、あなたの承認で確定します。下のデザイン設定は出発点になります。'
+              : 'どのAgentでも、同じAgentが調査から組版まで全工程を実行します。'}</small></label>
+          {form.agentSetup === 'claude-codex' && <>
+            <label>参考にしたい書籍（任意）<textarea value={form.designReferences.books} onChange={e => field('designReferences', { ...form.designReferences, books: e.target.value })} placeholder="誌面の参考にしたい本の書名（1行に1冊）。空欄ならAgentがジャンルに合う本を選びます。" rows={2} /></label>
+            <label className="check"><input type="checkbox" checked={form.designReferences.autoCollect} onChange={e => field('designReferences', { ...form.designReferences, autoCollect: e.target.checked })} />参考書籍をAgentが選び、公開されているサンプルページ画像を集めてデザインの参考にする</label>
+            <label className="check"><input type="checkbox" checked={form.figures.generative_images} onChange={e => field('figures', { ...form.figures, generative_images: e.target.checked })} />挿絵・章扉イラストを Codex CLI の画像生成で作る（本のデザインから作る画像スタイルシートとスタイルアンカー画像に合わせて生成）</label>
+          </>}
           <label>OS / CPU<select value={form.runtimeTarget} onChange={e => field('runtimeTarget', e.target.value as RuntimeTarget)}>{runtimeTargets.map(target => <option key={target.id} value={target.id}>{target.label}</option>)}<option value="none">同梱なし · 既存の実行環境を使用</option></select></label>
           {form.runtimeTarget !== 'none' ? <><p>Python・Pandoc・Typst・日本語フォントを同梱します。Agentが実行するマシンのOSとCPUを選んでください。</p><small>インストールや追加ダウンロードは不要です。対応ソース・ライセンス通知もZIPに含めます。Linuxはglibc 2.17以降が対象です。</small>{catalog && <small>同梱データ：約{Math.ceil((catalog.shared.bytes + (catalog.platforms.find(p => p.id === form.runtimeTarget)?.pack.bytes || 0)) / 1024 / 1024)} MB（ダウンロードZIPは圧縮されます）</small>}{!catalog && <p role="status">{catalogError || '実行環境一覧を読み込み中…'}</p>}</> : <small>Agent側にPython・Pandoc・Typstが必要です。</small>}
         </section>
@@ -95,8 +105,10 @@ export default function App() {
       {errors.length > 0 && <div className="error" role="alert" tabIndex={-1} ref={errorRef}>{errors.map(error => <p key={error}>{error}</p>)}</div>}
       <p className="download-info">ダウンロード前に <a href="#contents">同梱物・ライセンス</a> と <a href="#safety">安全性・データの扱い</a> を確認できます。</p>
       <div className="generate"><div><strong>出版ジョブをダウンロード</strong><p>Agentの実行は、この画面では行いません。</p>{busy && <small role="status">{stage}</small>}</div><button type="submit" disabled={busy}>{busy ? (stage === 'ZIPを生成中' ? `ZIPを生成中… ${progress}%` : '実行環境を準備中…') : 'Generate Publishing Job'}</button></div>
-      {success && <div className="success" role="status"><p>{success}</p><code>/goal AGENTS.mdを読み、bookorder goal が STATUS: COMPLETE を表示するまで出版ジョブを最後まで実行してください。</code><small>Codexでは /goal で1回指示するだけです。他のAgentでは同じ文をそのまま依頼してください。途中の「続けて」は不要です。</small></div>}
+      {success && <div className="success" role="status"><p>{success}</p>{form.agentSetup === 'claude-codex'
+        ? <><code>{CLAUDE_PROMPT}</code><small>ZIPを展開した <code>publishing-job</code> フォルダーをClaude Codeで開き、<code>{CLAUDE_PROMPT}</code> と入力します（または「{CLAUDE_PROMPT_TEXT}」と依頼）。デザインを詰めるときは <code>/book-design 落ち着いた雰囲気で</code> のように話しかけてください。</small></>
+        : <><code>{GOAL_PROMPT}</code><small>Codexでは /goal で1回指示するだけです。他のAgentでは同じ文をそのまま依頼してください。途中の「続けて」は不要です。</small></>}</div>}
     </form>
-    <footer>ZIPを展開 → Codex / Claude Code / Gemini CLI等で開く → /goal で1回指示 → BookOrderが全工程を管理 → publish/result.zipを受け取る</footer>
+    <footer>ZIPを展開 → Claude Codeで開いて /book（調査はCodexに委譲・デザインは対話）、または任意のAgentで /goal → BookOrderが全工程を管理 → publish/result.zipを受け取る</footer>
   </main>;
 }

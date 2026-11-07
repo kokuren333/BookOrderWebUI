@@ -94,6 +94,8 @@ def request_from_asset(asset, style, layout, *, provider=None):
            "density": style["visual_grammar"]["rhythm"], "composition_tendency": style["imagery"]["composition"],
            "illustration_style": style["imagery"]["realism"], "photography_preference": style["imagery"]["realism"],
            "background_treatment": style["imagery"]["palette_relationship"], "imagery": style["imagery"]}
+    import image_style
+    art.update(image_style.binding())  # style sheet / anchor hashes: changing the image style regenerates the images
     payload = {"schema": REQUEST_SCHEMA, "request_id": "igr-" + str(asset["id"]), "asset_id": str(asset["id"]),
                "purpose": str(asset.get("purpose") or ""), "semantic_role": str(asset.get("role") or "editorial_illustration"),
                "chapter_id": str(asset.get("chapter") or ""), "slot_id": str(asset.get("device") or asset["id"]),
@@ -169,6 +171,9 @@ class FakeImageProvider(ImageGenerationProvider):
 def provider_for(project):
     name = ((project.get("image_generation") or {}).get("provider") or "none").lower()
     if name == "fake": return FakeImageProvider()
+    if name == "codex":
+        import image_style
+        return image_style.CodexImageProvider(project)
     if name in ("none", "disabled"): return PendingProvider()
     raise ValueError(f"Image provider {name!r} is not installed; no real API is called")
 
@@ -302,7 +307,7 @@ def check(plan_assets, decisions, *, root=None, write=True):
                            "detail": reason, "required": required})
     result = {"schema": "bookorder/image-assets-check@1", "summary": {"high": sum(c["severity"] == "high" for c in checks),
               "medium": sum(c["severity"] == "medium" for c in checks), "status": "fail" if any(c["severity"] == "high" for c in checks) else "warn" if checks else "pass"},
-              "checks": checks, "provider_activity": {"real_api_requests": 0, "available_adapters": ["fake", "pending"]},
+              "checks": checks, "provider_activity": {"real_api_requests": 0, "available_adapters": ["fake", "pending", "codex"]},
               "routed_to_imagegen": [a["id"] for a in plan_assets if a.get("type") == "image" and decisions.get(str(a.get("id"))) == "accepted"],
               "not_routed": [{"id": a.get("id"), "type": a.get("type"), "decision": decisions.get(str(a.get("id")))}
                              for a in plan_assets if a.get("type") != "image" or decisions.get(str(a.get("id"))) != "accepted"]}

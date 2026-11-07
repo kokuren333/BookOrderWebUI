@@ -8,6 +8,9 @@ export interface BookForm {
   title: string; description: string; targetReaders: string; language: string;
   targetPages: number; instructions: string; urls: string;
   runtimeTarget: RuntimeTarget;
+  agentSetup: AgentSetup;                              // who runs the job (project.json workflow)
+  researchRequirements: string;                        // what to collect / evidence standard (project.json research.requirements)
+  designReferences: { books: string; autoCollect: boolean }; // reference books for the design dialogue (Claude mode)
   design: DesignOptions;
   publication: PublicationOptions;
   research: { allow_web_research: boolean; prefer_primary_sources: boolean; keep_provenance: boolean; require_supplied_coverage: boolean };
@@ -19,8 +22,25 @@ export interface BookForm {
   figures: { tables: boolean; diagrams: boolean; charts: boolean; generative_images: boolean };
   outputs: { canonical_markdown: true; docx: boolean; semantic_html: boolean; pdf: boolean; static_site: boolean; epub: boolean };
 }
+/** claude-codex: Claude Code orchestrates, writes and designs with the user; Codex CLI does research via `bookorder delegate`.
+ *  generic: the provider-neutral job (any agent runs every task itself). */
+export type AgentSetup = 'claude-codex' | 'generic';
+export const AGENT_SETUPS: Record<AgentSetup, string> = {
+  'claude-codex': 'Claude Code が統括・執筆・デザイン（対話）／ 調査は Codex CLI に委譲（推奨）',
+  generic: '任意のAgentが全工程を実行（Codex /goal など）',
+};
+export function workflowPayload(setup: AgentSetup | undefined) {
+  if (setup !== 'claude-codex') return { separated: true, agents: {} };
+  return { separated: true, mode: 'claude-orchestrated',
+    agents: { orchestrator: 'claude-code', researcher: 'codex-cli', writer: 'claude-code', designer: 'claude-code', reviewer: 'claude-code' },
+    delegate: { cli: 'codex', search: true, sandbox: 'workspace-write', network: true, model: null, reasoning_effort: null, timeout_minutes: 45, extra_args: [] },
+    evidence_maps: true, design_dialogue: true };
+}
+export const CLAUDE_PROMPT = '/book';
+export const CLAUDE_PROMPT_TEXT = 'CLAUDE.mdを読み、bookorder goal が STATUS: COMPLETE を表示するまで出版ジョブを実行してください。調査はbookorder delegateでCodexに委譲し、デザイン工程では私と対話してください。';
+export const GOAL_PROMPT = '/goal AGENTS.mdを読み、bookorder goal が STATUS: COMPLETE を表示するまで出版ジョブを最後まで実行してください。';
 export const defaults: BookForm = {
-  title: '', description: '', targetReaders: '', language: 'ja', targetPages: 150, instructions: '', urls: '', runtimeTarget: 'windows-x64',
+  title: '', description: '', targetReaders: '', language: 'ja', targetPages: 150, instructions: '', urls: '', runtimeTarget: 'windows-x64', agentSetup: 'claude-codex', researchRequirements: '', designReferences: { books: '', autoCollect: true },
   design: structuredClone(defaultDesign),
   publication: structuredClone(defaultPublication),
   research: { allow_web_research: true, prefer_primary_sources: true, keep_provenance: true, require_supplied_coverage: true },
@@ -90,8 +110,12 @@ export function projectData(form: BookForm, names: string[], files: SourceFile[]
   return {
     format: 'portable-publishing-job', format_version: '0.2',
     book: { title: form.title.trim(), description: form.description, target_readers: form.targetReaders, target_pages: form.targetPages, language },
-    user_instructions: form.instructions, research: form.research, figures: form.figures,
-    workflow: { separated: true, agents: {} },
+    user_instructions: form.instructions, research: researchPayload(form), figures: form.figures,
+    ...(form.agentSetup === 'claude-codex' ? {
+      design_references: { books: (form.designReferences?.books ?? '').trim(), auto_collect: form.designReferences?.autoCollect !== false },
+      // Codex CLI imagegen, bound to plan/image-style.md and the style anchor; used only for accepted illustrative images.
+      image_generation: { provider: 'codex', model: null, timeout_minutes: 15 } } : {}),
+    workflow: workflowPayload(form.agentSetup),
     citations: form.bibliography ? citationPayload(form.citationStyle, form.bibliography) : { style: form.citationStyle },
     outputs: { ...form.outputs, canonical_markdown: true },
     runtime: { target: form.runtimeTarget, bundled: form.runtimeTarget !== 'none' },
@@ -105,6 +129,11 @@ export function projectData(form: BookForm, names: string[], files: SourceFile[]
 }
 /** input.sources (content, with role metadata) and input.assets (not content). A file with an asset role that is also
  *  content (e.g. a PDF used as evidence and redrawn) is listed in sources with its asset_role. */
+/** research settings; the user's free-text research requirements travel verbatim when written. */
+export function researchPayload(form: BookForm) {
+  const requirements = (form.researchRequirements ?? '').trim();
+  return requirements ? { ...form.research, requirements: form.researchRequirements } : form.research;
+}
 export function inputPayload(form: BookForm, names: string[], files: SourceFile[]) {
   const sources = []; const assets = [];
   for (let i = 0; i < files.length; i++) {
@@ -166,6 +195,9 @@ export async function generateJob(form: BookForm, files: SourceFile[], templates
     if (path === 'bookorder.cmd' && form.runtimeTarget !== 'none' && !form.runtimeTarget.startsWith('windows')) continue;
     if (path === 'bookorder' && form.runtimeTarget.startsWith('windows')) continue;
     if (path === 'run.sh' && (form.runtimeTarget === 'none' || form.runtimeTarget.startsWith('windows'))) continue;
+    // Claude Code project files: shipped as .claude/ (dot folders are not globbed from the template) and only for Claude jobs.
+    if ((path === 'CLAUDE.md' || path.startsWith('claude-code/')) && form.agentSetup !== 'claude-codex') continue;
+    if (path.startsWith('claude-code/')) { root.file('.claude/' + path.slice('claude-code/'.length), text); continue; }
     root.file(path, text, path === 'run.sh' || path === 'bookorder' ? { unixPermissions: 0o100755 } : undefined);
   }
   if (runtime) for (const [path, data] of Object.entries(runtime.files)) {
@@ -184,7 +216,7 @@ export async function generateJob(form: BookForm, files: SourceFile[], templates
   }
   const requested = ['profile', 'layout_preset', 'layout_spec', 'style_preset', 'style_controls', 'style_bible'].filter(key => key in project);
   const preset = PUBLICATION_PRESETS[(form.publication ?? defaultPublication).publicationPreset];
-  root.file('TASK.md', `# Publishing task\n\n## Title\n${form.title}\n\n## Goal\n${form.description}\n\n## Target readers\n${form.targetReaders}\n\n## Language\n${form.language}\n\n## Expected scale\nApproximately ${form.targetPages} pages. This is a planning guide, not a fixed PDF page count.\n\n## Provided sources\n${names.map((n, i) => '- ' + (form.architecture ? filePath(files[i], n) : 'input/sources/' + n)).join('\n') || '(No uploaded files)'}\n\n### URLs\n${urlLines(form.urls).join('\n') || '(No URLs)'}\n\n## Research policy\n${JSON.stringify(form.research, null, 2)}\nIf additional web research is disabled, use only provided files and explicitly supplied URLs. Do not discover additional sources.\n\n## Requested outputs\n${Object.entries(project.outputs).filter(([, v]) => v).map(([key]) => '- ' + key).join('\n')}\n\n## Publication format\n${requested.length ? 'Requested in project.json (' + requested.join(', ') + ')' + (preset ? ', starting from the WebUI publication preset "' + preset.label + '"' : '') + '. BookOrder resolves it into plan/profile.resolved.yaml, plan/layout-spec.yaml and plan/style-bible.yaml; check it with `bookorder publication`.' : 'Theme defaults (no explicit publication request).'} Theme and typography: book.design.yaml.\n\n## Figure policy\n${JSON.stringify(form.figures, null, 2)}\n\n## Citations and bibliography\n${JSON.stringify(project.citations, null, 2)}\nHow the text cites and how the back matter lists are separate settings (docs/publication-architecture.md).\n\n${architectureTask(form, names, files)}## Additional user instructions (verbatim)\n${form.instructions}\n\n## Precedence of settings\nThe additional user instructions above are the book-specific instruction from the user. BookOrder repeats them verbatim in every task it prints; they are never replaced by a summary. From strongest to weakest:\n\n1. Invariants: factual accuracy, citation integrity, source provenance, safety, build validity and the requested outputs. No instruction waives them.\n2. Explicit user choices, each authoritative for what it states:\n   - the structured settings (project.json, book.design.yaml and the plan files resolved from them) for the fields they represent: scale, outputs, page size, layout and the design values selected in the WebUI;\n   - the additional user instructions for the editorial and semantic choices they state: voice and tone, distance to the reader, difficulty, explanation density, topics to cover or leave out, emphasis, cases, structure, what to show as figures or tables, and chapter apparatus such as summaries, exercises or counterarguments.\n3. Derived decisions: the resolved publication profile, Book Bible, outline and editorial plans, which must follow 1 and 2.\n4. BookOrder defaults and Skill heuristics (genre and tier defaults such as chapter summaries, device counts, balanced framing or teaching scaffolding), which fill only what the user left unspecified.\n\nDo not improve the book against the user's explicit intent. A genre preset does not outrank the instructions: with the Medical preset and \"no routine chapter-end summaries\" in the instructions, the chapters get no routine summary. A structured setting does: if the WebUI selects A5 and the instructions ask for A4, the book stays A5. If an instruction cannot be followed (it conflicts with an invariant or a structured setting, the sources do not support it, or it is technically impossible), do not ignore it silently: record the conflict in plan/user-intent.yaml and tell the user in your final report. See docs/user-intent.md.\n\n## How this job runs\nOne instruction runs the whole publication. With Codex: \`/goal AGENTS.mdを読み、bookorder goal が STATUS: COMPLETE を表示するまで出版ジョブを最後まで実行してください。\` BookOrder's orchestrator (\`bookorder goal\`) owns every phase and alone decides completion; a built PDF is not a finished publication.\n`);
+  root.file('TASK.md', `# Publishing task\n\n## Title\n${form.title}\n\n## Goal\n${form.description}\n\n## Target readers\n${form.targetReaders}\n\n## Language\n${form.language}\n\n## Expected scale\nApproximately ${form.targetPages} pages. This is a planning guide, not a fixed PDF page count.\n\n## Provided sources\n${names.map((n, i) => '- ' + (form.architecture ? filePath(files[i], n) : 'input/sources/' + n)).join('\n') || '(No uploaded files)'}\n\n### URLs\n${urlLines(form.urls).join('\n') || '(No URLs)'}\n\n## Research policy\n${JSON.stringify(form.research, null, 2)}${(form.researchRequirements ?? '').trim() ? '\n\n## Research requirements (verbatim)\n' + form.researchRequirements + '\nWhat to collect and the evidence standard. The agent finds the sources itself; the user does not have to supply them. Evidence (facts, numbers, scientific findings, recommendations) is cited and listed in the cited references; background (general knowledge) is read but neither cited nor listed.' : ''}${form.agentSetup === 'claude-codex' ? '\n\n## Design references\n' + ((form.designReferences?.books ?? '').trim() ? 'Books the user named: ' + form.designReferences.books.trim() + '\n' : '') + (form.designReferences?.autoCollect !== false ? 'The agent lists further reference books and collects public sample pages (bookorder delegate design-refs) before proposing a design.' : 'Use only the references the user supplies.') : ''}\nIf additional web research is disabled, use only provided files and explicitly supplied URLs. Do not discover additional sources.\n\n## Requested outputs\n${Object.entries(project.outputs).filter(([, v]) => v).map(([key]) => '- ' + key).join('\n')}\n\n## Publication format\n${requested.length ? 'Requested in project.json (' + requested.join(', ') + ')' + (preset ? ', starting from the WebUI publication preset "' + preset.label + '"' : '') + '. BookOrder resolves it into plan/profile.resolved.yaml, plan/layout-spec.yaml and plan/style-bible.yaml; check it with `bookorder publication`.' : 'Theme defaults (no explicit publication request).'} Theme and typography: book.design.yaml.\n\n## Figure policy\n${JSON.stringify(form.figures, null, 2)}\n\n## Citations and bibliography\n${JSON.stringify(project.citations, null, 2)}\nHow the text cites and how the back matter lists are separate settings (docs/publication-architecture.md).\n\n${architectureTask(form, names, files)}## Additional user instructions (verbatim)\n${form.instructions}\n\n## Precedence of settings\nThe additional user instructions above are the book-specific instruction from the user. BookOrder repeats them verbatim in every task it prints; they are never replaced by a summary. From strongest to weakest:\n\n1. Invariants: factual accuracy, citation integrity, source provenance, safety, build validity and the requested outputs. No instruction waives them.\n2. Explicit user choices, each authoritative for what it states:\n   - the structured settings (project.json, book.design.yaml and the plan files resolved from them) for the fields they represent: scale, outputs, page size, layout and the design values selected in the WebUI;\n   - the additional user instructions for the editorial and semantic choices they state: voice and tone, distance to the reader, difficulty, explanation density, topics to cover or leave out, emphasis, cases, structure, what to show as figures or tables, and chapter apparatus such as summaries, exercises or counterarguments.\n3. Derived decisions: the resolved publication profile, Book Bible, outline and editorial plans, which must follow 1 and 2.\n4. BookOrder defaults and Skill heuristics (genre and tier defaults such as chapter summaries, device counts, balanced framing or teaching scaffolding), which fill only what the user left unspecified.\n\nDo not improve the book against the user's explicit intent. A genre preset does not outrank the instructions: with the Medical preset and \"no routine chapter-end summaries\" in the instructions, the chapters get no routine summary. A structured setting does: if the WebUI selects A5 and the instructions ask for A4, the book stays A5. If an instruction cannot be followed (it conflicts with an invariant or a structured setting, the sources do not support it, or it is technically impossible), do not ignore it silently: record the conflict in plan/user-intent.yaml and tell the user in your final report. See docs/user-intent.md.\n\n## How this job runs\n${form.agentSetup === 'claude-codex' ? 'Claude-orchestrated (CLAUDE.md). Open this folder in Claude Code and run \`/book\` (or send: ' + CLAUDE_PROMPT_TEXT + '). Claude runs the orchestrator, writes the book and designs it with the user; research, evidence maps and fact checks are delegated to Codex CLI with \`bookorder delegate\`. Choosing this mode authorizes the delegate to read this job\'s sources and send them to its model provider. ' : 'One instruction runs the whole publication. With Codex: \`' + GOAL_PROMPT + '\` '}BookOrder's orchestrator (\`bookorder goal\`) owns every phase and alone decides completion; a built PDF is not a finished publication.\n`);
   for (const path of ['input/sources', 'input/assets', 'research', 'plan', 'source/manuscript', 'source/assets/figures', 'source/assets/images', 'source/assets/generated', 'source/metadata/chapters', 'interchange', 'publish', 'reports']) root.file(`${path}/.gitkeep`, '');
   root.file('source/references/references.bib', '% Add verified BibTeX records here.\n');
   for (const [file, key] of [['outline', 'chapters'], ['glossary', 'terms'], ['sources', 'sources'], ['figures', 'figures']]) root.file(`source/metadata/${file}.yaml`, `${key}: []\n`);

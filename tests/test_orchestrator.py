@@ -21,7 +21,8 @@ BASE = REPO / ".test-output/unit"
 MODULES = ["workflow", "page_budget", "layout_spec", "style_bible", "visual_grammar", "publication_request", "art_direction_qa", "common", "crossref", "sources", "research", "planning", "manuscript", "assets", "audit", "citations", "orchestrator",
            "design", "diagrams", "book_ir", "schema", "validate", "build", "package", "check_env",
            "publication_profile", "pacing", "layout_metrics", "figure_spec", "figure_check", "chartkit", "visual_review", "editorial_plan", "user_intent",
-           "publication_architecture", "source_roles", "bibliography", "visual_plan", "architecture_qa", "skills"]
+           "publication_architecture", "source_roles", "bibliography", "visual_plan", "architecture_qa", "skills",
+           "claude_mode", "delegate", "proof", "voice_check", "cli"]
 
 
 def make_job(name, pages=300, language="ja", urls=(), files=(), web_research=True, coverage=True):

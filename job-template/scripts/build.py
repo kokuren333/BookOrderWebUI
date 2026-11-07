@@ -257,12 +257,17 @@ def epub_check(path):
     return "epubcheck passed" if checker else "container, manifest, spine, XHTML, link and archive checks passed; epubcheck unavailable"
 
 
-def build(theme=None):
+def build(theme=None, proof=False):
+    """Build every requested output. `proof=True` (bookorder proof) typesets the PDF only, for design iteration; its
+    build report is marked not ok so the layout phase always makes a full build afterwards."""
     import workflow
     if (ROOT / 'handoff/manifest.json').is_file():
         changed = workflow.check_frozen()
         if changed: raise ValueError('Frozen manuscript/content changed; finish writer revision first: ' + ', '.join(changed))
     project = read_project(); outputs = project['outputs']
+    if proof:
+        outputs = {key: key in ('pdf', 'canonical_markdown') for key in outputs} | {'pdf': True}
+        project = {**project, 'outputs': outputs}
     spec = load_design(theme)
     if theme:
         # Preserve the selected design in result.zip so a later default build reproduces it.
@@ -337,6 +342,15 @@ def build(theme=None):
     import art_direction_qa
     art_check = art_direction_qa.run(visual_language, tokens,
         pdf_path=ROOT / 'publish/book.pdf' if outputs.get('pdf') else False)
+    if proof:
+        report('proof-build.json', {'ok': True, 'proof': True, 'theme': tokens['theme'], 'page_count': page_count, 'layout': layout,
+            'art_direction_check': art_check['summary'], 'style_check': style_findings['summary']})
+        stale = ROOT / 'reports/build-report.json'
+        if stale.is_file():  # a proof replaces publish/book.pdf: the previous full build is no longer current
+            previous = json.loads(stale.read_text(encoding='utf-8')); previous['ok'] = False; previous['superseded_by_proof'] = True
+            stale.write_text(json.dumps(previous, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+        print('Proof PDF built (PDF only).')
+        return
     hashes = artifact_hashes(project)
     report('build-report.json', {'ok': True, 'fingerprint': fingerprint(), 'theme': tokens['theme'],
         'outputs': [p.relative_to(ROOT).as_posix() for p in output_paths(project)], 'artifact_hashes': hashes, 'notes': notes, 'diagrams': diagrams,

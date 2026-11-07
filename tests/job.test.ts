@@ -61,7 +61,29 @@ test('generated job includes complete executable template, exact source bytes an
     assert.deepEqual([...png.slice(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
   }
   const task = await zip.file(root + 'TASK.md')!.async('string');
-  assert.ok(task.includes('## Additional user instructions (verbatim)\n' + form.instructions + '\n')); assert.ok(task.includes('/goal'));
+  assert.ok(task.includes('## Additional user instructions (verbatim)\n' + form.instructions + '\n')); assert.ok(task.includes('/book') && task.includes('bookorder delegate'));
+  // Claude-orchestrated by default: CLAUDE.md and the Claude Code project folder ship, routing is in project.json.
+  assert.equal(project.workflow.mode, 'claude-orchestrated'); assert.equal(project.workflow.agents.researcher, 'codex-cli');
+  for (const path of ['CLAUDE.md', '.claude/commands/book.md', '.claude/commands/book-design.md', '.claude/settings.json', 'scripts/delegate.py', 'scripts/claude_mode.py', 'scripts/proof.py', 'skills/authoring/voice.md', 'skills/design/design-dialogue.md'])
+    assert.ok(zip.file(root + path), path);
+  assert.ok(!Object.keys(zip.files).some(name => name.startsWith(root + 'claude-code/')));
+  const generic = await JSZip.loadAsync((await generateJob({ ...form, agentSetup: 'generic' }, files, await templateFiles())).data);
+  assert.ok(!generic.file(root + 'CLAUDE.md') && !generic.file(root + '.claude/commands/book.md'));
+  assert.ok((await generic.file(root + 'TASK.md')!.async('string')).includes('/goal'));
+  assert.deepEqual(JSON.parse(await generic.file(root + 'project.json')!.async('string')).workflow, { separated: true, agents: {} });
+  // Research requirements travel verbatim; design references and Codex imagegen are configured for Claude jobs only.
+  const asked = { ...form, researchRequirements: 'ガイドラインと系統的レビューを優先。\n個人ブログは根拠にしない。', designReferences: { books: '『理科系の作文技術』', autoCollect: true } };
+  const askedZip = await JSZip.loadAsync((await generateJob(asked, files, await templateFiles())).data);
+  const askedProject = JSON.parse(await askedZip.file(root + 'project.json')!.async('string'));
+  assert.equal(askedProject.research.requirements, asked.researchRequirements);
+  assert.deepEqual(askedProject.design_references, { books: '『理科系の作文技術』', auto_collect: true });
+  assert.equal(askedProject.image_generation.provider, 'codex');
+  const askedTask = await askedZip.file(root + 'TASK.md')!.async('string');
+  assert.ok(askedTask.includes('## Research requirements (verbatim)\n' + asked.researchRequirements) && askedTask.includes('## Design references'));
+  for (const path of ['scripts/evidence_verify.py', 'scripts/image_style.py', 'skills/research/evidence-research.md', 'skills/design/image-style.md', 'docs/research-brief.md'])
+    assert.ok(askedZip.file(root + path), path);
+  const genericProject = JSON.parse(await generic.file(root + 'project.json')!.async('string'));
+  assert.ok(!('design_references' in genericProject) && !('image_generation' in genericProject) && !('requirements' in genericProject.research));
   for (const path of ['scripts/orchestrator.py', 'scripts/sources.py', 'scripts/research.py', 'scripts/planning.py', 'scripts/audit.py', 'scripts/skills.py', 'scripts/prose_signals.py', 'config/prose-signals/ja.json', 'skills/research/source-ingestion.md', 'skills/quality/audit.md', 'skills/editorial/prose-audit.md', 'skills/editorial/whole-book-review.md', 'skills/editorial/developmental-editing.md', 'skills/editorial/cadence-editing.md', 'templates/csl/numeric.csl', 'research/.gitkeep', 'plan/.gitkeep']) assert.ok(zip.file(root + path), path);
   for (const file of files) assert.deepEqual(await zip.file(root + 'input/sources/' + file.name)!.async('uint8array'), file.data);
   await mkdir('.test-output', { recursive: true }); await writeFile('.test-output/generated-job.zip', result.data);
@@ -137,7 +159,7 @@ test('file picker snapshots the live FileList before the input is reset (attachm
 // ---------------------------------------------------------------- IA revision: single authorities, presets, precedence
 import { designFromTheme, defaultDesign } from '../src/design.ts';
 import { applyPublicationPreset, autoTier, designPage, effectivePublication, presetDeviations, requestPayload } from '../src/publication.ts';
-import { jobDesign, projectData, templateTheme } from '../src/job.ts';
+import { jobDesign, projectData, templateTheme, workflowPayload } from '../src/job.ts';
 
 const themeYaml = async (theme: string) => JSON.parse(await readFile(`job-template/themes/${theme}/theme.yaml`, 'utf8'));
 const themeOf = async (theme: string) => templateTheme({ [`themes/${theme}/theme.yaml`]: await readFile(`job-template/themes/${theme}/theme.yaml`, 'utf8') }, theme)!;
@@ -212,12 +234,12 @@ test('generated project.json and book.design.yaml stay compatible with the previ
     const expected = await golden(name);
     // Every field of the previous WebUI is unchanged. New jobs add the publication architecture (AUTO by default) and
     // decoupled citation / bibliography settings; the legacy citations.style value stays as it was.
-    const { publication_architecture, citations, workflow, ...rest } = projectData(form, [], [], modern) as Record<string, unknown>;
+    const { publication_architecture, citations, workflow, design_references, image_generation, ...rest } = projectData(form, [], [], modern) as Record<string, unknown>;
     const { citations: oldCitations, ...expectedRest } = expected.project;
     assert.deepEqual(rest, expectedRest, name);
     assert.equal((citations as { style: string }).style, oldCitations.style, name);
     assert.deepEqual(publication_architecture, { mode: 'auto' }, name);
-    assert.deepEqual(workflow, { separated: true, agents: {} }, name);
+    assert.deepEqual(workflow, workflowPayload(form.agentSetup), name);
     assert.equal((citations as { in_text_citation_style: string }).in_text_citation_style, oldCitations.style, name);
     assert.deepEqual(jobDesign(form, modern), expected.design, name);
   }

@@ -42,6 +42,19 @@ No single phrase or source role is a verdict about a source. In Advanced publish
 
 In-text citation style and bibliography formatting/grouping are separate choices. Evidence sources used for factual claims belong in cited references. Background materials stay private to the authoring process. Only sources assigned `further_reading` are eligible for the reader-facing Further reading list.
 
+## Claude Code orchestration (default agent setup)
+
+With **Agent setup → Claude Code orchestrates, writes and designs / research delegated to Codex CLI** (the default), the job ships `CLAUDE.md` and `.claude/commands/` (`/book`, `/book-design`). Open the extracted folder in Claude Code and type `/book`.
+
+- Claude runs the job, plans and writes the book and designs it. Source fetching and web research, per-source notes, chapter evidence maps, fact checks, design reference collection and illustrations are delegated to Codex CLI (`codex exec`) through `bookorder delegate …` / `bookorder images …`; Codex returns structured evidence, never prose.
+- Sources are optional: the research requirements field states what to collect and the evidence standard; Claude writes `plan/research-brief.md` and Codex finds primary and trustworthy secondary sources.
+- Evidence (facts, numbers, scientific findings) is cited and only cited evidence is listed; background (general knowledge) is read but neither cited nor listed.
+- Evidence maps before drafting; Codex fact checks and the deterministic `bookorder evidence verify` (quotes really occur in the source text, citations point to evidence) after drafting; gate 24 requires both.
+- A light harness: facts, citations, user intent, outputs, page target and legibility are enforced; editorial-plan device counts, text-wall pacing, art-direction drift and architecture QA are advisory (`workflow.strictness: "strict"` restores blocking).
+- Design is a dialogue with the user: reference books and public sample pages (`bookorder delegate design-refs`), directions, real proof pages (`bookorder proof`, `compare.html`), feedback, approval (`bookorder design-approve`); book-specific themes via `bookorder theme fork`.
+- Generated illustrations follow an image style sheet derived from the approved design and a chosen style-anchor image; a palette-conformance check and a contact sheet keep them one series.
+- Codex CLI must be installed and signed in on the agent's machine; choosing this setup sends the job's sources to Codex's model provider.
+
 ## What happens in the publishing job
 
 The WebUI creates a ZIP; the agent runs the job in the extracted folder. BookOrder's intent-driven architecture plans each book from the user's intent, audience, publication type, and source roles instead of applying a fixed chapter template.

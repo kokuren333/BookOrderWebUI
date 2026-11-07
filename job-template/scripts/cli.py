@@ -6,7 +6,11 @@ Feedback:     pages | revision request --reason ... [--chapter ch-id]
 Sources:      source list | fetch | submit | confirm | accept-partial | unavailable | add
 Research:     research log | research status
 Audit:        audit resolve <id> --note ... [--wontfix] | audit report
-Design:       build [--theme] | fonts | theme list | theme preview <name>
+Design:       build [--theme] | fonts | theme list | theme preview <name> | theme fork <base> [<name>]
+Claude mode:  delegate <task-id> | delegate evidence|factcheck <chapter> | delegate ask "<question>"
+              proof [--pages 3,10-11] | design-approve --user-approval "..." | voice [--chapter ch-id]
+              delegate design-refs | evidence verify [--chapter ch-id]
+              images samples [--count 3] | images anchor <png> | images check | images sheet
 """
 import argparse
 from contextlib import redirect_stdout, nullcontext
@@ -134,17 +138,84 @@ def main():
     commands.add_parser('fonts')
     theme = commands.add_parser('theme'); sub_theme = theme.add_subparsers(dest='theme_command', required=True)
     sub_theme.add_parser('list'); show = sub_theme.add_parser('preview'); show.add_argument('name')
+    fork = sub_theme.add_parser('fork', help='Copy a theme to themes/<name>/ for free editing and select it in book.design.yaml')
+    fork.add_argument('base'); fork.add_argument('name', nargs='?', default='book'); fork.add_argument('--no-select', action='store_true')
+
+    dele = commands.add_parser('delegate', help='Run a research task with the research delegate (Codex CLI) - Claude-orchestrated jobs')
+    dele.add_argument('target', help='a task id from bookorder goal, or: evidence | factcheck | ask')
+    dele.add_argument('argument', nargs='?', help='chapter id (evidence/factcheck) or the question (ask)')
+    dele.add_argument('--note', help='extra instruction, e.g. what to redo'); dele.add_argument('--dry-run', action='store_true')
+    dele.add_argument('--timeout', type=float, help='minutes'); dele.add_argument('--json', action='store_true')
+    prf = commands.add_parser('proof', help='Typeset the PDF with the current design and export representative pages as PNG (proofs/)')
+    prf.add_argument('--pages', help='e.g. 3,10-11 (default: chosen from the measured layout)'); prf.add_argument('--ppi', type=int, default=110)
+    prf.add_argument('--no-build', action='store_true'); prf.add_argument('--label')
+    apr = commands.add_parser('design-approve', help="Record the user's approval of the current design (design dialogue)")
+    apr.add_argument('--user-approval', required=True, help="the user's own words"); apr.add_argument('--note')
+    voi = commands.add_parser('voice', help='Advisory report of hedging / boilerplate density per chapter')
+    voi.add_argument('--chapter'); voi.add_argument('--json', action='store_true')
+    evi = commands.add_parser('evidence', help='Deterministic evidence-map and citation verification').add_subparsers(dest='evidence_command', required=True)
+    ver = evi.add_parser('verify'); ver.add_argument('--chapter'); ver.add_argument('--json', action='store_true')
+    img = commands.add_parser('images', help='Generated-image style: samples, anchor, palette check, contact sheet').add_subparsers(dest='images_command', required=True)
+    smp = img.add_parser('samples', help='Style-anchor candidates from plan/image-style.md (Codex imagegen)')
+    smp.add_argument('--count', type=int, default=3); smp.add_argument('--subject')
+    anc = img.add_parser('anchor', help='Fix the style anchor every image is generated against'); anc.add_argument('path')
+    img.add_parser('check', help='Palette conformance of generated images'); img.add_parser('sheet', help='proofs/images.html contact sheet')
     args = parser.parse_args()
 
     if args.command in ('goal', 'next', 'write', 'design', 'render'):
         agents = {}
         for assignment in getattr(args, 'agent', []):
             role, sep, value = assignment.partition('=')
-            if not sep or role not in ('writer', 'designer', 'reviewer') or not value.strip():
-                raise ValueError('--agent expects writer|designer|reviewer=assignment')
+            if not sep or role not in ('writer', 'designer', 'reviewer', 'researcher') or not value.strip():
+                raise ValueError('--agent expects writer|designer|reviewer|researcher=assignment')
             agents[role] = value
         return print_goal(args.json, 'all' if args.command == 'goal' else None if args.command == 'next' else args.command,
                           getattr(args, 'restart', False), agents)
+    if args.command == 'delegate':
+        import delegate
+        meta = delegate.run(args.target, args.argument, args.note, args.dry_run, args.timeout)
+        if args.json: print(json.dumps(meta, ensure_ascii=False, indent=2))
+        elif not meta.get('dry_run'): print(delegate.summary_text(meta))
+        return 0 if meta.get('dry_run') or meta.get('status') == 'ok' else 1
+    if args.command == 'proof':
+        import proof
+        manifest, folder = proof.make(args.pages, args.ppi, not args.no_build, args.label)
+        print(proof.summary(manifest, folder)); return 0
+    if args.command == 'design-approve':
+        import orchestrator, claude_mode
+        project, state = orchestrator.load_state()
+        approval = claude_mode.approve_design(state, args.user_approval, args.note)
+        orchestrator.log_event('design', 'user_approval', user_approval=args.user_approval, fingerprint=approval['fingerprint'])
+        orchestrator.save_state(state)
+        print('Design approval recorded for the current design files. Changing them later needs a new approval.'); return 0
+    if args.command == 'evidence':
+        import evidence_verify
+        report = evidence_verify.run(args.chapter)
+        print(json.dumps(report, ensure_ascii=False, indent=2) if args.json else evidence_verify.text(report))
+        return 1 if report['summary']['high'] else 0
+    if args.command == 'images':
+        import image_style, style_bible
+        from common import read_project
+        from design import load_design
+        project = read_project()
+        style = style_bible.load_or_resolve(project=project, design=load_design())
+        if args.images_command == 'samples':
+            made = image_style.samples(project, style, args.count, args.subject)
+            image_style.contact_sheet(style['palette'])
+            print('Style-anchor candidates:\n' + '\n'.join('  ' + m for m in made) +
+                  '\nOpen them (and proofs/images.html), choose one with the user, then: bookorder images anchor <file>')
+        elif args.images_command == 'anchor':
+            print(f"Style anchor: {image_style.set_anchor(args.path).relative_to(ROOT).as_posix()} — every image request now references it.")
+        elif args.images_command == 'check':
+            report = image_style.check(style['palette'])
+            for item in report['images']: print(f"{item['file']}: palette {item.get('score')} {item.get('off_palette_colours') or ''}")
+        else:
+            print(image_style.contact_sheet(style['palette']).relative_to(ROOT).as_posix())
+        return 0
+    if args.command == 'voice':
+        import voice_check
+        results = voice_check.analyse(args.chapter)
+        print(json.dumps(results, ensure_ascii=False, indent=2) if args.json else voice_check.text(results)); return 0
     if args.command == 'pages':
         import page_budget
         from common import read_project
@@ -251,6 +322,16 @@ def main():
         orchestrator.reopen(state, 'architecture', f"publication profile changed to {profile['id']}")
         orchestrator.save_state(state); return 0
     if args.command == 'source':
+        with registry_lock(args.source_command != 'list'):
+            return source_command(args)
+    if args.command == 'research':
+        with registry_lock(args.research_command == 'log'):
+            return research_command(args)
+    return other_command(args)
+
+
+def source_command(args):
+    if True:
         import sources
         c = args.source_command
         if c == 'list':
@@ -281,7 +362,10 @@ def main():
             s = sources.get(sources.load_index(), s['id'])
             print(f"{s['id']}: {s['ingest_status']} {s.get('chars', 0)} characters" + (f" (duplicate of {s['duplicate_of']})" if s.get('duplicate_of') else '') + ('' if s['ingest_status'] in sources.USABLE else f" — limitations: {'; '.join(s.get('limitations', []))}"))
         return 0
-    if args.command == 'research':
+
+
+def research_command(args):
+    if True:
         import research
         if args.research_command == 'log':
             rejected = [dict(zip(('url', 'reason'), (item.split('=', 1) + [''])[:2])) for item in args.rejected]
@@ -290,6 +374,9 @@ def main():
         else:
             print('\n'.join(research.check_research_plan()) or 'Supplementary research plan passes')
         return 0
+
+
+def other_command(args):
     if args.command == 'audit':
         import audit
         if args.audit_command == 'resolve':
@@ -329,8 +416,58 @@ def main():
         print(json.dumps(available_fonts(), ensure_ascii=False, indent=2))
     elif args.theme_command == 'list':
         print('\n'.join(path.parent.name for path in sorted((ROOT / 'themes').glob('*/theme.yaml'))))
+    elif args.theme_command == 'fork':
+        fork_theme(args.base, args.name, not args.no_select)
     else: preview(args.name)
     return 0
+
+
+def fork_theme(base, name, select=True):
+    """A book-specific theme: a copy of `base` under a new name, free to rewrite (CSS modules and typst/theme.typ)."""
+    import re
+    from design import theme_path
+    source = theme_path(base)
+    if not re.fullmatch(r'[a-z][a-z0-9-]*', name): raise ValueError('Theme name: lowercase letters, digits and hyphens')
+    target = ROOT / 'themes' / name
+    if target.exists(): raise ValueError(f'themes/{name} already exists; edit it directly or choose another name')
+    shutil.copytree(source, target, ignore=shutil.ignore_patterns('preview.png'))
+    meta = json.loads((target / 'theme.yaml').read_text(encoding='utf-8')); meta['theme'] = name
+    (target / 'theme.yaml').write_text(json.dumps(meta, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+    if select:
+        spec_path = ROOT / 'book.design.yaml'
+        spec = json.loads(spec_path.read_text(encoding='utf-8')) if spec_path.is_file() else {}
+        spec['theme'] = name
+        spec_path.write_text(json.dumps(spec, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+    print(f'themes/{name}/ created from {base}' + (' and selected in book.design.yaml' if select else '') +
+          '. Edit theme.yaml (defaults), css/*.css (HTML/EPUB/site) and typst/theme.typ (PDF) freely; run bookorder proof to see it.')
+
+
+class registry_lock:
+    """Serialise commands that rewrite research/index.json or the search log (parallel delegates call them)."""
+    def __init__(self, active=True):
+        self.active = active; self.path = ROOT / '.build/registry.lock'; self.fd = None
+
+    def __enter__(self):
+        if not self.active: return self
+        import os, time
+        self.path.parent.mkdir(parents=True, exist_ok=True); deadline = time.monotonic() + 600
+        while True:
+            try:
+                self.fd = os.open(self.path, os.O_CREAT | os.O_EXCL | os.O_WRONLY); os.write(self.fd, str(os.getpid()).encode()); return self
+            except FileExistsError:
+                try:
+                    if time.time() - self.path.stat().st_mtime > 900: self.path.unlink(); continue  # stale (crashed holder)
+                except FileNotFoundError: continue
+                if time.monotonic() > deadline: raise RuntimeError('Registry busy (.build/registry.lock); retry')
+                time.sleep(0.5)
+
+    def __exit__(self, *exc):
+        if self.active and self.fd is not None:
+            import os
+            os.close(self.fd)
+            try: self.path.unlink()
+            except FileNotFoundError: pass
+        return False
 
 
 if __name__ == '__main__':

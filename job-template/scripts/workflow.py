@@ -149,9 +149,12 @@ def export(path, root=None):
 
 
 def attach_task(item, project, state):
+    import claude_mode
     role = 'writer' if item.get('id') == 'manuscript-revision' or str(item.get('id', '')).startswith('expand:') else role_of(item["phase"])
-    agents = {**((project.get("workflow") or {}).get("agents") or {}), **state.get("agent_overrides", {})}
+    role = claude_mode.role(item, project) or role
+    agents = {**claude_mode.agents(project), **state.get("agent_overrides", {})}
     item.update(stage=stage_of(item["phase"]), role=role, agent=agents.get(role))
+    claude_mode.decorate(item, project)
     if separated(project, state) and item["stage"] != "write":
         item["inputs"] = list(dict.fromkeys(item["inputs"] + ["handoff/manifest.json"]))
         item["instructions"] = item["instructions"] + [

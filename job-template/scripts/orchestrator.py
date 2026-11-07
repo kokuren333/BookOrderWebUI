@@ -489,6 +489,8 @@ def h_editorial_planning(ctx):
     chapters = ctx.outline()
     result = ep.run(chapters, project=ctx.project)
     stopping = ep.blocking(ep.all_findings(result))
+    import claude_mode
+    if claude_mode.light(ctx.project): stopping = [f for f in stopping if f["severity"] == "error"]
     if stopping:
         by_chapter = {}
         for f in stopping: by_chapter.setdefault(f.get("chapter") or "book", []).append(f)
@@ -582,7 +584,9 @@ def h_drafting(ctx):
     import citations
     citations.generate()
     chapters = ctx.outline(); mapped = ctx.by_chapter()
-    done = {c["id"] for c in chapters if drafted(c, mapped.get(c["id"]), ctx) and c['id'] not in ctx.state.get('redraft_chapters', {})}
+    import claude_mode
+    done = {c["id"] for c in chapters if drafted(c, mapped.get(c["id"]), ctx) and c['id'] not in ctx.state.get('redraft_chapters', {})
+            and not claude_mode.drafting_problems(ctx.project, c["id"])}
     tasks = []; waiting = []
     waves = {}
     for chapter in chapters:
@@ -597,6 +601,7 @@ def h_drafting(ctx):
         problems += ([f"only {current} characters; a first full draft needs at least {int(0.5 * chapter['minimum_characters'])}"] if record and current < 0.5 * chapter["minimum_characters"] else []) + check_summary(chapter["id"])
         from planning import summary_path
         problems += intent_check_errors(ctx, summary_path(chapter["id"]))
+        problems += claude_mode.drafting_problems(ctx.project, chapter["id"])
         tasks.append(task(f"draft:{chapter['id']}", "drafting", f"Draft {chapter['id']} — {chapter['title']} ({chapter['target_characters']:,} characters)", [
             *(['Explicit write restart: redraft this chapter from the existing sources. Preserve protected sections and factual/citation integrity.']
               if chapter['id'] in ctx.state.get('redraft_chapters', {}) else []),
@@ -825,6 +830,9 @@ def h_asset_generation(ctx):
         workflow.request_revision(ctx.project, ctx.state, 'Unresolved manuscript slots require writer content before design can continue.')
         return Result(info='Slot completion requested from writer.')
     if filling: return Result(tasks=filling)
+    import claude_mode
+    review = claude_mode.image_review_task(ctx.project, ctx.state, style)
+    if review: return Result(tasks=[task(*review)])
     return Result(done=True)
 
 
@@ -866,6 +874,8 @@ def h_audit(ctx):
     for chapter in ctx.outline():
         path = ROOT / f"plan/audit/{chapter['id']}.yaml"
         errors = audit.check_review_file(path, [chapter["id"]])
+        import claude_mode
+        errors += claude_mode.audit_problems(ctx.project, chapter)
         if errors or not agent_reported(ctx.state, f"audit:{chapter['id']}"):
             tasks.append(task(f"audit:{chapter['id']}", "audit", f"Audit {chapter['id']}", [
                 f"Audit {chapter['file']} against its sources (packet + research/notes) and the Book Bible: factual consistency, unsupported claims, citation/source mismatch, contradictions, terminology drift, inconsistent definitions, repeated explanations, duplicated examples, dependency errors, transitions, figure/table/equation consistency, notation.",
@@ -1038,6 +1048,8 @@ def h_design(ctx):
     decisions = ROOT / "plan/design-decisions.yaml"
     errors += intent_check_errors(ctx, decisions)
     errors += layout_reference_design_errors(ctx, decisions)
+    import claude_mode
+    errors += claude_mode.design_dialogue_errors(ctx.project, ctx.state)
     if errors or not decisions.is_file() or not agent_reported(ctx.state, "design"):
         art = ""
         try: art = load_design().get("art_direction", "")
@@ -1047,8 +1059,9 @@ def h_design(ctx):
             "Translate the direction into book.design.yaml (theme, page, typography roles, colors, layout density, component variants, figure style). Use custom.css / custom.typ only for what the Design Spec cannot express.",
             "Run `bookorder fonts` if you change fonts; unavailable fonts fall back (reports/design-report.json).",
             "Write plan/design-decisions.yaml: theme, decisions: [{direction, spec_change}], overrides: [...], notes.",
-            *design_architecture_lines(ctx)],
-            outputs=["book.design.yaml", "plan/design-decisions.yaml"], checks=errors)])
+            *design_architecture_lines(ctx), *claude_mode.design_task_lines(ctx.project)],
+            outputs=["book.design.yaml", "plan/design-decisions.yaml"] + (["plan/design-dialogue.md"] if claude_mode.design_dialogue(ctx.project) else []),
+            checks=errors)])
     return Result(done=True)
 
 
@@ -1140,6 +1153,8 @@ def layout_pacing(ctx):
     audit.update_ledger(pacing.ledger_issues(result), "layout", ctx.manuscript_fingerprint())
     log_event("layout", "pacing", verdict=result["verdict"], high=result["summary"].get("high", 0))
     if result["verdict"] == "pass": return None
+    import claude_mode
+    if claude_mode.light(ctx.project) and not any(f["rule"] == "layout_unmeasured" for f in result["findings"]): return None
     high = [f for f in result["findings"] if f["severity"] == "high"]
     if any(f["rule"] == "layout_unmeasured" for f in high):
         return Result(tasks=[task("fix-layout-metrics", "layout", "Make the layout measurable", [high[0]["detail"]], checks=[high[0]["detail"][:300]])])
@@ -1346,6 +1361,11 @@ def completion_gates(ctx, include_package=True):
     gate(22, "User intent governed the book", intent["passed"], intent["detail"], intent["phase"], "user intent")
     arch_gate = architecture_gate(ctx, chapters)
     gate(23, "Publication architecture QA", arch_gate["passed"], arch_gate["detail"], arch_gate["phase"], "publication architecture")
+    import claude_mode
+    if claude_mode.active(ctx.project):
+        evidence = claude_mode.evidence_gate(ctx.project, ctx.outline())
+        gate(24, "Evidence mapped and verified", evidence["passed"], evidence["detail"], "audit", "citation errors")
+    claude_mode.relax_gates(ctx.project, gates)
     if include_package:
         from common import output_paths
         target = ROOT / "publish/result.zip"
@@ -1544,6 +1564,10 @@ def advance(max_steps=80, stage=None, restart=False, agent_overrides=None):
         info.append("Step limit reached; run bookorder goal again")
     save_state(state)
     tasks = [t if t.get('role') else workflow.attach_task(t, project, state) for t in tasks]
+    try:  # `bookorder delegate <task-id>` reads the tasks exactly as they were printed
+        (ROOT / '.build').mkdir(exist_ok=True)
+        write_json(ROOT / '.build/next-tasks.json', {'at': now(), 'phase': state.get('phase'), 'tasks': tasks})
+    except OSError: pass
     write_summary(ctx)
     return state, tasks, info
 
