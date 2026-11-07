@@ -208,7 +208,7 @@ def main():
     # Native library sources that may be statically linked by the official builds.
     for version in ("1.2.13", "1.3.1", "1.3.2"):
         source_manifest.append(source(shared, f"https://zlib.net/fossils/zlib-{version}.tar.gz", f"zlib-{version}.tar.gz"))
-    source_manifest.append(source(shared, "https://gmplib.org/download/gmp/gmp-6.3.0.tar.xz", "gmp-6.3.0.tar.xz"))
+    source_manifest.append(source(shared, "https://ftp.gnu.org/gnu/gmp/gmp-6.3.0.tar.xz", "gmp-6.3.0.tar.xz"))
     source_manifest.append(source(shared, f"https://codeload.github.com/astral-sh/python-build-standalone/tar.gz/refs/tags/{PBS}", f"python-build-standalone-{PBS}.tar.gz"))
     # CLI LICENSE/NOTICE alone do not cover the linked Rust crates' notices.
     typst_url = f'https://codeload.github.com/typst/typst/tar.gz/refs/tags/v{TYPST}'
